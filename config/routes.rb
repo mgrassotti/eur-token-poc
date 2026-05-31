@@ -16,6 +16,11 @@ Rails.application.routes.draw do
     resource :settlement, only: %i[new create], controller: "settlements"
   end
 
+  namespace :admin do
+    resource :demo_reset, only: :create
+    resource :market_rate, only: :update
+  end
+
   if Rails.env.development?
     namespace :dev do
       post "user_switch", to: "user_switches#create"

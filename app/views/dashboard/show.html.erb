@@ -1,38 +1,124 @@
-<h1 class="h3 mb-4">Dashboard</h1>
+<% if admin? %><span class="badge text-bg-info mb-4 d-inline-block">Admin</span><% end %>
 
+<% if admin? %>
+  <div class="card mb-4 border-info">
+    <div class="card-header bg-info-subtle">Pannello admin</div>
+    <div class="card-body">
+      <h2 class="h6">Cambio BTC/€ corrente</h2>
+      <%= form_with url: admin_market_rate_path, method: :patch, class: "row g-2 align-items-end mb-4" do %>
+        <div class="col-auto">
+          <%= label_tag :btc_eur_per_btc, "€/BTC", class: "form-label" %>
+          <%= number_field_tag :btc_eur_per_btc,
+            @market_rate.btc_eur_per_btc || 60_000,
+            class: "form-control form-control-sm",
+            step: 0.01,
+            min: 0.01,
+            required: true %>
+        </div>
+        <div class="col-auto">
+          <%= submit_tag "Aggiorna cambio", class: "btn btn-sm btn-info" %>
+        </div>
+      <% end %>
+      <% if @market_rate.set? %>
+        <p class="text-muted small mb-4">Cambio attuale: <strong><%= number_with_delimiter(@market_rate.btc_eur_per_btc) %> €/BTC</strong></p>
+      <% end %>
+
+      <% if @active_budgets.any? %>
+        <h2 class="h6">Budget attivi — settlement</h2>
+        <ul class="list-group mb-4">
+          <% @active_budgets.each do |budget| %>
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+              <span>#<%= budget.id %> — peg <%= number_with_delimiter(budget.peg_eur_per_btc) %> €/BTC</span>
+              <%= link_to "Settlement", new_budget_settlement_path(budget), class: "btn btn-sm btn-danger" %>
+            </li>
+          <% end %>
+        </ul>
+      <% elsif @market_rate.set? %>
+        <p class="text-muted mb-4">Nessun budget attivo in attesa di settlement.</p>
+      <% end %>
+
+      <% unless @market_rate.set? %>
+        <p class="text-muted mb-4">Imposta il cambio corrente per abilitare l'attivazione dei budget.</p>
+      <% end %>
+
+      <hr>
+      <h2 class="h6">Reset demo</h2>
+      <p class="text-muted small">Cancella budget, token e settlement. Imposta Alice a 0.1 BTC, Bob a 0.2 BTC, gli altri a 0.</p>
+      <%= button_to "Reset demo DB",
+        admin_demo_reset_path,
+        method: :post,
+        class: "btn btn-outline-danger btn-sm",
+        data: { turbo_confirm: "Confermi il reset? Tutti i budget e i token verranno eliminati." } %>
+    </div>
+  </div>
+<% end %>
+
+<% unless admin? %>
 <div class="row g-4 mb-4">
   <div class="col-md-4">
     <div class="card h-100">
       <div class="card-body">
-        <h2 class="h6 text-muted">Saldo BTC</h2>
-        <p class="display-6 mb-0"><%= format_sats(current_user.balance_sats) %></p>
+        <h2 class="h6 text-muted">Conto risparmio</h2>
+        <% if @savings_eur.present? %>
+          <p class="display-6 mb-1"><%= format_savings_eur(@savings_eur) %></p>
+          <p class="text-muted mb-0">= <%= format_sats(current_user.balance_sats) %></p>
+        <% else %>
+          <p class="display-6 mb-1"><%= format_sats(current_user.balance_sats) %></p>
+          <p class="text-muted small mb-0">Cambio BTC/€ non impostato dall'admin.</p>
+        <% end %>
       </div>
     </div>
   </div>
-  <div class="col-md-8">
+  <div class="col-md-4">
     <div class="card h-100">
       <div class="card-body">
-        <h2 class="h6 text-muted">Token EUR (EURT)</h2>
-        <% if @token_accounts.any? %>
-          <ul class="list-group list-group-flush">
-            <% @token_accounts.each do |account| %>
-              <li class="list-group-item d-flex justify-content-between px-0">
-                <span>Budget #<%= account.budget_id %></span>
-                <strong><%= format_eur(account.balance_cents) %></strong>
-              </li>
-            <% end %>
-          </ul>
+        <h2 class="h6 text-muted">Conto spesa</h2>
+        <% if @spending_budget_total_cents.positive? %>
+          <p class="display-6 mb-1"><%= format_eur(@spending_budget_total_cents) %></p>
+          <% @spending_budgets.each do |budget| %>
+            <p class="text-muted mb-0">Scadenza: <%= l(budget.period_end, format: :long) %></p>
+          <% end %>
         <% else %>
-          <p class="mb-0 text-muted">Nessun token in circolazione.</p>
+          <p class="mb-0 text-muted">Nessun saldo sul conto spesa.</p>
+        <% end %>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <h2 class="h6 text-muted">Conto investimento</h2>
+        <% if @investment_sats.positive? %>
+          <% if @investment_eur.present? %>
+            <p class="display-6 mb-1"><%= format_savings_eur(@investment_eur) %></p>
+            <p class="text-muted mb-1">= <%= format_sats(@investment_sats) %></p>
+          <% else %>
+            <p class="display-6 mb-1"><%= format_sats(@investment_sats) %></p>
+          <% end %>
+          <% @investment_budgets.each do |budget| %>
+            <p class="text-muted small mb-0">Scadenza: <%= l(budget.period_end, format: :long) %></p>
+          <% end %>
+        <% else %>
+          <p class="mb-0 text-muted">Nessun collateral attivo.</p>
         <% end %>
       </div>
     </div>
   </div>
 </div>
+<% end %>
 
 <div class="d-flex gap-2 mb-4">
-  <%= link_to "Nuovo budget", new_budget_path, class: "btn btn-primary" %>
-  <%= link_to "Tutti i budget", budgets_path, class: "btn btn-outline-secondary" %>
+  <% unless admin? %>
+    <%= link_to "Aggiungi budget spesa", new_budget_path, class: "btn btn-primary" %>
+    <% if @transfer_budget %>
+      <%= link_to "Invia Denaro", new_budget_token_transfer_path(@transfer_budget), class: "btn btn-outline-primary" %>
+    <% else %>
+      <span class="btn btn-outline-secondary disabled" aria-disabled="true">Invia Denaro</span>
+    <% end %>
+  <% end %>
+  <% if admin? %>
+    <%= link_to "Tutti i budget", budgets_path, class: "btn btn-outline-secondary" %>
+  <% end %>
 </div>
 
 <% if @investable_budgets.any? %>
@@ -45,6 +131,7 @@
             <th>Richiedente</th>
             <th>Importo</th>
             <th>Collateral</th>
+            <th>Cambio attuale</th>
             <th>Periodo</th>
             <th></th>
           </tr>
@@ -55,6 +142,7 @@
               <td><%= budget.borrower.name %></td>
               <td><%= format_eur(budget.amount_eur_cents) %></td>
               <td><%= format_eur(budget.collateral_eur_cents) %></td>
+              <td><%= @market_rate.set? ? number_with_delimiter(@market_rate.btc_eur_per_btc) : "—" %></td>
               <td><%= budget.period_start %> – <%= budget.period_end %></td>
               <td><%= link_to "Dettagli", budget, class: "btn btn-sm btn-outline-primary" %></td>
             </tr>
@@ -65,6 +153,7 @@
   </div>
 <% end %>
 
+<% unless admin? %>
 <div class="card">
   <div class="card-header">I miei budget</div>
   <div class="table-responsive">
@@ -92,3 +181,4 @@
     </table>
   </div>
 </div>
+<% end %>

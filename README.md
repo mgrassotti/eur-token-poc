@@ -1,4 +1,4 @@
-# EUR Token PoC
+# BTC wallet PoC
 
 Proof-of-concept Rails per budget di spesa mensili in token EUR-pegged, collateralizzati in BTC da un investitore che assume il rischio di cambio.
 
@@ -13,12 +13,13 @@ bin/rails server
 
 Apri http://localhost:3000 e accedi con:
 
-| Utente | Email | Password |
-|--------|-------|----------|
-| Alice | alice@example.com | password |
-| Bob | bob@example.com | password |
-| Claude | claude@example.com | password |
-| David | david@example.com | password |
+| Utente | Email | Password | Ruolo |
+|--------|-------|----------|-------|
+| Admin | admin@example.com | password | Imposta peg e settlement |
+| Alice | alice@example.com | password | Borrower |
+| Bob | bob@example.com | password | Investor |
+| Claude | claude@example.com | password | — |
+| David | david@example.com | password | — |
 
 In development puoi usare il dropdown **Switch** nella navbar per cambiare utente rapidamente.
 
@@ -28,19 +29,25 @@ In development puoi usare il dropdown **Switch** nella navbar per cambiare utent
 
 - **Alice**: 0.1 BTC (10_000_000 sats) in risparmio — non usato dal budget
 - **Bob**: 0.05 BTC (5_000_000 sats)
-- Budget **pending** da 1000 EUR con collateral 2000 EUR
+- Budget **pending** da 1000 EUR con collateral 2000 EUR (peg **non** impostato)
 
-### 1. Attivazione budget (Bob)
+### 1. Imposta peg (Admin)
 
-1. Login come **Bob**
+1. Login come **Admin**
+2. Dashboard → pannello admin → budget in attesa di peg → **Imposta peg**
+3. Conferma peg **60_000 EUR/BTC**
+
+### 2. Attivazione budget (Bob)
+
+1. Switch **Bob**
 2. Dashboard → budget in attesa → **Dettagli**
-3. Imposta peg **60_000 EUR/BTC** → **Accetta rischio e attiva budget**
+3. **Accetta rischio e attiva budget** (usa il peg fissato dall'admin)
 
 Il sistema:
 - Blocca ~3_333_333 sats da Bob (2000 EUR @ 60k)
 - Mint 1000 EURT ad Alice
 
-### 2. Spesa token (Alice → Claude → David)
+### 3. Spesa token (Alice → Claude → David)
 
 1. Switch **Alice** → budget attivo → **Trasferisci token**
 2. Invia 300 EUR a Claude
@@ -48,11 +55,12 @@ Il sistema:
 
 Saldi attesi: Alice 700, Claude 200, David 100 EURT.
 
-### 3. Settlement fine mese
+### 4. Settlement fine mese (Admin)
 
-1. Apri il budget attivo → **Settlement fine mese**
-2. Inserisci prezzo BTC finale (es. 70_000 o 50_000 EUR/BTC)
-3. **Esegui settlement**
+1. Switch **Admin**
+2. Dashboard → pannello admin → **Settlement** (o apri il budget attivo)
+3. Inserisci prezzo BTC finale (es. 70_000 o 50_000 EUR/BTC)
+4. **Esegui settlement**
 
 Il sistema:
 - Brucia i token
@@ -86,13 +94,15 @@ bundle exec rspec
 ## Console walkthrough
 
 ```ruby
+admin = User.find_by!(email: "admin@example.com")
 alice = User.find_by!(email: "alice@example.com")
 bob = User.find_by!(email: "bob@example.com")
 claude = User.find_by!(email: "claude@example.com")
 david = User.find_by!(email: "david@example.com")
 
 budget = Budget.pending.first
-Budgets::ActivateService.call(budget: budget, investor: bob, peg_eur_per_btc: 60_000)
+Budgets::SetPegService.call(budget: budget, peg_eur_per_btc: 60_000)
+Budgets::ActivateService.call(budget: budget, investor: bob)
 
 Tokens::TransferService.call(budget: budget, from_user: alice, to_user: claude, amount_cents: 30_000)
 Tokens::TransferService.call(budget: budget, from_user: claude, to_user: david, amount_cents: 10_000)

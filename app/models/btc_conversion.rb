@@ -15,8 +15,25 @@ module BtcConversion
     eur_cents_to_sats(token_cents, peg_eur_per_btc)
   end
 
+  # Returns [holder_sats, fx_to_investor_sats] for settlement.
+  def settlement_holder_sats(token_cents, peg_eur_per_btc, end_eur_per_btc)
+    peg_sats = token_cents_to_sats(token_cents, peg_eur_per_btc)
+    current_sats = token_cents_to_sats(token_cents, end_eur_per_btc)
+    fx_to_investor_sats = (peg_sats - current_sats).abs
+
+    [current_sats, fx_to_investor_sats]
+  end
+
   def sats_to_btc(sats)
     sats.to_d / SATS_PER_BTC
+  end
+
+  def sats_to_eur(sats, eur_per_btc)
+    sats_to_btc(sats) * eur_per_btc.to_d
+  end
+
+  def format_eur_amount(amount)
+    format("€%.2f", amount)
   end
 
   def format_btc(sats)
@@ -24,6 +41,6 @@ module BtcConversion
   end
 
   def format_eur(cents)
-    format("%.2f EUR", cents / 100.0)
+    format("€%.2f", cents / 100.0)
   end
 end

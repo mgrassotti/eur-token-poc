@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_31_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_31_170000) do
   create_table "btc_accounts", force: :cascade do |t|
     t.bigint "balance_sats", default: 0, null: false
     t.datetime "created_at", null: false
@@ -22,9 +22,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_31_130000) do
   create_table "budgets", force: :cascade do |t|
     t.integer "amount_eur_cents", null: false
     t.integer "borrower_id", null: false
+    t.bigint "borrower_locked_sats", default: 0, null: false
     t.integer "collateral_eur_cents", null: false
     t.datetime "created_at", null: false
     t.integer "investor_id"
+    t.bigint "investor_locked_sats", default: 0, null: false
     t.decimal "peg_eur_per_btc", precision: 16, scale: 2
     t.date "period_end", null: false
     t.date "period_start", null: false
@@ -41,6 +43,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_31_130000) do
     t.datetime "locked_at", null: false
     t.datetime "updated_at", null: false
     t.index ["budget_id"], name: "index_collateral_locks_on_budget_id", unique: true
+  end
+
+  create_table "market_rates", force: :cascade do |t|
+    t.decimal "btc_eur_per_btc", precision: 16, scale: 2
+    t.datetime "created_at", null: false
+    t.integer "set_by_id"
+    t.datetime "updated_at", null: false
+    t.index ["set_by_id"], name: "index_market_rates_on_set_by_id"
   end
 
   create_table "settlements", force: :cascade do |t|
@@ -78,6 +88,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_31_130000) do
   end
 
   create_table "users", force: :cascade do |t|
+    t.boolean "admin", default: false, null: false
     t.datetime "created_at", null: false
     t.string "email", null: false
     t.string "name", null: false
@@ -90,6 +101,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_31_130000) do
   add_foreign_key "budgets", "users", column: "borrower_id"
   add_foreign_key "budgets", "users", column: "investor_id"
   add_foreign_key "collateral_locks", "budgets"
+  add_foreign_key "market_rates", "users", column: "set_by_id"
   add_foreign_key "settlements", "budgets"
   add_foreign_key "token_accounts", "budgets"
   add_foreign_key "token_accounts", "users"

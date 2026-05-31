@@ -3,20 +3,28 @@
 <div class="card mb-4">
   <div class="card-header">Riepilogo</div>
   <div class="card-body">
-    <p>Prezzo BTC fine mese: <strong><%= number_with_delimiter(@result.end_btc_eur_rate) %> EUR/BTC</strong></p>
-    <p>Peg al mint: <strong><%= number_with_delimiter(@budget.peg_eur_per_btc) %> EUR/BTC</strong></p>
+    <p>Peg iniziale budget: <strong><%= number_with_delimiter(@result.peg_eur_per_btc) %> €/BTC</strong></p>
+    <p>Cambio corrente (fine mese): <strong><%= number_with_delimiter(@result.end_btc_eur_rate) %> €/BTC</strong></p>
+    <% if @result.total_fx_to_investor_sats.positive? %>
+      <p class="mb-0 text-muted">Differenza FX totale trasferita dai detentori → investitore: <strong><%= format_sats(@result.total_fx_to_investor_sats) %></strong></p>
+    <% else %>
+      <p class="mb-0 text-muted">Cambio uguale al peg: nessun aggiustamento FX.</p>
+    <% end %>
   </div>
 </div>
 
 <div class="card mb-4">
-  <div class="card-header">Payout detentori token (burn + BTC al peg)</div>
+  <div class="card-header">Detentori token</div>
   <div class="table-responsive">
     <table class="table mb-0">
       <thead>
         <tr>
           <th>Utente</th>
           <th>Token bruciati</th>
-          <th>BTC ricevuti</th>
+          <th>Al peg</th>
+          <th>Al cambio corrente</th>
+          <th>BTC accreditati</th>
+          <th>FX → investitore</th>
         </tr>
       </thead>
       <tbody>
@@ -24,7 +32,10 @@
           <tr>
             <td><%= payout.user.name %></td>
             <td><%= format_eur(payout.token_cents) %></td>
+            <td><%= format_sats(payout.peg_sats) %></td>
+            <td><%= format_sats(payout.current_sats) %></td>
             <td><%= format_sats(payout.btc_sats) %></td>
+            <td><%= payout.fx_to_investor_sats.positive? ? format_sats(payout.fx_to_investor_sats) : "—" %></td>
           </tr>
         <% end %>
       </tbody>
@@ -33,12 +44,11 @@
 </div>
 
 <div class="card mb-4 border-warning">
-  <div class="card-header bg-warning-subtle">Investor (rischio FX)</div>
+  <div class="card-header bg-warning-subtle">Investitore</div>
   <div class="card-body">
-    <p><%= @result.investor.name %> riceve il collateral residuo:</p>
-    <p class="display-6"><%= format_sats(@result.investor_btc_sats) %></p>
-    <% eur_value = (@result.investor_btc_sats / 100_000_000.0) * @result.end_btc_eur_rate.to_f %>
-    <p class="text-muted">Valore al prezzo fine mese: <%= number_to_currency(eur_value, unit: "€", format: "%n %u") %></p>
+    <p><%= @result.investor.name %> riceve il collateral residuo (inclusa la differenza FX):</p>
+    <p class="display-6 mb-1"><%= format_sats(@result.investor_btc_sats) %></p>
+    <p class="text-muted mb-0">Valore al cambio corrente: <%= format_savings_eur(@result.investor_eur_at_end) %></p>
   </div>
 </div>
 

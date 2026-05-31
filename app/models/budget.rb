@@ -20,8 +20,7 @@ class Budget < ApplicationRecord
 
   before_validation :set_default_collateral, on: :create
 
-  scope :awaiting_investor, -> { pending.where(investor_id: nil).where.not(peg_eur_per_btc: nil) }
-  scope :awaiting_peg, -> { pending.where(peg_eur_per_btc: nil) }
+  scope :awaiting_investor, -> { pending.where(investor_id: nil) }
 
   def peg_set?
     peg_eur_per_btc.present? && peg_eur_per_btc.positive?
@@ -46,7 +45,9 @@ class Budget < ApplicationRecord
   private
 
   def set_default_collateral
-    self.collateral_eur_cents ||= amount_eur_cents * COLLATERAL_MULTIPLIER
+    return if amount_eur_cents.blank?
+
+    self.collateral_eur_cents = amount_eur_cents * COLLATERAL_MULTIPLIER
   end
 
   def period_end_after_start

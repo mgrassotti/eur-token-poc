@@ -1,14 +1,17 @@
 <h1 class="h3 mb-4">Settlement fine mese</h1>
 
-<p class="text-muted">Budget #<%= @budget.id %> — brucia i token e ridistribuisce BTC ai detentori al peg fisso.</p>
+<p class="text-muted">Budget #<%= @budget.id %> — brucia i token e ridistribuisce BTC in base al peg iniziale e al cambio corrente.</p>
 
 <div class="card">
   <div class="card-body">
     <%= form_with url: budget_settlement_path(@budget), method: :post do %>
       <div class="mb-3">
-        <%= label_tag :end_btc_eur_rate, "Prezzo BTC/EUR a fine mese", class: "form-label" %>
+        <%= label_tag :end_btc_eur_rate, "Prezzo BTC/€ a fine mese", class: "form-label" %>
         <%= number_field_tag :end_btc_eur_rate, 60_000, class: "form-control", step: 0.01, min: 0.01, required: true %>
-        <div class="form-text">Usato per registrare il rischio FX di <%= @budget.investor.name %>. I detentori ricevono BTC al peg <%= number_with_delimiter(@budget.peg_eur_per_btc) %> EUR/BTC.</div>
+        <div class="form-text">
+          Cambio corrente a fine mese (peg budget: <%= number_with_delimiter(@budget.peg_eur_per_btc) %> €/BTC).
+          Se diverso dal peg, la differenza FX sui token va all'investitore <%= @budget.investor.name %>.
+        </div>
       </div>
       <%= submit_tag "Esegui settlement", class: "btn btn-danger", data: { turbo_confirm: "Confermi il settlement? I token verranno bruciati." } %>
       <%= link_to "Annulla", @budget, class: "btn btn-link" %>

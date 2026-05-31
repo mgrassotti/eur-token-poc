@@ -6,11 +6,21 @@ RSpec.describe Tokens::TransferService do
   let(:alice) { create(:user) }
   let(:bob) { create(:user) }
   let(:claude) { create(:user) }
-  let(:budget) { create(:budget, borrower: alice) }
+
+  let!(:budget) do
+    alice.btc_account.update!(balance_sats: 10_000_000)
+    MarketRate.current.update!(btc_eur_per_btc: 60_000)
+    Budgets::CreateService.call(
+      borrower: alice,
+      amount_eur_cents: 100_000,
+      period_start: Date.current,
+      period_end: Date.current + 1.month
+    )
+  end
 
   before do
     bob.btc_account.update!(balance_sats: 5_000_000)
-    Budgets::ActivateService.call(budget: budget, investor: bob, peg_eur_per_btc: 60_000)
+    Budgets::ActivateService.call(budget: budget, investor: bob)
   end
 
   it "transfers tokens between users" do

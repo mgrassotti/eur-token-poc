@@ -9,6 +9,10 @@ module ApplicationHelper
     BtcConversion.format_eur(cents)
   end
 
+  def format_savings_eur(amount)
+    BtcConversion.format_eur_amount(amount)
+  end
+
   def budget_status_badge(budget)
     color = { "pending" => "warning", "active" => "success", "settled" => "secondary" }[budget.status]
     tag.span budget.status.titleize, class: "badge text-bg-#{color}"

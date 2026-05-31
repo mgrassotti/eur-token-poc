@@ -25,6 +25,7 @@ RSpec.describe Budgets::ActivateService do
     peg = 60_000
     bob_collateral_sats = budget.collateral_sats_at_peg(peg)
     starting_bob_sats = bob.balance_sats
+    alice_sats_after_create = alice.btc_account.balance_sats
 
     described_class.call(budget: budget, investor: bob)
 
@@ -32,6 +33,7 @@ RSpec.describe Budgets::ActivateService do
     expect(budget.peg_eur_per_btc).to eq(peg)
     expect(budget.collateral_lock.amount_sats).to eq(bob_collateral_sats + budget.borrower_locked_sats)
     expect(budget.investor_locked_sats).to eq(bob_collateral_sats)
+    expect(alice.btc_account.reload.balance_sats).to eq(alice_sats_after_create)
     expect(bob.btc_account.reload.balance_sats).to eq(starting_bob_sats - bob_collateral_sats)
     expect(alice.token_accounts.find_by(budget: budget).balance_cents).to eq(100_000)
   end

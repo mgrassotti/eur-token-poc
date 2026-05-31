@@ -6,12 +6,14 @@ class SettlementsController < ApplicationController
   before_action :set_budget
 
   def new
+    @market_rate = MarketRate.current
   end
 
   def create
     @result = Settlements::ExecuteService.call(
       budget: @budget,
-      end_btc_eur_rate: params[:end_btc_eur_rate]
+      end_btc_eur_rate: params[:end_btc_eur_rate],
+      set_by: current_user
     )
     render :show
   rescue Settlements::ExecuteService::Error => e

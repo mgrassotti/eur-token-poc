@@ -7,10 +7,20 @@
     <%= form_with url: budget_settlement_path(@budget), method: :post do %>
       <div class="mb-3">
         <%= label_tag :end_btc_eur_rate, "Prezzo BTC/€ a fine mese", class: "form-label" %>
-        <%= number_field_tag :end_btc_eur_rate, 60_000, class: "form-control", step: 0.01, min: 0.01, required: true %>
+        <%= number_field_tag :end_btc_eur_rate,
+          @market_rate.btc_eur_per_btc || 60_000,
+          class: "form-control",
+          step: 0.01,
+          min: 0.01,
+          required: true %>
         <div class="form-text">
           Cambio corrente a fine mese (peg budget: <%= number_with_delimiter(@budget.peg_eur_per_btc) %> €/BTC).
-          Se diverso dal peg, la differenza FX sui token va all'investitore <%= @budget.investor.name %>.
+          <% if @market_rate.set? %>
+            Cambio attuale in dashboard: <%= number_with_delimiter(@market_rate.btc_eur_per_btc) %> €/BTC —
+            se modifichi il valore, verrà aggiornato anche il cambio corrente.
+          <% end %>
+          I detentori ricevono BTC al cambio corrente; <%= @budget.borrower.name %> recupera il collateral iniziale;
+          il residuo (con rischio FX) va a <%= @budget.investor.name %>.
         </div>
       </div>
       <%= submit_tag "Esegui settlement", class: "btn btn-danger", data: { turbo_confirm: "Confermi il settlement? I token verranno bruciati." } %>

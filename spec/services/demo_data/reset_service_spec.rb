@@ -34,4 +34,20 @@ RSpec.describe DemoData::ResetService do
     expect(admin.btc_account.reload.balance_sats).to eq(0)
     expect(MarketRate.current.btc_eur_per_btc).to eq(60_000)
   end
+
+  it "creates demo users when they are missing" do
+    Settlement.delete_all
+    TokenTransfer.delete_all
+    TokenAccount.delete_all
+    CollateralLock.delete_all
+    Budget.delete_all
+    MarketRate.update_all(set_by_id: nil)
+    BtcAccount.delete_all
+    User.delete_all
+
+    described_class.call
+
+    expect(User.count).to eq(DemoData::ResetService::DEMO_USERS.size)
+    expect(User.find_by!(email: "alice@example.com").btc_account.balance_sats).to eq(10_000_000)
+  end
 end

@@ -14,14 +14,15 @@ module Settlements
       :eur_at_peg
     )
 
-    def self.call(budget:, end_btc_eur_rate:)
-      new(budget:, end_btc_eur_rate:).call
+    def self.call(budget:, end_btc_eur_rate:, set_by: nil)
+      new(budget:, end_btc_eur_rate:, set_by:).call
     end
 
-    def initialize(budget:, end_btc_eur_rate:)
+    def initialize(budget:, end_btc_eur_rate:, set_by: nil)
       @budget = budget
       @end_btc_eur_rate = end_btc_eur_rate.to_d
       @peg_eur_per_btc = budget.peg_eur_per_btc.to_d
+      @set_by = set_by
     end
 
     def call
@@ -29,6 +30,7 @@ module Settlements
 
       payouts = []
       total_holders_sats = 0
+      total_peg_sats = 0
       total_fx_to_investor_sats = 0
 
       ActiveRecord::Base.transaction do
@@ -49,14 +51,20 @@ module Settlements
 
           token_account.update!(balance_cents: 0)
           total_holders_sats += holder_sats
+          total_peg_sats += peg_sats
           total_fx_to_investor_sats += fx_to_investor_sats
         end
 
-        borrower_return_sats = budget.borrower_locked_sats
         collateral = budget.collateral_lock.lock!
-        investor_payout_sats = collateral.amount_sats - total_holders_sats - borrower_return_sats
+        borrower_return_sats, investor_payout_sats = settlement_payouts(
+          collateral_sats: collateral.amount_sats,
+          total_holders_sats: total_holders_sats,
+          total_peg_sats: total_peg_sats,
+          total_fx_to_investor_sats: total_fx_to_investor_sats
+        )
 
         raise Error, "Collateral insufficient for token redemptions" if investor_payout_sats.negative?
+        raise Error, "Borrower return exceeds locked collateral" if borrower_return_sats.negative?
 
         borrower_btc = budget.borrower.btc_account.lock!
         borrower_btc.update!(balance_sats: borrower_btc.balance_sats + borrower_return_sats)
@@ -74,6 +82,8 @@ module Settlements
 
         budget.update!(status: :settled)
 
+        market_rate_updated = update_market_rate!
+
         Result.new(
           settlement: settlement,
           payouts: payouts,
@@ -84,7 +94,8 @@ module Settlements
           total_fx_to_investor_sats: total_fx_to_investor_sats,
           investor_eur_at_end: BtcConversion.sats_to_eur(investor_payout_sats, end_btc_eur_rate),
           peg_eur_per_btc: peg_eur_per_btc,
-          end_btc_eur_rate: end_btc_eur_rate
+          end_btc_eur_rate: end_btc_eur_rate,
+          market_rate_updated: market_rate_updated
         )
       end
     end
@@ -99,12 +110,13 @@ module Settlements
       :total_fx_to_investor_sats,
       :investor_eur_at_end,
       :peg_eur_per_btc,
-      :end_btc_eur_rate
+      :end_btc_eur_rate,
+      :market_rate_updated
     )
 
     private
 
-    attr_reader :budget, :end_btc_eur_rate, :peg_eur_per_btc
+    attr_reader :budget, :end_btc_eur_rate, :peg_eur_per_btc, :set_by
 
     def holder_payout(token_cents)
       peg_sats = BtcConversion.token_cents_to_sats(token_cents, peg_eur_per_btc)
@@ -115,11 +127,37 @@ module Settlements
       [peg_sats, current_sats, holder_sats, fx_to_investor_sats]
     end
 
+    def settlement_payouts(collateral_sats:, total_holders_sats:, total_peg_sats:, total_fx_to_investor_sats:)
+      borrower_locked_sats = budget.borrower_locked_sats
+      investor_locked_sats = budget.investor_locked_sats
+      fx_surplus_sats = [total_peg_sats - total_holders_sats, 0].max
+
+      if fx_surplus_sats.positive?
+        investor_payout_sats = investor_locked_sats + fx_surplus_sats
+        borrower_return_sats = borrower_locked_sats - total_peg_sats
+      else
+        borrower_return_sats = borrower_locked_sats
+        investor_payout_sats = collateral_sats - total_holders_sats - borrower_return_sats
+      end
+
+      [borrower_return_sats, investor_payout_sats]
+    end
+
     def validate!
       raise Error, "Budget is not active" unless budget.active?
       raise Error, "End BTC/EUR rate must be positive" unless end_btc_eur_rate.positive?
       raise Error, "Budget peg is missing" unless budget.peg_set?
       raise Error, "Budget already settled" if budget.settlement.present?
+    end
+
+    def update_market_rate!
+      return false unless set_by
+
+      market_rate = MarketRate.current
+      return false if market_rate.btc_eur_per_btc.to_d == end_btc_eur_rate
+
+      market_rate.update!(btc_eur_per_btc: end_btc_eur_rate, set_by: set_by)
+      true
     end
   end
 end

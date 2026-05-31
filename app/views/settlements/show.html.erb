@@ -5,16 +5,19 @@
   <div class="card-body">
     <p>Peg iniziale budget: <strong><%= number_with_delimiter(@result.peg_eur_per_btc) %> €/BTC</strong></p>
     <p>Cambio corrente (fine mese): <strong><%= number_with_delimiter(@result.end_btc_eur_rate) %> €/BTC</strong></p>
+    <% if @result.market_rate_updated %>
+      <p class="text-success mb-0">Cambio BTC/€ in dashboard aggiornato a fine settlement.</p>
+    <% end %>
     <% if @result.total_fx_to_investor_sats.positive? %>
-      <p class="mb-0 text-muted">Differenza FX totale trasferita dai detentori → investitore: <strong><%= format_sats(@result.total_fx_to_investor_sats) %></strong></p>
+      <p class="mb-0 text-muted">Differenza FX totale sui token (peg vs cambio corrente): <strong><%= format_sats(@result.total_fx_to_investor_sats) %></strong></p>
     <% else %>
-      <p class="mb-0 text-muted">Cambio uguale al peg: nessun aggiustamento FX.</p>
+      <p class="mb-0 text-muted">Cambio uguale al peg: nessun aggiustamento FX sui token.</p>
     <% end %>
   </div>
 </div>
 
 <div class="card mb-4">
-  <div class="card-header">Detentori token</div>
+  <div class="card-header">Detentori token — BTC al cambio corrente</div>
   <div class="table-responsive">
     <table class="table mb-0">
       <thead>
@@ -43,10 +46,18 @@
   </div>
 </div>
 
-<div class="card mb-4 border-warning">
-  <div class="card-header bg-warning-subtle">Investitore</div>
+<div class="card mb-4">
+  <div class="card-header">Borrower — restituzione collateral iniziale</div>
   <div class="card-body">
-    <p><%= @result.investor.name %> riceve il collateral residuo (inclusa la differenza FX):</p>
+    <p><%= @result.borrower.name %> riceve il BTC bloccati alla attivazione:</p>
+    <p class="display-6 mb-0"><%= format_sats(@result.borrower_btc_sats) %></p>
+  </div>
+</div>
+
+<div class="card mb-4 border-warning">
+  <div class="card-header bg-warning-subtle">Investitore — residuo collateral</div>
+  <div class="card-body">
+    <p><%= @result.investor.name %> riceve il collateral residuo (include l'effetto FX sui token):</p>
     <p class="display-6 mb-1"><%= format_sats(@result.investor_btc_sats) %></p>
     <p class="text-muted mb-0">Valore al cambio corrente: <%= format_savings_eur(@result.investor_eur_at_end) %></p>
   </div>

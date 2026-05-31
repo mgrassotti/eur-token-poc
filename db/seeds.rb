@@ -2,15 +2,7 @@
 
 password = "password"
 
-users = {
-  admin: { name: "Admin", email: "admin@example.com", sats: 0, admin: true },
-  alice: { name: "Alice", email: "alice@example.com", sats: 10_000_000, admin: false },
-  bob: { name: "Bob", email: "bob@example.com", sats: 20_000_000, admin: false },
-  claude: { name: "Claude", email: "claude@example.com", sats: 0, admin: false },
-  david: { name: "David", email: "david@example.com", sats: 0, admin: false }
-}
-
-records = users.transform_values do |attrs|
+records = DemoData::ResetService::DEMO_USERS.to_h do |attrs|
   user = User.find_or_initialize_by(email: attrs[:email])
   user.assign_attributes(
     name: attrs[:name],
@@ -20,7 +12,7 @@ records = users.transform_values do |attrs|
   )
   user.save!
   user.btc_account.update!(balance_sats: attrs[:sats])
-  user
+  [attrs[:email].split("@").first.to_sym, user]
 end
 
 alice = records[:alice]

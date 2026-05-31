@@ -10,11 +10,12 @@ class DashboardController < ApplicationController
     @investment_sats = current_user.invested_budgets.active.sum(:investor_locked_sats)
     @investment_budgets = current_user.invested_budgets.active.where("investor_locked_sats > 0").order(:period_end)
     @investment_eur = savings_eur_value(@investment_sats, @market_rate)
+    @savings_sats = current_user.balance_sats
     @transfer_budget = transferable_budget_for(current_user)
     @borrowed_budgets = current_user.borrowed_budgets.order(created_at: :desc)
     @pending_budgets = Budget.awaiting_investor.order(created_at: :desc)
     @investable_budgets = @pending_budgets.reject { |b| b.borrower_id == current_user.id }
-    @savings_eur = savings_eur_value(current_user.balance_sats, @market_rate)
+    @savings_eur = savings_eur_value(@savings_sats, @market_rate)
 
     return unless admin?
 

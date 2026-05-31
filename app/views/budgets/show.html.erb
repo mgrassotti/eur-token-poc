@@ -119,7 +119,8 @@
       <p>Cambio corrente fine mese: <strong><%= number_with_delimiter(s.end_btc_eur_rate) %> €/BTC</strong></p>
       <p>Peg budget: <strong><%= number_with_delimiter(@budget.peg_eur_per_btc) %> €/BTC</strong></p>
       <p>BTC ai detentori token: <strong><%= format_sats(s.total_btc_to_holders_sats) %></strong></p>
-      <p>BTC a <%= @budget.investor.name %> (residuo + FX): <strong><%= format_sats(s.btc_to_investor_sats) %></strong></p>
+      <p>BTC restituiti a <%= @budget.borrower.name %>: <strong><%= format_sats(@budget.borrower_locked_sats) %></strong></p>
+      <p>BTC a <%= @budget.investor.name %>: <strong><%= format_sats(s.btc_to_investor_sats) %></strong></p>
     </div>
   </div>
 <% end %>

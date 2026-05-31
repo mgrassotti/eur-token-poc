@@ -20,8 +20,9 @@ module BtcConversion
     peg_sats = token_cents_to_sats(token_cents, peg_eur_per_btc)
     current_sats = token_cents_to_sats(token_cents, end_eur_per_btc)
     fx_to_investor_sats = (peg_sats - current_sats).abs
+    holder_sats = current_sats
 
-    [current_sats, fx_to_investor_sats]
+    [holder_sats, fx_to_investor_sats]
   end
 
   def sats_to_btc(sats)

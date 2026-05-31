@@ -61,7 +61,7 @@
         <h2 class="h6 text-muted">Conto risparmio</h2>
         <% if @savings_eur.present? %>
           <p class="display-6 mb-1"><%= format_savings_eur(@savings_eur) %></p>
-          <p class="text-muted mb-0">= <%= format_sats(current_user.balance_sats) %></p>
+          <p class="text-muted mb-0">= <%= format_sats(@savings_sats) %></p>
         <% else %>
           <p class="display-6 mb-1"><%= format_sats(current_user.balance_sats) %></p>
           <p class="text-muted small mb-0">Cambio BTC/€ non impostato dall'admin.</p>

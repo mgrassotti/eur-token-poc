@@ -1,0 +1,41 @@
+<h1 class="h3 mb-4">Nuovo budget mensile</h1>
+
+<div class="card">
+  <div class="card-body">
+    <%= form_with model: @budget, url: budgets_path do |f| %>
+      <% if @budget.errors.any? %>
+        <div class="alert alert-danger">
+          <ul class="mb-0">
+            <% @budget.errors.full_messages.each do |message| %>
+              <li><%= message %></li>
+            <% end %>
+          </ul>
+        </div>
+      <% end %>
+
+      <div class="mb-3">
+        <%= f.label :amount_eur, "Importo budget (EUR)", class: "form-label" %>
+        <%= f.number_field :amount_eur, value: @budget.amount_eur_cents ? @budget.amount_eur : 1000, class: "form-control", step: 0.01, min: 0.01, required: true %>
+      </div>
+
+      <div class="mb-3">
+        <%= f.label :collateral_eur, "Collateral richiesto (EUR, default 2x)", class: "form-label" %>
+        <%= f.number_field :collateral_eur, value: @budget.collateral_eur_cents ? @budget.collateral_eur : 2000, class: "form-control", step: 0.01, min: 0.01 %>
+      </div>
+
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <%= f.label :period_start, "Inizio periodo", class: "form-label" %>
+          <%= f.date_field :period_start, class: "form-control", required: true %>
+        </div>
+        <div class="col-md-6 mb-3">
+          <%= f.label :period_end, "Fine periodo", class: "form-label" %>
+          <%= f.date_field :period_end, class: "form-control", required: true %>
+        </div>
+      </div>
+
+      <%= f.submit "Crea richiesta budget", class: "btn btn-primary" %>
+      <%= link_to "Annulla", root_path, class: "btn btn-link" %>
+    <% end %>
+  </div>
+</div>

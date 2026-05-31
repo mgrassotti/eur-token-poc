@@ -1,0 +1,45 @@
+<h1 class="h3 mb-4">Settlement completato</h1>
+
+<div class="card mb-4">
+  <div class="card-header">Riepilogo</div>
+  <div class="card-body">
+    <p>Prezzo BTC fine mese: <strong><%= number_with_delimiter(@result.end_btc_eur_rate) %> EUR/BTC</strong></p>
+    <p>Peg al mint: <strong><%= number_with_delimiter(@budget.peg_eur_per_btc) %> EUR/BTC</strong></p>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header">Payout detentori token (burn + BTC al peg)</div>
+  <div class="table-responsive">
+    <table class="table mb-0">
+      <thead>
+        <tr>
+          <th>Utente</th>
+          <th>Token bruciati</th>
+          <th>BTC ricevuti</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @result.payouts.each do |payout| %>
+          <tr>
+            <td><%= payout.user.name %></td>
+            <td><%= format_eur(payout.token_cents) %></td>
+            <td><%= format_sats(payout.btc_sats) %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card mb-4 border-warning">
+  <div class="card-header bg-warning-subtle">Investor (rischio FX)</div>
+  <div class="card-body">
+    <p><%= @result.investor.name %> riceve il collateral residuo:</p>
+    <p class="display-6"><%= format_sats(@result.investor_btc_sats) %></p>
+    <% eur_value = (@result.investor_btc_sats / 100_000_000.0) * @result.end_btc_eur_rate.to_f %>
+    <p class="text-muted">Valore al prezzo fine mese: <%= number_to_currency(eur_value, unit: "€", format: "%n %u") %></p>
+  </div>
+</div>
+
+<%= link_to "Torna al budget", @budget, class: "btn btn-primary" %>

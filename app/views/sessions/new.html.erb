@@ -1,0 +1,21 @@
+<div class="row justify-content-center">
+  <div class="col-md-5">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h1 class="h3 mb-4">Login</h1>
+        <%= form_with url: session_path do |f| %>
+          <div class="mb-3">
+            <%= label_tag :email, "Email", class: "form-label" %>
+            <%= email_field_tag :email, params[:email], class: "form-control", required: true %>
+          </div>
+          <div class="mb-3">
+            <%= label_tag :password, "Password", class: "form-label" %>
+            <%= password_field_tag :password, nil, class: "form-control", required: true %>
+          </div>
+          <%= submit_tag "Log in", class: "btn btn-primary w-100" %>
+        <% end %>
+        <p class="text-muted small mt-3 mb-0">Demo: alice@example.com / password</p>
+      </div>
+    </div>
+  </div>
+</div>

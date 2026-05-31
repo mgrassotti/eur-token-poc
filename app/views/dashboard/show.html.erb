@@ -1,0 +1,94 @@
+<h1 class="h3 mb-4">Dashboard</h1>
+
+<div class="row g-4 mb-4">
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <h2 class="h6 text-muted">Saldo BTC</h2>
+        <p class="display-6 mb-0"><%= format_sats(current_user.balance_sats) %></p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-8">
+    <div class="card h-100">
+      <div class="card-body">
+        <h2 class="h6 text-muted">Token EUR (EURT)</h2>
+        <% if @token_accounts.any? %>
+          <ul class="list-group list-group-flush">
+            <% @token_accounts.each do |account| %>
+              <li class="list-group-item d-flex justify-content-between px-0">
+                <span>Budget #<%= account.budget_id %></span>
+                <strong><%= format_eur(account.balance_cents) %></strong>
+              </li>
+            <% end %>
+          </ul>
+        <% else %>
+          <p class="mb-0 text-muted">Nessun token in circolazione.</p>
+        <% end %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="d-flex gap-2 mb-4">
+  <%= link_to "Nuovo budget", new_budget_path, class: "btn btn-primary" %>
+  <%= link_to "Tutti i budget", budgets_path, class: "btn btn-outline-secondary" %>
+</div>
+
+<% if @investable_budgets.any? %>
+  <div class="card mb-4">
+    <div class="card-header">Budget in attesa di investitore</div>
+    <div class="table-responsive">
+      <table class="table mb-0">
+        <thead>
+          <tr>
+            <th>Richiedente</th>
+            <th>Importo</th>
+            <th>Collateral</th>
+            <th>Periodo</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @investable_budgets.each do |budget| %>
+            <tr>
+              <td><%= budget.borrower.name %></td>
+              <td><%= format_eur(budget.amount_eur_cents) %></td>
+              <td><%= format_eur(budget.collateral_eur_cents) %></td>
+              <td><%= budget.period_start %> – <%= budget.period_end %></td>
+              <td><%= link_to "Dettagli", budget, class: "btn btn-sm btn-outline-primary" %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% end %>
+
+<div class="card">
+  <div class="card-header">I miei budget</div>
+  <div class="table-responsive">
+    <table class="table mb-0">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Ruolo</th>
+          <th>Importo</th>
+          <th>Stato</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% (@borrowed_budgets + current_user.invested_budgets).uniq.sort_by(&:created_at).reverse.each do |budget| %>
+          <tr>
+            <td>#<%= budget.id %></td>
+            <td><%= budget.borrower_id == current_user.id ? "Borrower" : "Investor" %></td>
+            <td><%= format_eur(budget.amount_eur_cents) %></td>
+            <td><%= budget_status_badge(budget) %></td>
+            <td><%= link_to "Apri", budget, class: "btn btn-sm btn-outline-primary" %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+</div>

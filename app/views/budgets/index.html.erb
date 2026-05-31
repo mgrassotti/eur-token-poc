@@ -1,0 +1,30 @@
+<h1 class="h3 mb-4">Tutti i budget</h1>
+
+<div class="table-responsive">
+  <table class="table table-striped">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Borrower</th>
+        <th>Investor</th>
+        <th>Importo</th>
+        <th>Stato</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @budgets.each do |budget| %>
+        <tr>
+          <td>#<%= budget.id %></td>
+          <td><%= budget.borrower.name %></td>
+          <td><%= budget.investor&.name || "—" %></td>
+          <td><%= format_eur(budget.amount_eur_cents) %></td>
+          <td><%= budget_status_badge(budget) %></td>
+          <td><%= link_to "Apri", budget, class: "btn btn-sm btn-outline-primary" %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
+
+<%= link_to "← Dashboard", root_path, class: "btn btn-link px-0" %>

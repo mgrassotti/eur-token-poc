@@ -1,0 +1,122 @@
+<h1 class="h3 mb-4">Budget</h1>
+
+<div class="card mb-4">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-start mb-3">
+      <div>
+        <h2 class="h5 mb-1">Budget #<%= @budget.id %></h2>
+        <%= budget_status_badge(@budget) %>
+      </div>
+      <% if @budget.active? %>
+        <%= link_to "Trasferisci token", new_budget_token_transfer_path(@budget), class: "btn btn-primary" %>
+      <% end %>
+    </div>
+
+    <dl class="row mb-0">
+      <dt class="col-sm-3">Borrower</dt>
+      <dd class="col-sm-9"><%= @budget.borrower.name %></dd>
+      <dt class="col-sm-3">Investor</dt>
+      <dd class="col-sm-9"><%= @budget.investor&.name || "—" %></dd>
+      <dt class="col-sm-3">Importo budget</dt>
+      <dd class="col-sm-9"><%= format_eur(@budget.amount_eur_cents) %></dd>
+      <dt class="col-sm-3">Collateral richiesto</dt>
+      <dd class="col-sm-9"><%= format_eur(@budget.collateral_eur_cents) %></dd>
+      <% if @budget.peg_eur_per_btc.present? %>
+        <dt class="col-sm-3">Peg BTC/EUR</dt>
+        <dd class="col-sm-9"><%= number_with_delimiter(@budget.peg_eur_per_btc) %> EUR/BTC</dd>
+      <% end %>
+      <dt class="col-sm-3">Periodo</dt>
+      <dd class="col-sm-9"><%= @budget.period_start %> – <%= @budget.period_end %></dd>
+    </dl>
+  </div>
+</div>
+
+<% if @budget.pending? && @budget.borrower_id != current_user.id %>
+  <div class="card mb-4 border-warning">
+    <div class="card-header bg-warning-subtle">Accetta e collateralizza</div>
+    <div class="card-body">
+      <%= form_with url: activate_budget_path(@budget), method: :post do %>
+        <div class="mb-3">
+          <%= label_tag :peg_eur_per_btc, "Peg EUR/BTC al momento dell'attivazione", class: "form-label" %>
+          <%= number_field_tag :peg_eur_per_btc, 60_000, class: "form-control", step: 0.01, min: 0.01, required: true %>
+          <div class="form-text">
+            Collateral richiesto: <%= format_eur(@budget.collateral_eur_cents) %>
+            (~<%= format_sats(@budget.collateral_sats_at_peg(60_000)) %> al peg 60.000 EUR/BTC)
+          </div>
+        </div>
+        <%= submit_tag "Accetta rischio e attiva budget", class: "btn btn-warning" %>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<% if @budget.active? %>
+  <div class="card mb-4">
+    <div class="card-header">Token in circolazione</div>
+    <div class="table-responsive">
+      <table class="table mb-0">
+        <thead>
+          <tr>
+            <th>Utente</th>
+            <th>Saldo EURT</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @budget.token_accounts.includes(:user).where("balance_cents > 0").each do |account| %>
+            <tr>
+              <td><%= account.user.name %></td>
+              <td><%= format_eur(account.balance_cents) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="d-flex gap-2 mb-4">
+    <%= link_to "Settlement fine mese", new_budget_settlement_path(@budget), class: "btn btn-danger" %>
+  </div>
+<% end %>
+
+<% if @budget.token_transfers.any? %>
+  <div class="card mb-4">
+    <div class="card-header">Storico trasferimenti token</div>
+    <div class="table-responsive">
+      <table class="table mb-0">
+        <thead>
+          <tr>
+            <th>Da</th>
+            <th>A</th>
+            <th>Importo</th>
+            <th>Data</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @budget.token_transfers.includes(:from_user, :to_user).order(created_at: :desc).each do |transfer| %>
+            <tr>
+              <td><%= transfer.from_user.name %></td>
+              <td><%= transfer.to_user.name %></td>
+              <td><%= format_eur(transfer.amount_cents) %></td>
+              <td><%= l(transfer.created_at, format: :short) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% end %>
+
+<% if @budget.settlement.present? %>
+  <% s = @budget.settlement %>
+  <div class="card border-success">
+    <div class="card-header bg-success-subtle">Settlement eseguito</div>
+    <div class="card-body">
+      <p>Prezzo BTC fine mese: <strong><%= number_with_delimiter(s.end_btc_eur_rate) %> EUR/BTC</strong></p>
+      <p>BTC ai detentori token: <strong><%= format_sats(s.total_btc_to_holders_sats) %></strong></p>
+      <p>BTC residuo a <%= @budget.investor.name %>: <strong><%= format_sats(s.btc_to_investor_sats) %></strong></p>
+      <p class="text-muted small mb-0">Il valore EUR del residuo di Bob varia con il prezzo finale (rischio FX).</p>
+    </div>
+  </div>
+<% end %>
+
+<%= link_to "← Dashboard", root_path, class: "btn btn-link mt-3 px-0" %>

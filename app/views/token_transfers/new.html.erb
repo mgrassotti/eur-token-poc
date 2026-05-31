@@ -1,0 +1,20 @@
+<h1 class="h3 mb-4">Trasferisci token</h1>
+
+<p class="text-muted">Budget #<%= @budget.id %> — peg <%= number_with_delimiter(@budget.peg_eur_per_btc) %> EUR/BTC</p>
+
+<div class="card">
+  <div class="card-body">
+    <%= form_with url: budget_token_transfers_path(@budget) do %>
+      <div class="mb-3">
+        <%= label_tag :to_user_id, "Destinatario", class: "form-label" %>
+        <%= select_tag :to_user_id, options_from_collection_for_select(@users, :id, :name), class: "form-select", required: true %>
+      </div>
+      <div class="mb-3">
+        <%= label_tag :amount_eur, "Importo (EUR)", class: "form-label" %>
+        <%= number_field_tag :amount_eur, nil, class: "form-control", step: 0.01, min: 0.01, required: true %>
+      </div>
+      <%= submit_tag "Invia token", class: "btn btn-primary" %>
+      <%= link_to "Annulla", @budget, class: "btn btn-link" %>
+    <% end %>
+  </div>
+</div>

@@ -16,7 +16,10 @@
       <div class="mb-3">
         <%= f.label :amount_eur, "Importo budget (€)", class: "form-label" %>
         <%= f.number_field :amount_eur, value: @budget.amount_eur_cents ? @budget.amount_eur : 1000, class: "form-control", step: 0.01, min: 0.01, required: true %>
-        <div class="form-text">Il conto risparmio verrà addebitato dei BTC equivalenti al cambio corrente. Il collateral per l'investitore resta 2× l'importo.</div>
+        <div class="form-text">
+          Dal tuo conto risparmio verranno bloccati BTC per 1× l'importo (collateral del contratto, non rimborsato al settlement).
+          Un investitore dovrà bloccare altrettanto per coprire il rischio di cambio sui token.
+        </div>
       </div>
 
       <div class="row">

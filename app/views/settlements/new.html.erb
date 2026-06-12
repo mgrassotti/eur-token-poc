@@ -19,8 +19,8 @@
             Cambio attuale in dashboard: <%= number_with_delimiter(@market_rate.btc_eur_per_btc) %> €/BTC —
             se modifichi il valore, verrà aggiornato anche il cambio corrente.
           <% end %>
-          I detentori ricevono BTC al cambio corrente; <%= @budget.borrower.name %> recupera il collateral iniziale;
-          il residuo (con rischio FX) va a <%= @budget.investor.name %>.
+          I detentori di token (incluso <%= @budget.borrower.name %>) ricevono BTC al cambio corrente.
+          Il collateral del borrower resta nel pool; il residuo (rischio FX) va a <%= @budget.investor.name %>.
         </div>
       </div>
       <%= submit_tag "Esegui settlement", class: "btn btn-danger", data: { turbo_confirm: "Confermi il settlement? I token verranno bruciati." } %>

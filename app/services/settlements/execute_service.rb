@@ -64,10 +64,6 @@ module Settlements
         )
 
         raise Error, "Collateral insufficient for token redemptions" if investor_payout_sats.negative?
-        raise Error, "Borrower return exceeds locked collateral" if borrower_return_sats.negative?
-
-        borrower_btc = budget.borrower.btc_account.lock!
-        borrower_btc.update!(balance_sats: borrower_btc.balance_sats + borrower_return_sats)
 
         investor_btc = budget.investor.btc_account.lock!
         investor_btc.update!(balance_sats: investor_btc.balance_sats + investor_payout_sats)
@@ -128,19 +124,9 @@ module Settlements
     end
 
     def settlement_payouts(collateral_sats:, total_holders_sats:, total_peg_sats:, total_fx_to_investor_sats:)
-      borrower_locked_sats = budget.borrower_locked_sats
-      investor_locked_sats = budget.investor_locked_sats
-      fx_surplus_sats = [total_peg_sats - total_holders_sats, 0].max
+      investor_payout_sats = collateral_sats - total_holders_sats
 
-      if fx_surplus_sats.positive?
-        investor_payout_sats = investor_locked_sats + fx_surplus_sats
-        borrower_return_sats = borrower_locked_sats - total_peg_sats
-      else
-        borrower_return_sats = borrower_locked_sats
-        investor_payout_sats = collateral_sats - total_holders_sats - borrower_return_sats
-      end
-
-      [borrower_return_sats, investor_payout_sats]
+      [0, investor_payout_sats]
     end
 
     def validate!

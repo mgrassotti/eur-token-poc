@@ -16,10 +16,22 @@
       <dd class="col-sm-9"><%= @budget.investor&.name || "—" %></dd>
       <dt class="col-sm-3">Importo budget</dt>
       <dd class="col-sm-9"><%= format_eur(@budget.amount_eur_cents) %></dd>
-      <dt class="col-sm-3">BTC bloccati dal borrower</dt>
-      <dd class="col-sm-9"><%= format_sats(@budget.borrower_locked_sats) %></dd>
-      <dt class="col-sm-3">BTC bloccati dall'investitore</dt>
-      <dd class="col-sm-9"><%= @budget.investor_locked_sats.positive? ? format_sats(@budget.investor_locked_sats) : "—" %></dd>
+      <dt class="col-sm-3">Collateral borrower</dt>
+      <dd class="col-sm-9">
+        <% if @budget.borrower_locked_sats.positive? %>
+          <%= format_sats(@budget.borrower_locked_sats) %> (<%= format_eur(@budget.amount_eur_cents) %>) — non rimborsato
+        <% else %>
+          —
+        <% end %>
+      </dd>
+      <dt class="col-sm-3">Collateral investitore</dt>
+      <dd class="col-sm-9">
+        <% if @budget.investor_locked_sats.positive? %>
+          <%= format_sats(@budget.investor_locked_sats) %> (<%= format_eur(@budget.collateral_eur_cents) %>) — rischio FX
+        <% else %>
+          <%= format_eur(@budget.collateral_eur_cents) %> — in attesa di attivazione
+        <% end %>
+      </dd>
       <% if @budget.peg_eur_per_btc.present? %>
         <dt class="col-sm-3">Peg BTC/€</dt>
         <dd class="col-sm-9"><%= number_with_delimiter(@budget.peg_eur_per_btc) %> €/BTC</dd>
@@ -119,8 +131,7 @@
       <p>Cambio corrente fine mese: <strong><%= number_with_delimiter(s.end_btc_eur_rate) %> €/BTC</strong></p>
       <p>Peg budget: <strong><%= number_with_delimiter(@budget.peg_eur_per_btc) %> €/BTC</strong></p>
       <p>BTC ai detentori token: <strong><%= format_sats(s.total_btc_to_holders_sats) %></strong></p>
-      <p>BTC restituiti a <%= @budget.borrower.name %>: <strong><%= format_sats(@budget.borrower_locked_sats) %></strong></p>
-      <p>BTC a <%= @budget.investor.name %>: <strong><%= format_sats(s.btc_to_investor_sats) %></strong></p>
+      <p>BTC a <%= @budget.investor.name %> (residuo collateral): <strong><%= format_sats(s.btc_to_investor_sats) %></strong></p>
     </div>
   </div>
 <% end %>

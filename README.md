@@ -27,9 +27,9 @@ In development puoi usare il dropdown **Switch** nella navbar per cambiare utent
 
 ### Stato iniziale (seed)
 
-- **Alice**: 0.1 BTC (10_000_000 sats) in risparmio — non usato dal budget
-- **Bob**: 0.05 BTC (5_000_000 sats)
-- Budget **pending** da 1000 EUR con collateral 2000 EUR (peg **non** impostato)
+- **Alice**: 0.1 BTC (10_000_000 sats) in risparmio
+- **Bob**: 0.2 BTC (20_000_000 sats) — investitore potenziale
+- Budget **pending** da 1000 EUR (borrower + investitore bloccano ciascuno **1×**)
 
 ### 1. Imposta peg (Admin)
 
@@ -43,9 +43,11 @@ In development puoi usare il dropdown **Switch** nella navbar per cambiare utent
 2. Dashboard → budget in attesa → **Dettagli**
 3. **Accetta rischio e attiva budget** (usa il peg fissato dall'admin)
 
-Il sistema:
-- Blocca ~3_333_333 sats da Bob (2000 EUR @ 60k)
+Il sistema (se Alice ha già creato il budget):
+- Blocca ~1_666_667 sats da Bob (1000 EUR @ 60k, rischio FX)
 - Mint 1000 EURT ad Alice
+
+Alla **creazione** del budget Alice ha già bloccato altrettanto dal conto risparmio (collateral contratto, non rimborsato al settlement).
 
 ### 3. Spesa token (Alice → Claude → David)
 
@@ -64,20 +66,20 @@ Saldi attesi: Alice 700, Claude 200, David 100 EURT.
 
 Il sistema:
 - Brucia i token
-- Accredita BTC ai detentori al **peg fisso** (token_EUR / 60_000)
-- Restituisce il collateral residuo a **Bob** (rischio FX)
+- Accredita BTC a **tutti i detentori** (inclusa Alice) al **cambio corrente**
+- Il collateral del borrower resta nel pool (nessun rimborso separato del peg)
+- L'**investitore** riceve il residuo e compensa la differenza di cambio sui token
 
-### Esempio numerico @ peg 60k
+### Esempio numerico @ peg 60k, budget 1000 EUR
 
 ```
-Collateral Bob:     3_333_333 sats
-Payout holders:     1_666_667 sats  (1000 EUR / 60000)
-Bob remainder:      1_666_666 sats
+Pool totale:             3_333_333 sats  (borrower 1× + investitore 1×)
+Payout detentori:        al cambio finale (es. 2_000_000 sats @ 50k)
+Investitore:             residuo (0 sats se BTC dimezza del 50%)
+Borrower:                solo token residui convertiti — nessun rimborso del lock
 ```
 
-Il valore EUR del residuo di Bob dipende dal prezzo finale:
-- @ 70k → ~1_166 EUR
-- @ 50k → ~833 EUR
+Con calo del 50% (es. 100k → 50k) il pool copre esattamente i detentori: l'investitore perde tutto il suo 1×, il collateral di Alice finisce nei payout ai detentori.
 
 ## Test
 

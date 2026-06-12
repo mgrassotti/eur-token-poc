@@ -38,7 +38,7 @@ module Budgets
         Budget.create!(
           borrower: borrower,
           amount_eur_cents: amount_eur_cents,
-          collateral_eur_cents: amount_eur_cents * Budget::COLLATERAL_MULTIPLIER,
+          collateral_eur_cents: amount_eur_cents * Budget::INVESTOR_COLLATERAL_MULTIPLIER,
           peg_eur_per_btc: peg_eur_per_btc,
           period_start: period_start,
           period_end: period_end,

@@ -1,7 +1,9 @@
 # frozen_string_literal: true
 
 class Budget < ApplicationRecord
-  COLLATERAL_MULTIPLIER = 2
+  # Borrower 1× (alla creazione) + investitore 1× (all'attivazione) = pool 2× il budget.
+  # Al settlement il borrower non recupera il lock: riceve solo i token residui al cambio corrente.
+  INVESTOR_COLLATERAL_MULTIPLIER = 1
 
   belongs_to :borrower, class_name: "User"
   belongs_to :investor, class_name: "User", optional: true
@@ -47,7 +49,7 @@ class Budget < ApplicationRecord
   def set_default_collateral
     return if amount_eur_cents.blank?
 
-    self.collateral_eur_cents = amount_eur_cents * COLLATERAL_MULTIPLIER
+    self.collateral_eur_cents = amount_eur_cents * INVESTOR_COLLATERAL_MULTIPLIER
   end
 
   def period_end_after_start

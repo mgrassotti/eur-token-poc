@@ -47,7 +47,8 @@ RSpec.describe Settlements::ExecuteService do
     end
 
     expect(result.settlement.total_btc_to_holders_sats).to eq(expected_holders_sats)
-    expect(result.investor_btc_sats).to eq(collateral_sats - expected_holders_sats - budget.borrower_locked_sats)
+    expect(result.borrower_btc_sats).to eq(0)
+    expect(result.investor_btc_sats).to eq(collateral_sats - expected_holders_sats)
     expect(budget.reload).to be_settled
   end
 
@@ -61,7 +62,7 @@ RSpec.describe Settlements::ExecuteService do
 
     expect(result.settlement.total_btc_to_holders_sats).to eq(expected_holders_sats)
     expect(result.total_fx_to_investor_sats).to eq(expected_fx_sats)
-    expect(result.investor_btc_sats).to eq(budget.investor_locked_sats + expected_fx_sats)
+    expect(result.investor_btc_sats).to eq(collateral_sats - expected_holders_sats)
     expect(result.borrower_btc_sats).to eq(0)
   end
 
@@ -74,7 +75,7 @@ RSpec.describe Settlements::ExecuteService do
 
     expect(result.total_fx_to_investor_sats).to eq(0)
     expect(result.settlement.total_btc_to_holders_sats).to eq(expected_holders_sats)
-    expect(result.investor_btc_sats).to eq(collateral_sats - expected_holders_sats - budget.borrower_locked_sats)
+    expect(result.investor_btc_sats).to eq(collateral_sats - expected_holders_sats)
     expect(collateral_sats).to eq(
       result.settlement.total_btc_to_holders_sats + result.borrower_btc_sats + result.settlement.btc_to_investor_sats
     )

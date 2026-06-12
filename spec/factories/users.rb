@@ -14,7 +14,7 @@ FactoryBot.define do
   factory :budget do
     association :borrower, factory: :user
     amount_eur_cents { 100_000 }
-    collateral_eur_cents { 200_000 }
+    collateral_eur_cents { 100_000 }
     period_start { Date.current.beginning_of_month }
     period_end { Date.current.end_of_month }
     status { :pending }

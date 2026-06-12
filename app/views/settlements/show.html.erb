@@ -46,18 +46,10 @@
   </div>
 </div>
 
-<div class="card mb-4">
-  <div class="card-header">Borrower — restituzione collateral iniziale</div>
-  <div class="card-body">
-    <p><%= @result.borrower.name %> riceve il BTC bloccati alla attivazione:</p>
-    <p class="display-6 mb-0"><%= format_sats(@result.borrower_btc_sats) %></p>
-  </div>
-</div>
-
 <div class="card mb-4 border-warning">
   <div class="card-header bg-warning-subtle">Investitore — residuo collateral</div>
   <div class="card-body">
-    <p><%= @result.investor.name %> riceve il collateral residuo (include l'effetto FX sui token):</p>
+    <p><%= @result.investor.name %> riceve il residuo del pool dopo i payout ai detentori (compensa il rischio FX):</p>
     <p class="display-6 mb-1"><%= format_sats(@result.investor_btc_sats) %></p>
     <p class="text-muted mb-0">Valore al cambio corrente: <%= format_savings_eur(@result.investor_eur_at_end) %></p>
   </div>

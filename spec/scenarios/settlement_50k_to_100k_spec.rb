@@ -50,7 +50,7 @@ RSpec.describe "Settlement scenario 50k → 100k" do
 
     expect(savings_eur(alice, end_rate)).to be_within(0.01).of(8_000)
     expect(total_wealth_eur(alice, end_rate)).to be_within(0.01).of(8_900)
-    expect(savings_eur(bob, end_rate)).to be_within(0.01).of(16_000)
+    expect(savings_eur(bob, end_rate)).to be_within(0.01).of(18_000)
     expect(total_wealth_eur(bob, end_rate)).to be_within(0.01).of(20_000)
 
     result = Settlements::ExecuteService.call(budget: budget, end_btc_eur_rate: end_rate)
@@ -59,7 +59,7 @@ RSpec.describe "Settlement scenario 50k → 100k" do
     expect(savings_eur(bob.reload, end_rate)).to be_within(0.01).of(21_000)
     expect(savings_eur(claude.reload, end_rate)).to be_within(0.01).of(50)
     expect(savings_eur(david.reload, end_rate)).to be_within(0.01).of(50)
-    expect(result.investor_btc_sats).to eq(5_000_000)
+    expect(result.investor_btc_sats).to eq(3_000_000)
     expect(result.borrower_btc_sats).to eq(0)
     expect(result.total_fx_to_investor_sats).to eq(1_000_000)
   end

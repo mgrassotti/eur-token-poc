@@ -7,6 +7,8 @@ Rails.application.routes.draw do
 
   root "dashboard#show"
 
+  resource :token_transfer, only: %i[new create], controller: "token_transfers"
+
   resources :budgets, only: %i[index show new create] do
     member do
       post :activate

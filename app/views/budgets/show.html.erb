@@ -57,7 +57,7 @@
     <div class="card-body">
       <p class="mb-3">Peg iniziale budget: <strong><%= number_with_delimiter(@budget.peg_eur_per_btc) %> €/BTC</strong></p>
       <p class="text-muted mb-3">
-        Dal conto riserva verranno decurtati
+        Dal conto di riserva verranno decurtati
         <strong><%= format_sats(@budget.collateral_sats_at_peg(@budget.peg_eur_per_btc)) %></strong>
         (collateral <%= format_eur(@budget.collateral_eur_cents) %>).
       </p>

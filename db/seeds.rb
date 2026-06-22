@@ -29,4 +29,4 @@ Budgets::CreateService.call(
 alice.reload
 puts "Seeded #{User.count} users."
 puts "Admin: admin@example.com / password"
-puts "Alice has #{BtcConversion.format_btc(alice.balance_sats)} on conto riserva, pending budget spesa"
+puts "Alice has #{BtcConversion.format_btc(alice.balance_sats)} on conto di riserva, pending budget spesa"

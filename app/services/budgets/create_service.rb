@@ -30,7 +30,7 @@ module Budgets
         borrower_btc = borrower.btc_account.lock!
 
         if borrower_btc.balance_sats < locked_sats
-          raise Error, "Saldo insufficiente sul conto riserva"
+          raise Error, "Saldo insufficiente sul conto di riserva"
         end
 
         borrower_btc.update!(balance_sats: borrower_btc.balance_sats - locked_sats)

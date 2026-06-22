@@ -62,6 +62,6 @@ RSpec.describe Budgets::ActivateService do
 
     expect do
       described_class.call(budget: budget, investor: bob)
-    end.to raise_error(Budgets::ActivateService::Error, "Saldo insufficiente sul conto riserva")
+    end.to raise_error(Budgets::ActivateService::Error, "Saldo insufficiente sul conto di riserva")
   end
 end

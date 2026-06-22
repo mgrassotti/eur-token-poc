@@ -95,7 +95,7 @@
   <div class="col-md-4">
     <div class="card h-100">
       <div class="card-body">
-        <h2 class="h6 text-muted">Conto riserva (BTC)</h2>
+        <h2 class="h6 text-muted">Conto di riserva (BTC)</h2>
         <% if @savings_eur.present? %>
           <p class="display-6 mb-1"><%= format_savings_eur(@savings_eur) %></p>
           <p class="text-muted mb-0">= <%= format_sats(@savings_sats) %></p>
@@ -109,19 +109,11 @@
   <div class="col-md-4">
     <div class="card h-100">
       <div class="card-body">
-        <h2 class="h6 text-muted">Conto spesa / risparmio (EURT)</h2>
+        <h2 class="h6 text-muted">Conto corrente (spesa / risparmio)</h2>
         <% if @spending_budget_total_cents.positive? %>
-          <p class="display-6 mb-1"><%= format_eur(@spending_budget_total_cents) %></p>
-          <% @spending_budgets.each do |budget| %>
-            <p class="text-muted mb-0">
-              Scadenza: <%= l(budget.period_end, format: :long) %>
-              <% if budget.maturity_block_height %>
-                — maturity blocco <%= number_with_delimiter(budget.maturity_block_height) %>
-              <% end %>
-            </p>
-          <% end %>
+          <p class="display-6 mb-0"><%= format_eur(@spending_budget_total_cents) %></p>
         <% else %>
-          <p class="mb-0 text-muted">Nessun saldo sul conto spesa / risparmio.</p>
+          <p class="mb-0 text-muted">Nessun saldo sul conto corrente.</p>
         <% end %>
       </div>
     </div>
@@ -141,7 +133,7 @@
             <p class="text-muted small mb-0">Scadenza: <%= l(budget.period_end, format: :long) %></p>
           <% end %>
         <% else %>
-          <p class="mb-0 text-muted">Nessun collateral attivo.</p>
+          <p class="mb-0 text-muted">Nessun deal attivo.</p>
         <% end %>
       </div>
     </div>
@@ -151,9 +143,9 @@
 
 <div class="d-flex gap-2 mb-4">
   <% unless admin? %>
-    <%= link_to "Richiedi liquidità", new_budget_path, class: "btn btn-primary" %>
-    <% if @transfer_budget %>
-      <%= link_to "Invia Denaro", new_budget_token_transfer_path(@transfer_budget), class: "btn btn-outline-primary" %>
+    <%= link_to "Ricarica conto corrente", new_budget_path, class: "btn btn-primary" %>
+    <% if @spendable_token_cents.positive? %>
+      <%= link_to "Invia Denaro", new_token_transfer_path, class: "btn btn-outline-primary" %>
     <% else %>
       <span class="btn btn-outline-secondary disabled" aria-disabled="true">Invia Denaro</span>
     <% end %>
@@ -197,25 +189,26 @@
 
 <% unless admin? %>
 <div class="card">
-  <div class="card-header">I miei budget</div>
+  <div class="card-header">Le mie ricariche</div>
   <div class="table-responsive">
     <table class="table mb-0">
       <thead>
         <tr>
           <th>ID</th>
-          <th>Ruolo</th>
           <th>Importo</th>
           <th>Stato</th>
+          <th>Scadenza</th>
           <th></th>
         </tr>
       </thead>
       <tbody>
-        <% (@borrowed_budgets + current_user.invested_budgets).uniq.sort_by(&:created_at).reverse.each do |budget| %>
+        <% @borrowed_budgets.each do |budget| %>
+          <% balance_cents = ricarica_balance_cents(budget, current_user) %>
           <tr>
             <td>#<%= budget.id %></td>
-            <td><%= budget.borrower_id == current_user.id ? "Borrower" : "Investor" %></td>
             <td><%= format_eur(budget.amount_eur_cents) %></td>
             <td><%= budget_status_badge(budget) %></td>
+            <td class="small text-muted"><%= ricarica_scadenza_line(budget, balance_cents: balance_cents) %></td>
             <td><%= link_to "Apri", budget, class: "btn btn-sm btn-outline-primary" %></td>
           </tr>
         <% end %>

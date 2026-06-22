@@ -78,6 +78,32 @@ class Budget < ApplicationRecord
     maturity_block_height.present? && ChainState.block_height >= maturity_block_height
   end
 
+  def liability_eur_cents(at_height: ChainState.block_height, months: nil)
+    months ||= months_elapsed(at_height: at_height)
+    (notional_eur_cents * (10_000 + rate_bps_monthly * months)) / 10_000
+  end
+
+  def holder_liability_cents(share_cents, at_height: ChainState.block_height, months: nil)
+    return 0 if share_cents.zero?
+
+    (liability_eur_cents(at_height: at_height, months: months) * share_cents) / amount_eur_cents
+  end
+
+  # Interessi maturati al blocco corrente (mesi interi, PAYOFF-SPEC §3).
+  def holder_accrued_interest_cents(share_cents, at_height: ChainState.block_height)
+    [holder_liability_cents(share_cents, at_height: at_height) - share_cents, 0].max
+  end
+
+  # Interessi totali a scadenza maturity (per display conto corrente).
+  def holder_interest_at_maturity_cents(share_cents)
+    months = symbolic_months_duration
+    [holder_liability_cents(share_cents, months: months) - share_cents, 0].max
+  end
+
+  def holder_interest_cents(share_cents, at_height: ChainState.block_height)
+    holder_accrued_interest_cents(share_cents, at_height: at_height)
+  end
+
   ESTIMATED_SETTLEMENT_FEE_SATS = 5_000
 
   def peg_collateral_sats

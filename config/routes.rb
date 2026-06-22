@@ -19,6 +19,7 @@ Rails.application.routes.draw do
   namespace :admin do
     resource :demo_reset, only: :create
     resource :market_rate, only: :update
+    resource :chain_state, only: :update
   end
 
   if Rails.env.development?

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_15_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_15_140100) do
   create_table "btc_accounts", force: :cascade do |t|
     t.bigint "balance_sats", default: 0, null: false
     t.datetime "created_at", null: false
@@ -25,11 +25,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_15_120000) do
     t.bigint "borrower_locked_sats", default: 0, null: false
     t.integer "collateral_eur_cents", null: false
     t.datetime "created_at", null: false
+    t.bigint "genesis_block_height"
     t.integer "investor_id"
     t.bigint "investor_locked_sats", default: 0, null: false
+    t.bigint "maturity_block_height"
     t.decimal "peg_eur_per_btc", precision: 16, scale: 2
     t.date "period_end", null: false
     t.date "period_start", null: false
+    t.integer "rate_bps_monthly", default: 100, null: false
     t.integer "status", default: 0, null: false
     t.datetime "updated_at", null: false
     t.index ["borrower_id"], name: "index_budgets_on_borrower_id"
@@ -58,6 +61,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_15_120000) do
   end
 
   create_table "market_rates", force: :cascade do |t|
+    t.bigint "bitcoin_block_height", default: 0, null: false
     t.decimal "btc_eur_per_btc", precision: 16, scale: 2
     t.datetime "created_at", null: false
     t.integer "set_by_id"

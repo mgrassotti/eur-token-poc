@@ -3,101 +3,86 @@
 require "rails_helper"
 
 RSpec.describe Settlements::ExecuteService do
-  let(:peg) { 60_000 }
+  let(:peg) { 50_000 }
   let(:alice) { create(:user, name: "Alice") }
   let(:bob) { create(:user, name: "Bob") }
   let(:claude) { create(:user, name: "Claude") }
   let(:david) { create(:user, name: "David") }
 
+  def six_month_period
+    start = Date.new(2026, 1, 1)
+    [start, start >> 6]
+  end
+
   let!(:budget) do
-    bob.btc_account.update!(balance_sats: 5_000_000)
-    alice.btc_account.update!(balance_sats: 10_000_000)
+    period_start, period_end = six_month_period
+    alice.btc_account.update!(balance_sats: BtcConversion.eur_cents_to_sats(500_000, peg))
+    bob.btc_account.update!(balance_sats: BtcConversion.eur_cents_to_sats(1_000_000, peg))
     MarketRate.current.update!(btc_eur_per_btc: peg)
     created = Budgets::CreateService.call(
       borrower: alice,
-      amount_eur_cents: 100_000,
-      period_start: Date.current,
-      period_end: Date.current + 1.month
+      amount_eur_cents: 500_000,
+      period_start: period_start,
+      period_end: period_end
     )
     Budgets::ActivateService.call(budget: created, investor: bob)
     created
   end
 
   before do
-    Tokens::TransferService.call(budget: budget, from_user: alice, to_user: claude, amount_cents: 30_000)
-    Tokens::TransferService.call(budget: budget, from_user: claude, to_user: david, amount_cents: 10_000)
+    Tokens::TransferService.call(budget: budget, from_user: alice, to_user: claude, amount_cents: 100_000)
+    Tokens::TransferService.call(budget: budget, from_user: claude, to_user: david, amount_cents: 50_000)
+    advance_to_maturity!(budget)
   end
 
-  def expected_holder_sats(token_cents, end_rate)
-    BtcConversion.settlement_holder_sats(token_cents, peg, end_rate).first
-  end
-
-  it "pays holders at end rate and returns remaining investor collateral" do
+  it "pays holders FloorEUR liability at spot and returns investor remainder" do
     end_rate = 50_000
     collateral_sats = budget.collateral_lock.amount_sats
-    token_balances = { alice => 70_000, claude => 20_000, david => 10_000 }
-    expected_holders_sats = token_balances.sum { |_, cents| expected_holder_sats(cents, end_rate) }
+    fee = Budget::ESTIMATED_SETTLEMENT_FEE_SATS
+    expected_total_holder = 10_600_000
 
     result = described_class.call(budget: budget, end_btc_eur_rate: end_rate)
 
-    expect(result.payouts.map(&:user)).to contain_exactly(alice, claude, david)
-    token_balances.each do |user, token_cents|
-      payout = result.payouts.find { |p| p.user == user }
-      expect(payout.btc_sats).to eq(expected_holder_sats(token_cents, end_rate))
-    end
-
-    expect(result.settlement.total_btc_to_holders_sats).to eq(expected_holders_sats)
-    expect(result.borrower_btc_sats).to eq(0)
-    expect(result.investor_btc_sats).to eq(collateral_sats - expected_holders_sats)
+    expect(result.payoff.liability_eur_cents).to eq(530_000)
+    expect(result.payoff.total_holder_sats).to eq(expected_total_holder)
+    expect(result.payouts.sum(&:btc_sats)).to eq(expected_total_holder)
+    expect(result.investor_btc_sats).to eq(collateral_sats - expected_total_holder - fee)
     expect(budget.reload).to be_settled
   end
 
-  it "returns more collateral to investor when end rate is above peg" do
-    end_rate = 70_000
-    collateral_sats = budget.collateral_lock.amount_sats
-    expected_holders_sats = BtcConversion.token_cents_to_sats(100_000, end_rate)
-    expected_fx_sats = BtcConversion.token_cents_to_sats(100_000, peg) - expected_holders_sats
-
-    result = described_class.call(budget: budget, end_btc_eur_rate: end_rate)
-
-    expect(result.settlement.total_btc_to_holders_sats).to eq(expected_holders_sats)
-    expect(result.total_fx_to_investor_sats).to eq(expected_fx_sats)
-    expect(result.investor_btc_sats).to eq(collateral_sats - expected_holders_sats)
-    expect(result.borrower_btc_sats).to eq(0)
-  end
-
-  it "returns all collateral to investor when end rate equals peg" do
-    end_rate = peg
-    collateral_sats = budget.collateral_lock.amount_sats
-    expected_holders_sats = BtcConversion.token_cents_to_sats(100_000, end_rate)
-
-    result = described_class.call(budget: budget, end_btc_eur_rate: end_rate)
-
-    expect(result.total_fx_to_investor_sats).to eq(0)
-    expect(result.settlement.total_btc_to_holders_sats).to eq(expected_holders_sats)
-    expect(result.investor_btc_sats).to eq(collateral_sats - expected_holders_sats)
-    expect(collateral_sats).to eq(
-      result.settlement.total_btc_to_holders_sats + result.borrower_btc_sats + result.settlement.btc_to_investor_sats
+  it "returns more collateral to investor when spot is above strike (same € liability)" do
+    low_spot_result = described_class.call(
+      budget: activate_fresh_budget,
+      end_btc_eur_rate: 50_000
     )
+    high_spot_result = described_class.call(
+      budget: activate_fresh_budget,
+      end_btc_eur_rate: 100_000
+    )
+
+    expect(low_spot_result.payoff.total_holder_sats).to eq(10_600_000)
+    expect(high_spot_result.payoff.total_holder_sats).to eq(5_300_000)
+    expect(high_spot_result.investor_btc_sats).to be > low_spot_result.investor_btc_sats
   end
 
   it "conserves sats regardless of end rate" do
-    [50_000, 60_000, 70_000].each do |end_rate|
-      bob.btc_account.update!(balance_sats: 5_000_000)
-      alice.btc_account.update!(balance_sats: 10_000_000)
-      MarketRate.current.update!(btc_eur_per_btc: peg)
-      test_budget = Budgets::CreateService.call(
-        borrower: alice,
-        amount_eur_cents: 100_000,
-        period_start: Date.current,
-        period_end: Date.current + 1.month
-      )
-      Budgets::ActivateService.call(budget: test_budget, investor: bob)
+    [25_000, 50_000, 100_000].each do |end_rate|
+      test_budget = activate_fresh_budget
+      escrow = test_budget.collateral_lock.amount_sats
+      fee = Budget::ESTIMATED_SETTLEMENT_FEE_SATS
 
       result = described_class.call(budget: test_budget, end_btc_eur_rate: end_rate)
-      total = result.settlement.total_btc_to_holders_sats + result.borrower_btc_sats + result.settlement.btc_to_investor_sats
-      expect(total).to eq(test_budget.collateral_lock.amount_sats)
+      total = result.payoff.total_holder_sats + result.investor_btc_sats + fee
+      expect(total).to eq(escrow)
     end
+  end
+
+  it "rejects settlement before maturity block" do
+    ChainState.update_block_height!(budget.maturity_block_height - 1, auto_settle: false)
+
+    expect do
+      described_class.call(budget: budget, end_btc_eur_rate: peg)
+    end.to raise_error(Settlements::ExecuteService::Error, /Settlement disponibile dal blocco/)
   end
 
   it "rejects inactive budgets" do
@@ -108,22 +93,38 @@ RSpec.describe Settlements::ExecuteService do
 
   it "updates the dashboard market rate when the end rate differs" do
     admin = create(:user, :admin)
-    MarketRate.current.update!(btc_eur_per_btc: 60_000)
+    MarketRate.current.update!(btc_eur_per_btc: peg)
 
-    result = described_class.call(budget: budget, end_btc_eur_rate: 50_000, set_by: admin)
+    result = described_class.call(budget: budget, end_btc_eur_rate: 25_000, set_by: admin)
 
     expect(result.market_rate_updated).to be(true)
-    expect(MarketRate.current.btc_eur_per_btc).to eq(50_000)
+    expect(MarketRate.current.btc_eur_per_btc).to eq(25_000)
     expect(MarketRate.current.set_by).to eq(admin)
   end
 
   it "does not update the dashboard market rate when the end rate is unchanged" do
     admin = create(:user, :admin)
-    MarketRate.current.update!(btc_eur_per_btc: 60_000, set_by: admin)
+    MarketRate.current.update!(btc_eur_per_btc: peg, set_by: admin)
 
-    result = described_class.call(budget: budget, end_btc_eur_rate: 60_000, set_by: admin)
+    result = described_class.call(budget: budget, end_btc_eur_rate: peg, set_by: admin)
 
     expect(result.market_rate_updated).to be(false)
-    expect(MarketRate.current.btc_eur_per_btc).to eq(60_000)
+    expect(MarketRate.current.btc_eur_per_btc).to eq(peg)
+  end
+
+  def activate_fresh_budget
+    period_start, period_end = six_month_period
+    bob.btc_account.update!(balance_sats: BtcConversion.eur_cents_to_sats(1_000_000, peg))
+    alice.btc_account.update!(balance_sats: BtcConversion.eur_cents_to_sats(500_000, peg))
+    MarketRate.current.update!(btc_eur_per_btc: peg)
+    created = Budgets::CreateService.call(
+      borrower: alice,
+      amount_eur_cents: 500_000,
+      period_start: period_start,
+      period_end: period_end
+    )
+    Budgets::ActivateService.call(budget: created, investor: bob)
+    advance_to_maturity!(created)
+    created
   end
 end

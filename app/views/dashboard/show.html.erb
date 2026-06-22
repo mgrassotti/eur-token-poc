@@ -27,8 +27,16 @@
         <h2 class="h6">Budget attivi — settlement</h2>
         <ul class="list-group mb-4">
           <% @active_budgets.each do |budget| %>
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-              <span>#<%= budget.id %> — peg <%= number_with_delimiter(budget.peg_eur_per_btc) %> €/BTC</span>
+            <% ltv = budget.loan_to_value_ratio(@market_rate.btc_eur_per_btc) %>
+            <li class="list-group-item d-flex justify-content-between align-items-center flex-wrap gap-2">
+              <span>
+                #<%= budget.id %> — peg <%= number_with_delimiter(budget.peg_eur_per_btc) %> €/BTC
+                <% if ltv.present? %>
+                  <span class="badge text-bg-<%= ltv >= Budget::LIQUIDATION_LTV_THRESHOLD ? "danger" : ltv < Budget::INVESTOR_YIELD_LTV_THRESHOLD ? "info" : "secondary" %>">
+                    LTV <%= number_to_percentage(ltv * 100, precision: 0) %>
+                  </span>
+                <% end %>
+              </span>
               <%= link_to "Settlement", new_budget_settlement_path(budget), class: "btn btn-sm btn-danger" %>
             </li>
           <% end %>

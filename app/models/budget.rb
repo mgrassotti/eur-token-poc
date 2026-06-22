@@ -4,6 +4,8 @@ class Budget < ApplicationRecord
   # Borrower 1× (alla creazione) + investitore 1× (all'attivazione) = pool 2× il budget.
   # Al settlement il borrower non recupera il lock: riceve solo i token residui al cambio corrente.
   INVESTOR_COLLATERAL_MULTIPLIER = 1
+  INVESTOR_YIELD_LTV_THRESHOLD = 0.3
+  LIQUIDATION_LTV_THRESHOLD = 0.9
 
   belongs_to :borrower, class_name: "User"
   belongs_to :investor, class_name: "User", optional: true
@@ -12,6 +14,7 @@ class Budget < ApplicationRecord
   has_one :settlement, dependent: :destroy
   has_many :token_accounts, dependent: :destroy
   has_many :token_transfers, dependent: :destroy
+  has_many :investor_yield_payouts, dependent: :destroy
 
   enum :status, { pending: 0, active: 1, settled: 2 }
 
@@ -42,6 +45,37 @@ class Budget < ApplicationRecord
 
   def minted_token_cents
     token_accounts.sum(:balance_cents)
+  end
+
+  def pool_sats
+    collateral_lock&.amount_sats.to_i
+  end
+
+  def pool_collateral_eur(btc_eur_per_btc)
+    return unless btc_eur_per_btc.to_d.positive?
+
+    BtcConversion.sats_to_eur(pool_sats, btc_eur_per_btc)
+  end
+
+  # EURT in circolazione / valore collateral del deal al cambio corrente.
+  def loan_to_value_ratio(btc_eur_per_btc)
+    collateral_eur = pool_collateral_eur(btc_eur_per_btc)
+    return if collateral_eur.nil? || collateral_eur.zero?
+
+    tokens_eur = minted_token_cents / 100.0
+    return 0.0 if tokens_eur.zero?
+
+    tokens_eur / collateral_eur
+  end
+
+  def liquidation_threshold_reached?(btc_eur_per_btc)
+    ltv = loan_to_value_ratio(btc_eur_per_btc)
+    ltv.present? && ltv >= LIQUIDATION_LTV_THRESHOLD
+  end
+
+  def yield_eligible?(btc_eur_per_btc)
+    ltv = loan_to_value_ratio(btc_eur_per_btc)
+    ltv.present? && ltv < INVESTOR_YIELD_LTV_THRESHOLD
   end
 
   private

@@ -16,7 +16,7 @@ module Budgets
     def call
       validate!
 
-      peg_eur_per_btc = budget.peg_eur_per_btc
+      peg_eur_per_btc = MarketRate.current.btc_eur_per_btc
 
       ActiveRecord::Base.transaction do
         investor_btc = investor.btc_account.lock!
@@ -34,6 +34,7 @@ module Budgets
         budget.update!(
           investor: investor,
           investor_locked_sats: collateral_sats,
+          peg_eur_per_btc: peg_eur_per_btc,
           genesis_block_height: genesis_height,
           maturity_block_height: maturity_height,
           status: :active
@@ -61,9 +62,8 @@ module Budgets
 
     def validate!
       raise Error, "Budget is not pending" unless budget.pending?
-      raise Error, "Investor cannot be the borrower" if investor.id == budget.borrower_id
-      raise Error, "Budget peg is missing" unless budget.peg_set?
-      raise Error, "Admin must set current BTC/EUR rate" unless MarketRate.current.set?
+      raise Error, "L'investitore non può essere il richiedente" if investor.id == budget.borrower_id
+      raise Error, "L'admin deve impostare il cambio BTC/€ corrente" unless MarketRate.current.set?
     end
   end
 end

@@ -157,7 +157,7 @@
 
 <% if @investable_budgets.any? %>
   <div class="card mb-4">
-    <div class="card-header">Budget in attesa di investitore</div>
+    <div class="card-header">Ricariche in attesa di investitore</div>
     <div class="table-responsive">
       <table class="table mb-0">
         <thead>
@@ -198,6 +198,8 @@
           <th>Importo</th>
           <th>Stato</th>
           <th>Scadenza</th>
+          <th>Importo rimanente</th>
+          <th>Interessi alla scadenza</th>
           <th></th>
         </tr>
       </thead>
@@ -208,7 +210,14 @@
             <td>#<%= budget.id %></td>
             <td><%= format_eur(budget.amount_eur_cents) %></td>
             <td><%= budget_status_badge(budget) %></td>
-            <td class="small text-muted"><%= ricarica_scadenza_line(budget, balance_cents: balance_cents) %></td>
+            <td>
+              <%= l(budget.period_end, format: :long) %>
+              <% if budget.maturity_block_height %>
+                <span class="text-muted d-block small">blocco <%= number_with_delimiter(budget.maturity_block_height) %></span>
+              <% end %>
+            </td>
+            <td><%= balance_cents.positive? ? format_eur(balance_cents) : "—" %></td>
+            <td><%= balance_cents.positive? ? format_eur(budget.holder_interest_at_maturity_cents(balance_cents)) : "—" %></td>
             <td><%= link_to "Apri", budget, class: "btn btn-sm btn-outline-primary" %></td>
           </tr>
         <% end %>

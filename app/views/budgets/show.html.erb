@@ -1,22 +1,22 @@
-<h1 class="h3 mb-4">Budget</h1>
+<h1 class="h3 mb-4">Ricarica</h1>
 
 <div class="card mb-4">
   <div class="card-body">
     <div class="d-flex justify-content-between align-items-start mb-3">
       <div>
-        <h2 class="h5 mb-1">Budget #<%= @budget.id %></h2>
+        <h2 class="h5 mb-1">Ricarica #<%= @budget.id %></h2>
         <%= budget_status_badge(@budget) %>
       </div>
     </div>
 
     <dl class="row mb-0">
-      <dt class="col-sm-3">Borrower</dt>
+      <dt class="col-sm-3">Richiedente</dt>
       <dd class="col-sm-9"><%= @budget.borrower.name %></dd>
-      <dt class="col-sm-3">Investor</dt>
+      <dt class="col-sm-3">Investitore</dt>
       <dd class="col-sm-9"><%= @budget.investor&.name || "—" %></dd>
-      <dt class="col-sm-3">Importo budget</dt>
+      <dt class="col-sm-3">Importo richiesto</dt>
       <dd class="col-sm-9"><%= format_eur(@budget.amount_eur_cents) %></dd>
-      <dt class="col-sm-3">Collateral borrower</dt>
+      <dt class="col-sm-3">Collateral richiedente</dt>
       <dd class="col-sm-9">
         <% if @budget.borrower_locked_sats.positive? %>
           <%= format_sats(@budget.borrower_locked_sats) %> (<%= format_eur(@budget.amount_eur_cents) %>) — non rimborsato
@@ -32,9 +32,15 @@
           <%= format_eur(@budget.collateral_eur_cents) %> — in attesa di attivazione
         <% end %>
       </dd>
-      <% if @budget.peg_eur_per_btc.present? %>
+      <% if @budget.peg_set? %>
         <dt class="col-sm-3">Peg BTC/€</dt>
         <dd class="col-sm-9"><%= number_with_delimiter(@budget.peg_eur_per_btc) %> €/BTC</dd>
+      <% elsif @market_rate.set? %>
+        <dt class="col-sm-3">Peg BTC/€</dt>
+        <dd class="col-sm-9">
+          <%= number_with_delimiter(@market_rate.btc_eur_per_btc) %> €/BTC
+          <span class="text-muted small">(cambio attuale — fissato all'attivazione)</span>
+        </dd>
       <% end %>
       <dt class="col-sm-3">Periodo</dt>
       <dd class="col-sm-9"><%= @budget.period_start %> – <%= @budget.period_end %></dd>
@@ -55,13 +61,16 @@
   <div class="card mb-4 border-warning">
     <div class="card-header bg-warning-subtle">Accetta e collateralizza</div>
     <div class="card-body">
-      <p class="mb-3">Peg iniziale budget: <strong><%= number_with_delimiter(@budget.peg_eur_per_btc) %> €/BTC</strong></p>
+      <p class="mb-3">
+        Peg al momento dell'attivazione: <strong><%= number_with_delimiter(@market_rate.btc_eur_per_btc) %> €/BTC</strong>
+        <span class="text-muted small">(cambio corrente)</span>
+      </p>
       <p class="text-muted mb-3">
         Dal conto di riserva verranno decurtati
-        <strong><%= format_sats(@budget.collateral_sats_at_peg(@budget.peg_eur_per_btc)) %></strong>
+        <strong><%= format_sats(@budget.collateral_sats_at_peg(@market_rate.btc_eur_per_btc)) %></strong>
         (collateral <%= format_eur(@budget.collateral_eur_cents) %>).
       </p>
-      <%= button_to "Accetta rischio e attiva budget", activate_budget_path(@budget), method: :post, class: "btn btn-warning" %>
+      <%= button_to "Accetta rischio e attiva la richiesta", activate_budget_path(@budget), method: :post, class: "btn btn-warning" %>
     </div>
   </div>
 <% end %>

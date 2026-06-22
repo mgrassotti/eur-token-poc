@@ -13,7 +13,7 @@ Offrire **esposizione sintetica** (tipo “€ stabile” o BTC con **floor** a 
 | Attore | Ruolo |
 |--------|--------|
 | **Alice** (receiver) | Deposita BTC in escrow; a maturity ha payoff definito vs strike `K` |
-| **Bob** (hedger / provider) | Collaterale ≥ 2× Alice; lato opposto (short volatility / short put) |
+| **Bob** (hedger / provider) | Collaterale **1×** notional all’apertura (totale escrow **2×** con Alice); top-up se LTV ≥ 70% |
 | **Claude / David** | Acquisitori del **diritto contrattuale** (cedenza) |
 | **Bot** (facilitatore) | Match, PSBT, publish oracle median; una chiave su multisig per deal |
 
@@ -27,7 +27,7 @@ Modello di riferimento: Hodl Hodl + DLC/oracle a maturity + assignment RGB trans
 2. **RGB** per diritti transferibili e validazione client-side (app mobile).
 3. **Bot** come facilitatore; recovery **senza bot** obbligatoria (Alice + Bob, timelock).
 4. **Fiat** via exchange dell’utente o P2P off-chain; il protocollo regola solo la gamba BTC.
-5. **Un deal = un escrow multisig**; collateral Bob **≥ 2×** collateral Alice.
+5. **Un deal = un escrow multisig**; all’apertura **escrow 2× notional** (Alice 1× + Bob 1×, LTV 50%). Monitoraggio LTV: margin call **70%**, liquidazione **90%**; Bob può versare collateral aggiuntivo.
 
 ---
 
@@ -53,7 +53,7 @@ Modello di riferimento: Hodl Hodl + DLC/oracle a maturity + assignment RGB trans
 hedge_collateral_sats ≥ 2 × peg_collateral_sats
 ```
 
-Esempio semplificato: Alice e Bob versano in momenti separati (PSBT asincrona) → **un** escrow 2-of-3 da **3 M sats** (1M + 2M).
+Esempio semplificato: Alice e Bob versano in momenti separati (PSBT asincrona) → **un** escrow 2-of-3 da **2 M sats** (1M + 1M), LTV iniziale 50% sul notional €.
 
 ### 3.2 Payoff a maturity (concettuale)
 
@@ -94,7 +94,7 @@ Specifica completa: [`MULTISIG-SPEC.md`](MULTISIG-SPEC.md).
                     ┌─────────────────────────┐
                     │  UTXO escrow (2-of-3)   │
                     │  Alice + Bob + Bot      │
-                    │  1M + 2M = 3M sats      │
+                    │  1M + 1M = 2M sats      │
                     └─────────────────────────┘
                               │
          maturity + oracle    │    cooperative close anytime
@@ -181,7 +181,7 @@ L’UTXO resta unico fino a maturity o refund.
 ```text
 Escrow Bitcoin (multisig)          Assignment RGB
 ─────────────────────────          ─────────────────
-[ 3M sats: Alice 1M + Bob 2M ]     Alice: notional_share = 1_000_000 (100%)
+[ 2M sats: Alice 1M + Bob 1M ]     Alice: notional_share = 1_000_000 (100%)
    ↑ invariato al transfer              │
                                         │ TransferPosition Δ = 400_000
                                         ▼
@@ -270,7 +270,7 @@ tra wallet con canale aperto.
 
 ```text
 Deal escrow (L1, fino a maturity)
-  Alice 1M + Bob 2M  ─────────────────────────►  payoff a T
+  Alice 1M + Bob 1M  ─────────────────────────►  payoff a T
 
 TransferPosition Alice → Claude (diritto, non BTC escrow)
   │
@@ -323,7 +323,7 @@ On-chain ogni riga “epoch / pool globale” diventa **N deal** con escrow dedi
 |-------------------------|-------------------|----------------|----------------|
 | Apertura posizione Alice | `Budgets::CreateService` + `ActivateService` | Genesis deal: Alice collateral + mint `notional` | Budget pending → **escrow multisig** per deal |
 | Strike al mint | `Budget#peg_eur_per_btc` | `strike_eur_per_btc` | Stesso concetto |
-| Collateral 2× | `Budget::INVESTOR_COLLATERAL_MULTIPLIER` (2×) | `hedge_collateral ≥ 2 × peg_collateral` | Pool investitori **aggregata** → hedger dedicato per deal |
+| Collateral apertura | 1× richiedente + 1× investitore (`OPENING_COLLATERAL_MULTIPLIER = 2`) | `escrow_total ≥ 2 × notional` | LTV 70% margin call, 90% liquidazione |
 | Investor hedger | `InvestorDeposits::CreateService` | `hedge_collateral_sats` in escrow | N investitori pro-rata → **un** controparte per deal |
 | Token € fungibile | `TokenAccount#balance_cents` post-activate | `notional_share` RGB (cent = unità nominale) | DB account → assignment |
 | Transfer | `Tokens::TransferService` | `TransferPosition` (anche parziale); L1 o LN | Validazione server → client-side RGB |
@@ -340,7 +340,7 @@ On-chain ogni riga “epoch / pool globale” diventa **N deal** con escrow dedi
 | Utente demo | Ruolo Rails tipico | Ruolo P2P |
 |-------------|-------------------|-----------|
 | Alice | Borrower (`Budget`) | Receiver / holder `FloorBTCPosition` |
-| Bob | Investitore pool (`InvestorDeposit`) | Hedger (collateral 2×) |
+| Bob | Investitore per deal | Hedger (1× minimo; top-up se LTV ≥ 70%) |
 | Claude / David | Destinatario `TokenTransfer` | Cessionario `TransferPosition` |
 | Admin | `ChainState`, `MarketRate`, settlement epoch | Opzionale: oracle publish; non custode fondi |
 
@@ -351,15 +351,15 @@ Per avvicinare `eur-token-poc` al target P2P **prima** del codice RGB:
 1. **Budget = deal** con collateral investitori **allocato** (non solo capienza pool epoch).
 2. **Settlement per budget** a scadenza locale, oltre o invece del settlement epoch globale.
 3. Transfer token invariato come proxy di `TransferPosition` (già parziale).
-4. Test numerici: Alice 1M sats equivalenti, Bob 2M, `peg` = strike, `end_block` budget = maturity.
+4. Test numerici: Alice 1M sats equivalenti, Bob 1M, escrow 2M, `peg` = strike, `end_block` budget = maturity.
 
 ---
 
 ## 11) Roadmap implementazione
 
 ```text
-M0  Spec payoff + multisig 2-of-3 + timelock refund + vincolo 2× collateral
-M1  Prototipo L1: regtest, 1 deal (Alice 1M / Bob 2M), settlement oracle mock
+M0  Spec payoff + multisig 2-of-3 + timelock refund + escrow 2× + LTV 70/90
+M1  Prototipo L1: regtest, 1 deal (Alice 1M / Bob 1M), settlement oracle mock
 M2  Bot: match + PSBT template + recovery package export
 M3  RGB FloorEURPosition + TransferPosition (split) + rgb-lib mobile
 M4  DLC/adaptor (opz.) — settlement L1 più ricco del multisig cooperativo
@@ -375,7 +375,7 @@ M6  (opz.) Refactor eur-token-poc: budget-as-deal + settlement per budget
 
 | Rischio | Mitigazione |
 |---------|-------------|
-| Bob default a maturity | Collateral Bob ≥ 2× Alice |
+| Bob default a maturity | Escrow 2× + top-up; liquidazione LTV 90% |
 | Oracle manipolazione | Mediana 5 feed; outlier drop; attestazione firmata |
 | Bot compromesso | Bot solo 1-of-3 |
 | Bob rifiuta coop | Timelock refund pro-rata |
@@ -410,7 +410,7 @@ M6  (opz.) Refactor eur-token-poc: budget-as-deal + settlement per budget
 
 ## Sintesi
 
-**Contratti bilaterali** su BTC in escrow multisig (Alice 1M + Bob 2M, vincolo 2×),
+**Contratti bilaterali** su BTC in escrow multisig (Alice 1M + Bob 1M = 2M, LTV monitorato),
 payoff a maturity via **oracle mediano**, **cedenza frazionabile** del diritto via **RGB**
 (L1 o **Lightning** opzionale per transfer istante a fee marginali zero),
 bot facilitatore con recovery **Alice+Bob** e **timelock**.

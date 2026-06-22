@@ -1,14 +1,15 @@
 # frozen_string_literal: true
 
 class Budget < ApplicationRecord
-  # Borrower 1× (alla creazione) + investitore 1× (all'attivazione) = pool 2× il budget.
-  # Settlement FloorEUR: liability € + interesse, liquidato in sats allo spot (PAYOFF-SPEC).
+  # Richiedente 1× + investitore 1× all'apertura = escrow 2× l'importo (LTV iniziale 50%).
+  # LTV ≥ 70% → margin call investitore; ≥ 90% → liquidazione automatica FloorEUR.
   INVESTOR_COLLATERAL_MULTIPLIER = 1
+  OPENING_COLLATERAL_MULTIPLIER = 2
   INVESTOR_YIELD_LTV_THRESHOLD = 0.3
+  MARGIN_CALL_LTV_THRESHOLD = 0.7
   LIQUIDATION_LTV_THRESHOLD = 0.9
   BLOCKS_PER_MONTH = 4356
   DAYS_PER_SYMBOLIC_MONTH = 30.25
-  MIN_HEDGE_TO_PEG_RATIO = 2
 
   belongs_to :borrower, class_name: "User"
   belongs_to :investor, class_name: "User", optional: true
@@ -114,16 +115,19 @@ class Budget < ApplicationRecord
 
   ESTIMATED_SETTLEMENT_FEE_SATS = 5_000
 
-  def peg_collateral_sats
-    borrower_locked_sats
-  end
-
-  def hedge_collateral_sats
+  def investor_collateral_sats
     investor_locked_sats
   end
 
-  def hedge_collateral_meets_floor?
-    peg_collateral_sats.positive? && hedge_collateral_sats >= MIN_HEDGE_TO_PEG_RATIO * peg_collateral_sats
+  def opening_collateral_sats_at_peg(peg_rate)
+    BtcConversion.eur_cents_to_sats(amount_eur_cents * OPENING_COLLATERAL_MULTIPLIER, peg_rate)
+  end
+
+  def opening_collateral_adequate?(peg_rate = peg_eur_per_btc)
+    return false unless peg_rate.to_d.positive?
+    return false unless pool_sats.positive?
+
+    pool_sats >= opening_collateral_sats_at_peg(peg_rate)
   end
 
   def pool_sats
@@ -145,6 +149,11 @@ class Budget < ApplicationRecord
     return 0.0 if tokens_eur.zero?
 
     tokens_eur / collateral_eur
+  end
+
+  def margin_call_threshold_reached?(btc_eur_per_btc)
+    ltv = loan_to_value_ratio(btc_eur_per_btc)
+    ltv.present? && ltv >= MARGIN_CALL_LTV_THRESHOLD && ltv < LIQUIDATION_LTV_THRESHOLD
   end
 
   def liquidation_threshold_reached?(btc_eur_per_btc)

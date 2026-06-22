@@ -66,16 +66,12 @@ RSpec.describe "PAYOFF-SPEC §11 integration" do
     expect(claude_payout.btc_sats).to eq(4_240_000)
   end
 
-  it "documents hedge ≥ 2× peg when investor locks double (§11)" do
+  it "documents 2× opening collateral at activation (§11)" do
     budget = activate_deal!
-    expect(budget.peg_collateral_sats).to eq(budget.hedge_collateral_sats)
-    expect(budget.hedge_collateral_meets_floor?).to be(false)
 
-    budget.update!(investor_locked_sats: budget.peg_collateral_sats * 2)
-    budget.collateral_lock.update!(amount_sats: budget.peg_collateral_sats * 3)
-
-    expect(budget.hedge_collateral_meets_floor?).to be(true)
-    expect(budget.hedge_collateral_sats).to eq(2 * budget.peg_collateral_sats)
+    expect(budget.opening_collateral_adequate?).to be(true)
+    expect(budget.pool_sats).to eq(budget.opening_collateral_sats_at_peg(budget.peg_eur_per_btc))
+    expect(budget.loan_to_value_ratio(budget.peg_eur_per_btc)).to be_within(0.01).of(0.5)
   end
 
   it "conserves escrow sats (holders + investor + mining fee)" do

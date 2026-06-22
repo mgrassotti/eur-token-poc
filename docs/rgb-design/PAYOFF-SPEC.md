@@ -232,18 +232,20 @@ Su **`TransferPosition`** (RGB o simulatore Rails):
 
 ## 9) Mapping implementativo
 
-### Simulatore Rails (`eur-token-poc` / `mat-token-poc`)
+### Simulatore Rails (`eur-token-poc`)
 
-| Concetto PAYOFF | Modello Rails target |
-|-----------------|----------------------|
-| `notional_share` | `TokenAccount#balance_cents` o campo su `Position` |
-| `strike_eur_per_btc` | `Budget#peg_eur_per_btc` / `Deal#strike` |
-| `maturity_height` | `Deal#maturity_height` (non epoch globale) |
-| `peg_collateral_sats` | Deposito parte peg / borrower al genesis |
-| `hedge_collateral_sats` | Deposito hedger |
-| `liability_eur_cents` | Calcolo in `Deals::SettleService` |
-| `spot` a maturity | `MarketRate` / oracle mock |
-| Transfer | `Tokens::TransferService` |
+| Concetto PAYOFF | Modello Rails (PoC attuale) |
+|-----------------|-----------------------------|
+| `notional_share` | `TokenAccount#balance_cents` (per budget) |
+| `strike_eur_per_btc` | `Budget#peg_eur_per_btc` (fissato all’activate) |
+| `maturity_height` | `Budget#maturity_block_height` (per deal, non epoch globale) |
+| `genesis_height` | `Budget#genesis_block_height` |
+| `peg_collateral_sats` | `Budget#borrower_locked_sats` |
+| `hedge_collateral_sats` | `Budget#investor_locked_sats` (+ top-up investitore) |
+| `escrow_total_sats` | `CollateralLock#amount_sats` |
+| `liability_eur_cents`, payout | `Payoffs::FloorEurCalculator` via `Settlements::ExecuteService` |
+| `spot` a maturity | `MarketRate` / parametro `end_btc_eur_rate` |
+| Transfer | `Tokens::WalletTransferService` (coin selection multi-budget) |
 
 **Settlement holder (equivalente Rails):**
 
@@ -291,7 +293,7 @@ Validazione client-side (rgb-lib):
 | — | Funding escrow | **Momenti separati**, **un UTXO** — [`MULTISIG-SPEC.md`](MULTISIG-SPEC.md) §3 |
 | — | Mining fee settlement | **Prima del payout holder** (`distributable = escrow − fees`) |
 
-Fase 0 design: **chiusa**. Prossimo lavoro operativo: checklist M0 §11 (fixture + `Deal`).
+Fase 0 design: **chiusa**. Checklist M0 §11 **completata in Rails** (46 spec verdi); resta aperto solo multisig L1 (M1) — vedi [`MULTISIG-SPEC.md`](MULTISIG-SPEC.md) §10.
 
 ---
 

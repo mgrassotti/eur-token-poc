@@ -227,7 +227,7 @@ Ogni wallet (`peg_party`, `investor`) deve persistere localmente:
 | `consignment_rgb` | Assignment `FloorEURPosition` (fase M3) |
 | `oracle_policy` | Feed, soglia mediana, pubkey attestation |
 
-**Checklist M0:** il simulatore Rails può modellare questo come `Deal#recovery_package` (JSON blob) senza PSBT reali fino a M1.
+**Checklist M0:** non implementato in Rails PoC (M1: export JSON / PSBT reali; target `Deal#recovery_package` o equivalente su `Budget`).
 
 ---
 
@@ -286,16 +286,18 @@ protocol_fee_sats = 0    # MVP: nessun output verso il bot dall’escrow
 
 ## 8) Mapping implementativo
 
-### Simulatore Rails (`mat-token-poc` / `eur-token-poc`)
+### Simulatore Rails (`eur-token-poc`)
 
-| Concetto MULTISIG | Modello Rails target |
-|-------------------|----------------------|
-| `multisig_policy` | `Deal#multisig_policy` enum (`two_of_three`) |
-| Pubkeys | `Deal#peg_party_pubkey`, `#investor_pubkey`, `#bot_pubkey` (string hex) |
-| `escrow_utxo` | `Deal#escrow_outpoint` |
-| `escrow_utxos` | `[escrow_utxo]` + annex; `Deal#escrow_utxos` (jsonb) |
-| Recovery package | `Deal#recovery_package` (jsonb) |
-| Stato funding | `pending` → `funding` / `peg_deposited` → `funded` → `settled` / `refunded` |
+| Concetto MULTISIG | Modello Rails (PoC attuale) | Gap verso L1 |
+|-------------------|-----------------------------|--------------|
+| `multisig_policy` | Implicito `2-of-3` (non persistito) | Enum + pubkeys |
+| Pubkeys | — | `Budget` / `Deal` con hex keys |
+| `escrow_utxo` | `CollateralLock` (1 riga, `amount_sats`) | Outpoint reale |
+| `escrow_utxos` | Stesso pool DB (+ top-up investitore, no annex) | Array outpoint |
+| `estimated_settlement_fee_sats` | `Budget::ESTIMATED_SETTLEMENT_FEE_SATS` (5_000) | — |
+| `refund_delay_blocks` | Solo in spec (default 1008), non in DB | CLTV Path B |
+| Recovery package | — | JSON export wallet |
+| Stato funding | `Budget` `pending` → `active` → `settled` | PSBT async / consolidate |
 
 ### Bitcoin L1 (M1 regtest)
 
@@ -325,13 +327,15 @@ protocol_fee_sats = 0    # MVP: nessun output verso il bot dall’escrow
 
 ## 10) Checklist test (M0 — multisig)
 
-- [ ] Parametri §2 presenti nel modello `Deal` (o fixture equivalente).
-- [ ] Matrice firme §4 coperta da test documentali / unitari.
-- [ ] Recovery package §6 elencato e serializzabile.
-- [ ] Path B: `refund_delay_blocks` e split pro-rata collateral definiti.
-- [ ] Funding: PSBT asincrona o consolidamento → **un solo** `escrow_utxo`.
-- [ ] Settlement: `total_holder = min(gross, escrow − fees)`.
-- [ ] Verifica: nessuna spend possibile con **solo** `bot_pubkey`.
+Legenda: `[x]` fatto in Rails PoC · `[~]` parziale / simulato in DB · `[ ]` M1+ L1.
+
+- [~] Parametri §2: subset su `Budget` (`peg_eur_per_btc`, `genesis_block_height`, `maturity_block_height`, `borrower_locked_sats`, `investor_locked_sats`, `CollateralLock#amount_sats`, `ESTIMATED_SETTLEMENT_FEE_SATS`). Mancano pubkeys, `escrow_outpoint`, `refund_delay_blocks`.
+- [ ] Matrice firme §4 coperta da test documentali / unitari (M1 regtest).
+- [ ] Recovery package §6 elencato e serializzabile (M1).
+- [~] Path B: `refund_delay_blocks` e split pro-rata definiti in spec (§6–§7); non implementati on-chain né in DB.
+- [~] Funding: un solo escrow simulato (`CollateralLock` a activate); versamenti separati non modellati come PSBT.
+- [x] Settlement: `total_holder = min(gross, escrow − fees)` — `Payoffs::FloorEurCalculator` + spec §11.
+- [ ] Verifica L1: nessuna spend possibile con **solo** `bot_pubkey` (M1).
 
 ---
 

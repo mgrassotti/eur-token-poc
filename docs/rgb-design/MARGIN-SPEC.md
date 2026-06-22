@@ -280,17 +280,19 @@ Se l’investor non deposita e `coverage_bps` resta &lt; `10_500` dopo la grace 
 
 ## 11) Mapping implementativo
 
-### Simulatore Rails
+### Simulatore Rails (`eur-token-poc`)
 
-| Concetto MARGIN | Modello target |
-|-----------------|----------------|
-| `margin_enabled` | `Deal#margin_enabled` |
-| Soglie | `Deal#margin_call_bps`, `#liquidation_bps`, `#grace_blocks` |
-| `escrow_utxos` | `Deal#escrow_utxos` (jsonb array) o `EscrowUtxo` has_many |
-| `top_ups_sats` | `Deal#top_ups_sats` (denormalizzato) |
-| Stato | `Deal#margin_state` enum (`healthy`, `margin_call`, `liquidating`, `closed`) |
-| Call | `MarginCall` (deal_id, height, spot, coverage_bps, amount_required, deadline) |
-| Tick | `Margins::EvaluateCoverageService` su `MarketRate` / `ChainState` update |
+Il PoC **non** abilita `margin_enabled` / `coverage_bps` di questa spec. Usa una policy **LTV semplificata** su `Budget`:
+
+| Concetto MARGIN (spec) | PoC Rails attuale | Gap |
+|------------------------|-------------------|-----|
+| `margin_enabled` | Assente (= spec disabilitata) | Flag al genesis |
+| Soglie | `MARGIN_CALL_LTV_THRESHOLD` 0.7, `LIQUIDATION_LTV_THRESHOLD` 0.9 | `margin_call_bps` / `liquidation_bps` |
+| `coverage_bps` | — (usa LTV su escrow totale) | Formula §3 |
+| Top-up | `Budgets::InvestorCollateralTopUpService` → stesso `CollateralLock` | Annex UTXO §4 |
+| Liquidazione | `Budgets::AutoLiquidationService` → `Settlements::ExecuteService` | PSBT anticipata |
+| Call UI | `Budgets::MarginCall` (dashboard investitore) | Attestation bot + grace |
+| Tick | Admin `MarketRate` update + `ChainState` | `Margins::EvaluateCoverageService` |
 
 ### Bitcoin L1 (M2 regtest)
 
@@ -327,13 +329,15 @@ Validazione client: rifiuta transfer se `margin_state = liquidating`.
 
 ## 13) Checklist test
 
-- [ ] `coverage_bps` calcolato come §3 per fixture PAYOFF-SPEC §5 a metà deal.
-- [ ] Margin call: `top_up_required_sats` corretto (esempio §10).
+Legenda: `[x]` fatto in Rails PoC (LTV semplificato) · `[~]` parziale · `[ ]` MARGIN-SPEC piena / L1.
+
+- [ ] `coverage_bps` calcolato come §3 per fixture PAYOFF-SPEC §5 a metà deal (M2+).
+- [~] Margin call: notifica investitore a LTV ≥ 70% + top-up via `InvestorCollateralTopUpService` (non `top_up_required_sats` da §10).
 - [ ] Annex: `escrow_utxos` e `top_ups_sats` aggiornati; coverage torna ≥ `margin_call_bps`.
-- [ ] Liquidazione: payout = `min(required, escrow)`; `investor_remainder` ≥ 0.
-- [ ] Maturity con annex: PSBT multi-input; stesso payout che con escrow aggregato.
+- [x] Liquidazione: payout = `min(gross, escrow − fees)`; `investor_remainder` ≥ 0 — `FloorEurCalculator` + `AutoLiquidationService` a LTV ≥ 90%.
+- [ ] Maturity con annex: PSBT multi-input; stesso payout che con escrow aggregato (M1+).
 - [ ] Cancel / timelock: investor riceve `hedge_collateral_sats + top_ups_sats`.
-- [ ] `margin_enabled = false` → nessuna call (regressione M0–M1).
+- [x] `margin_enabled = false` (comportamento PoC): nessun monitor `coverage_bps` / annex; LTV 70/90 è extra demo Rails, non MARGIN-SPEC §3–§10.
 
 ---
 

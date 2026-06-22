@@ -20,7 +20,7 @@
             se modifichi il valore, verrà aggiornato anche il cambio corrente.
           <% end %>
           I detentori di token (incluso <%= @budget.borrower.name %>) ricevono BTC al cambio corrente.
-          Il collateral del borrower resta nel pool; il residuo (rischio FX) va a <%= @budget.investor.name %>.
+          Il collateral del richiedente resta nel pool; il residuo (rischio FX) va a <%= @budget.investor.name %>.
         </div>
       </div>
       <%= submit_tag "Esegui settlement", class: "btn btn-danger", data: { turbo_confirm: "Confermi il settlement? I token verranno bruciati." } %>

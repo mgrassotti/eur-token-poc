@@ -14,7 +14,7 @@
       <% end %>
 
       <div class="mb-3">
-        <%= f.label :amount_eur, "Importo budget (€)", class: "form-label" %>
+        <%= f.label :amount_eur, "Importo (€)", class: "form-label" %>
         <%= f.number_field :amount_eur, value: @budget.amount_eur_cents ? @budget.amount_eur : 1000, class: "form-control", step: 0.01, min: 0.01, required: true %>
         <div class="form-text">
           Dal conto di riserva verranno bloccati BTC per 1× l'importo (collateral del contratto, non rimborsato al settlement).
@@ -33,7 +33,7 @@
         </div>
       </div>
 
-      <%= f.submit "Crea richiesta budget", class: "btn btn-primary" %>
+      <%= f.submit "Crea ricarica", class: "btn btn-primary" %>
       <%= link_to "Annulla", root_path, class: "btn btn-link" %>
     <% end %>
   </div>

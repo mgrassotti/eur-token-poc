@@ -32,8 +32,8 @@ RSpec.describe DemoData::ResetService do
     expect(bob.btc_account.reload.balance_sats).to eq(20_000_000)
     expect(claude.btc_account.reload.balance_sats).to eq(0)
     expect(admin.btc_account.reload.balance_sats).to eq(0)
-    expect(MarketRate.current.btc_eur_per_btc).to eq(60_000)
-    expect(MarketRate.current.bitcoin_block_height).to eq(0)
+    expect(MarketRate.current.btc_eur_per_btc).to eq(50_000)
+    expect(MarketRate.current.bitcoin_block_height).to eq(ChainState.estimate_block_height)
   end
 
   it "creates demo users when they are missing" do

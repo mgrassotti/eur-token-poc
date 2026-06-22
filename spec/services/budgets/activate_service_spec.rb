@@ -40,13 +40,13 @@ RSpec.describe Budgets::ActivateService do
     expect(budget.maturity_block_height).to eq(budget.genesis_block_height + budget.symbolic_months_duration * Budget::BLOCKS_PER_MONTH)
   end
 
-  it "uses create-time peg for collateral even if market moved before activation" do
+  it "fixes peg and investor collateral at the current rate on activation" do
     MarketRate.current.update!(btc_eur_per_btc: 70_000)
 
     described_class.call(budget: budget, investor: bob)
 
-    expect(budget.reload.peg_eur_per_btc).to eq(60_000)
-    expect(budget.investor_locked_sats).to eq(budget.collateral_sats_at_peg(60_000))
+    expect(budget.reload.peg_eur_per_btc).to eq(70_000)
+    expect(budget.investor_locked_sats).to eq(budget.collateral_sats_at_peg(70_000))
   end
 
   it "rejects activation without current market rate" do
@@ -54,7 +54,7 @@ RSpec.describe Budgets::ActivateService do
 
     expect do
       described_class.call(budget: budget, investor: bob)
-    end.to raise_error(Budgets::ActivateService::Error, "Admin must set current BTC/EUR rate")
+    end.to raise_error(Budgets::ActivateService::Error, "L'admin deve impostare il cambio BTC/€ corrente")
   end
 
   it "rejects insufficient collateral" do

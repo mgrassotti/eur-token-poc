@@ -34,6 +34,14 @@ class Budget < ApplicationRecord
     peg_eur_per_btc.present? && peg_eur_per_btc.positive?
   end
 
+  # In pending il peg non è ancora fissato: per stime UI usa il cambio corrente.
+  def provisional_strike_eur_per_btc(market_rate: MarketRate.current)
+    return peg_eur_per_btc if peg_set?
+    return unless market_rate.set?
+
+    market_rate.btc_eur_per_btc
+  end
+
   def amount_eur
     amount_eur_cents / 100.0
   end

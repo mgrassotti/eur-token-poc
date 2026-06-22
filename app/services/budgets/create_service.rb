@@ -39,7 +39,6 @@ module Budgets
           borrower: borrower,
           amount_eur_cents: amount_eur_cents,
           collateral_eur_cents: amount_eur_cents * Budget::INVESTOR_COLLATERAL_MULTIPLIER,
-          peg_eur_per_btc: peg_eur_per_btc,
           period_start: period_start,
           period_end: period_end,
           borrower_locked_sats: locked_sats,
@@ -54,7 +53,7 @@ module Budgets
 
     def validate!
       raise Error, "L'admin deve impostare il cambio BTC/€ corrente" unless MarketRate.current.set?
-      raise Error, "Importo budget non valido" unless amount_eur_cents.to_i.positive?
+      raise Error, "Importo richiesto non valido" unless amount_eur_cents.to_i.positive?
       raise Error, "Periodo non valido" if period_start.blank? || period_end.blank? || period_end < period_start
     end
   end

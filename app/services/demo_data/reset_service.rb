@@ -4,7 +4,7 @@ module DemoData
   class ResetService
     ALICE_SATS = 10_000_000 # 0.1 BTC
     BOB_SATS = 20_000_000   # 0.2 BTC
-    DEFAULT_BTC_EUR_PER_BTC = 60_000
+    DEFAULT_BTC_EUR_PER_BTC = 50_000
     DEMO_PASSWORD = "password"
 
     DEMO_USERS = [
@@ -64,7 +64,7 @@ module DemoData
     def reset_market_rate!
       MarketRate.current.update!(
         btc_eur_per_btc: DEFAULT_BTC_EUR_PER_BTC,
-        bitcoin_block_height: 0,
+        bitcoin_block_height: ChainState.estimate_block_height,
         set_by: demo_users.fetch("admin@example.com")
       )
     end

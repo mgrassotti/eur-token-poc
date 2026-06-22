@@ -1,4 +1,4 @@
-<h1 class="h3 mb-4">Aggiungi budget spesa</h1>
+<h1 class="h3 mb-4">Richiedi liquidità</h1>
 
 <div class="card">
   <div class="card-body">
@@ -17,7 +17,7 @@
         <%= f.label :amount_eur, "Importo budget (€)", class: "form-label" %>
         <%= f.number_field :amount_eur, value: @budget.amount_eur_cents ? @budget.amount_eur : 1000, class: "form-control", step: 0.01, min: 0.01, required: true %>
         <div class="form-text">
-          Dal tuo conto risparmio verranno bloccati BTC per 1× l'importo (collateral del contratto, non rimborsato al settlement).
+          Dal conto riserva verranno bloccati BTC per 1× l'importo (collateral del contratto, non rimborsato al settlement).
           Un investitore dovrà bloccare altrettanto per coprire il rischio di cambio sui token.
         </div>
       </div>

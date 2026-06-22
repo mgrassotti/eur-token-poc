@@ -11,7 +11,16 @@ module Admin
         btc_eur_per_btc: params[:btc_eur_per_btc],
         set_by: current_user
       )
-      redirect_to root_path, notice: "Cambio BTC/€ aggiornato a #{params[:btc_eur_per_btc]} €/BTC."
+      liquidations = Budgets::AutoLiquidationService.call(market_rate: rate, set_by: current_user)
+      settled_ids = liquidations.map { |result| result.settlement.budget_id }
+      Budgets::ReconcileService.call(exclude_budget_ids: settled_ids)
+      notice = if liquidations.any?
+        ids = settled_ids.join(", ")
+        "Liquidazione automatica (LTV ≥ #{(Budget::LIQUIDATION_LTV_THRESHOLD * 100).to_i}%): deal ##{ids} chiusi al cambio #{params[:btc_eur_per_btc]} €/BTC."
+      else
+        "Cambio BTC/€ aggiornato a #{params[:btc_eur_per_btc]} €/BTC."
+      end
+      redirect_to root_path, notice: notice
     rescue ActiveRecord::RecordInvalid => e
       redirect_to root_path, alert: e.record.errors.full_messages.to_sentence
     end

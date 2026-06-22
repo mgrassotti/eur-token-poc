@@ -31,6 +31,7 @@ module DemoData
     private
 
     def clear_ledger!
+      InvestorYieldPayout.delete_all
       Settlement.delete_all
       TokenTransfer.delete_all
       TokenAccount.delete_all

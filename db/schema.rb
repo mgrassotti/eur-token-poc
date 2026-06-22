@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_31_170000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_15_120000) do
   create_table "btc_accounts", force: :cascade do |t|
     t.bigint "balance_sats", default: 0, null: false
     t.datetime "created_at", null: false
@@ -43,6 +43,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_31_170000) do
     t.datetime "locked_at", null: false
     t.datetime "updated_at", null: false
     t.index ["budget_id"], name: "index_collateral_locks_on_budget_id", unique: true
+  end
+
+  create_table "investor_yield_payouts", force: :cascade do |t|
+    t.decimal "btc_eur_per_btc", precision: 16, scale: 2, null: false
+    t.bigint "btc_sats", null: false
+    t.integer "budget_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "paid_at", null: false
+    t.datetime "updated_at", null: false
+    t.integer "user_id", null: false
+    t.index ["budget_id"], name: "index_investor_yield_payouts_on_budget_id"
+    t.index ["user_id"], name: "index_investor_yield_payouts_on_user_id"
   end
 
   create_table "market_rates", force: :cascade do |t|
@@ -101,6 +113,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_31_170000) do
   add_foreign_key "budgets", "users", column: "borrower_id"
   add_foreign_key "budgets", "users", column: "investor_id"
   add_foreign_key "collateral_locks", "budgets"
+  add_foreign_key "investor_yield_payouts", "budgets"
+  add_foreign_key "investor_yield_payouts", "users"
   add_foreign_key "market_rates", "users", column: "set_by_id"
   add_foreign_key "settlements", "budgets"
   add_foreign_key "token_accounts", "budgets"

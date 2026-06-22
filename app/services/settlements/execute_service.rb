@@ -14,15 +14,16 @@ module Settlements
       :eur_at_peg
     )
 
-    def self.call(budget:, end_btc_eur_rate:, set_by: nil)
-      new(budget:, end_btc_eur_rate:, set_by:).call
+    def self.call(budget:, end_btc_eur_rate:, set_by: nil, force_liquidation: false)
+      new(budget:, end_btc_eur_rate:, set_by:, force_liquidation:).call
     end
 
-    def initialize(budget:, end_btc_eur_rate:, set_by: nil)
+    def initialize(budget:, end_btc_eur_rate:, set_by: nil, force_liquidation: false)
       @budget = budget
       @end_btc_eur_rate = end_btc_eur_rate.to_d
       @peg_eur_per_btc = budget.peg_eur_per_btc.to_d
       @set_by = set_by
+      @force_liquidation = force_liquidation
     end
 
     def call
@@ -112,7 +113,7 @@ module Settlements
 
     private
 
-    attr_reader :budget, :end_btc_eur_rate, :peg_eur_per_btc, :set_by
+    attr_reader :budget, :end_btc_eur_rate, :peg_eur_per_btc, :set_by, :force_liquidation
 
     def holder_payout(token_cents)
       peg_sats = BtcConversion.token_cents_to_sats(token_cents, peg_eur_per_btc)

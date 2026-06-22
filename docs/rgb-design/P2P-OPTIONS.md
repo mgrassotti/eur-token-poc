@@ -136,11 +136,13 @@ Se il transfer usa un canale LN: chiusura unilaterale del canale; consignment RG
 
 Terza chiave **nota** (non il bot prod) solo per deadlock prolungato — usare con parsimonia.
 
-**Checklist wallet:** all’apertura deal, wallet **deve** esportare:
+**Checklist wallet (M1+):** all’apertura deal on-chain, wallet **deve** esportare:
 
 - consignment RGB
 - PSBT refund timelocked
 - parametri deal (K, T, outpoint)
+
+*Il PoC Rails M0 non implementa questi artefatti — solo stato DB.*
 
 ---
 
@@ -316,23 +318,22 @@ Apertura deal, maturity e refund timelock restano su **L1**.
 
 ## 10) Mapping `eur-token-poc` → modello P2P
 
-Il demo Rails **`eur-token-poc`** simula la stessa economia in DB centralizzato.
-On-chain ogni riga “epoch / pool globale” diventa **N deal** con escrow dedicato.
+Il demo Rails **`eur-token-poc`** simula la stessa economia in DB centralizzato, **un budget = un deal** con escrow dedicato simulato (`CollateralLock`).
 
 | `eur-token-poc` (Rails) | Servizio / modello | `FloorBTC` P2P | Gap principale |
 |-------------------------|-------------------|----------------|----------------|
-| Apertura posizione Alice | `Budgets::CreateService` + `ActivateService` | Genesis deal: Alice collateral + mint `notional` | Budget pending → **escrow multisig** per deal |
-| Strike al mint | `Budget#peg_eur_per_btc` | `strike_eur_per_btc` | Stesso concetto |
-| Collateral apertura | 1× richiedente + 1× investitore (`OPENING_COLLATERAL_MULTIPLIER = 2`) | `escrow_total ≥ 2 × notional` | LTV 70% margin call, 90% liquidazione |
-| Investor hedger | `InvestorDeposits::CreateService` | `hedge_collateral_sats` in escrow | N investitori pro-rata → **un** controparte per deal |
+| Apertura posizione Alice | `Budgets::CreateService` + `ActivateService` | Genesis deal: Alice collateral + mint `notional` | Escrow **multisig L1** per deal (M1) |
+| Strike al mint | `Budget#peg_eur_per_btc` (fissato all’activate) | `strike_eur_per_btc` | Stesso concetto |
+| Collateral apertura | 1× richiedente + 1× investitore (`OPENING_COLLATERAL_MULTIPLIER = 2`) | `escrow_total ≥ 2 × notional` | LTV 70% margin call, 90% liquidazione (PoC) |
+| Investor hedger | `InvestorDeposits::CreateService` + `InvestorCollateralTopUpService` | `hedge_collateral_sats` in escrow | Top-up DB, non annex UTXO |
 | Token € fungibile | `TokenAccount#balance_cents` post-activate | `notional_share` RGB (cent = unità nominale) | DB account → assignment |
-| Transfer | `Tokens::TransferService` | `TransferPosition` (anche parziale); L1 o LN | Validazione server → client-side RGB |
-| Maturity | `Epoch#end_block` (210_000 blocchi) | `maturity_height` per deal | Maturity **globale epoch** → **per deal** |
-| Settlement | `Settlements::ExecuteService` | Payoff a T con oracle (`spot` vs `K`) | Settlement **tutti gli holder epoch** → singolo escrow |
-| Ritiro anticipato | `Tokens::RedeemService` (cambio corrente) | Opzionale: uscita cooperativa pre-T | Non nel MVP P2P core |
-| Catena / oracle | `ChainState` + `MarketRate` (admin) | `maturity_height` + attestation mediana | Admin DB → oracle firmato |
-| Liquidazione LTV 90% | `Epochs::AutoLiquidationService` | Liquidazione anticipata margin — vedi [`MARGIN-SPEC.md`](MARGIN-SPEC.md) §6 | Extra demo PoC; per-deal in M2+ |
-| Yield investitori | `Epochs::InvestorYieldService` (LTV &lt; 30%) | `premium_sats` upfront a Bob | Meccanismo diverso |
+| Transfer | `Tokens::WalletTransferService` | `TransferPosition` (anche parziale); L1 o LN | Validazione server → client-side RGB |
+| Maturity | `Budget#maturity_block_height` | `maturity_height` per deal | **Fatto** per deal (no epoch globale) |
+| Settlement | `Settlements::ExecuteService` + `Payoffs::FloorEurCalculator` | Payoff a T con oracle (`spot` vs `K`) | **Fatto** per budget; PSBT L1 in M1 |
+| Ritiro anticipato | — | Opzionale: uscita cooperativa pre-T | Non nel MVP P2P core |
+| Catena / oracle | `ChainState` + `MarketRate` (admin) + `Budgets::AutoSettleService` | `maturity_height` + attestation mediana | Admin DB → oracle firmato |
+| Liquidazione LTV 90% | `Budgets::AutoLiquidationService` | Liquidazione anticipata — vedi [`MARGIN-SPEC.md`](MARGIN-SPEC.md) §6 | LTV PoC, non `coverage_bps` annex |
+| Yield investitori | `Budgets::InvestorYieldService` (LTV &lt; 30%) | `premium_sats` upfront a Bob | Meccanismo diverso |
 | Bot facilitatore | Dashboard admin + auto-activate | Match + PSBT + oracle; chiave 1-of-3 | Admin DB → facilitatore non custode |
 
 ### 10.1 Attori demo → P2P
@@ -342,16 +343,18 @@ On-chain ogni riga “epoch / pool globale” diventa **N deal** con escrow dedi
 | Alice | Borrower (`Budget`) | Receiver / holder `FloorBTCPosition` |
 | Bob | Investitore per deal | Hedger (1× minimo; top-up se LTV ≥ 70%) |
 | Claude / David | Destinatario `TokenTransfer` | Cessionario `TransferPosition` |
-| Admin | `ChainState`, `MarketRate`, settlement epoch | Opzionale: oracle publish; non custode fondi |
+| Admin | `ChainState`, `MarketRate`, settlement per budget | Opzionale: oracle publish; non custode fondi |
 
 ### 10.2 Evoluzione consigliata del demo Rails
 
-Per avvicinare `eur-token-poc` al target P2P **prima** del codice RGB:
+Stato **M6 parziale** (branch `deal-per-budget`):
 
-1. **Budget = deal** con collateral investitori **allocato** (non solo capienza pool epoch).
-2. **Settlement per budget** a scadenza locale, oltre o invece del settlement epoch globale.
-3. Transfer token invariato come proxy di `TransferPosition` (già parziale).
-4. Test numerici: Alice 1M sats equivalenti, Bob 1M, escrow 2M, `peg` = strike, `end_block` budget = maturity.
+- [x] **Budget = deal** con collateral investitori allocato per budget.
+- [x] **Settlement per budget** a `maturity_block_height` (`AutoSettleService` + `ExecuteService`).
+- [x] Transfer token multi-budget (`WalletTransferService`) come proxy di `TransferPosition`.
+- [x] Test numerici PAYOFF-SPEC §11 (Alice/Bob 1× ciascuno, escrow 2×, FloorEUR settlement).
+- [ ] Multisig L1, pubkeys, recovery package, Path B timelock — M1.
+- [ ] `Deal` model / rename formale da `Budget` (opzionale, cosmetico).
 
 ---
 
@@ -364,7 +367,7 @@ M2  Bot: match + PSBT template + recovery package export
 M3  RGB FloorEURPosition + TransferPosition (split) + rgb-lib mobile
 M4  DLC/adaptor (opz.) — settlement L1 più ricco del multisig cooperativo
 M5  TransferPosition over Lightning (instant, ~zero fee marginale)
-M6  (opz.) Refactor eur-token-poc: budget-as-deal + settlement per budget
+M6  (opz.) Refactor eur-token-poc: budget-as-deal + settlement per budget  ← **parziale in PoC Rails**
 ```
 
 **Ordine fase 0 #5:** dopo M1/M2 si implementa **RGB prima** (diritti transferibili); **DLC** resta enhancement opzionale dello settlement, non prerequisito.
@@ -402,7 +405,7 @@ M6  (opz.) Refactor eur-token-poc: budget-as-deal + settlement per budget
 - [`PAYOFF-SPEC.md`](PAYOFF-SPEC.md) — peg € + interesse sul notional (FloorEUR), formula settlement
 - [`MULTISIG-SPEC.md`](MULTISIG-SPEC.md) — escrow 2-of-3, matrice firme, recovery, timelock
 - [`MARGIN-SPEC.md`](MARGIN-SPEC.md) — margin intraday, top-up annex, liquidazione anticipata
-- [`eur-token-poc` README](../../README.md) — simulatore Rails (epoch, budget, pool 2×, settlement)
+- [`eur-token-poc` README](../../README.md) — simulatore Rails (budget per deal, settlement FloorEUR, LTV 70/90)
 - [Hodl Hodl](https://hodlhodl.com/) — multisig per contratto
 - [rgb-lib](https://github.com/RGB-Tools/rgb-lib) — wallet mobile + validazione
 
@@ -415,5 +418,5 @@ payoff a maturity via **oracle mediano**, **cedenza frazionabile** del diritto v
 (L1 o **Lightning** opzionale per transfer istante a fee marginali zero),
 bot facilitatore con recovery **Alice+Bob** e **timelock**.
 
-Il demo **`eur-token-poc`** fornisce i casi numerici e il vocabolario (budget, peg, epoch, transfer, settlement);
+Il demo **`eur-token-poc`** fornisce i casi numerici e il vocabolario (budget-as-deal, peg, transfer, settlement FloorEUR);
 l’implementazione on-chain sostituisce pool/epoch globali con **deal indipendenti**.

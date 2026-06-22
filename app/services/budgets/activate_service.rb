@@ -22,7 +22,7 @@ module Budgets
         investor_btc = investor.btc_account.lock!
         collateral_sats = budget.collateral_sats_at_peg(peg_eur_per_btc)
 
-        raise Error, "Saldo insufficiente sul conto risparmio" if investor_btc.balance_sats < collateral_sats
+        raise Error, "Saldo insufficiente sul conto riserva" if investor_btc.balance_sats < collateral_sats
 
         investor_btc.update!(balance_sats: investor_btc.balance_sats - collateral_sats)
 

@@ -36,6 +36,6 @@ RSpec.describe Budgets::CreateService do
         period_start: Date.current,
         period_end: Date.current + 1.month
       )
-    end.to raise_error(Budgets::CreateService::Error, "Saldo insufficiente sul conto risparmio")
+    end.to raise_error(Budgets::CreateService::Error, "Saldo insufficiente sul conto riserva")
   end
 end

@@ -53,7 +53,7 @@ class BudgetsController < ApplicationController
       budget: @budget,
       investor: current_user
     )
-    redirect_to budget, notice: "Budget attivato. #{BtcConversion.format_btc(budget.investor_locked_sats)} decurtati dal tuo conto risparmio."
+    redirect_to budget, notice: "Budget attivato. #{BtcConversion.format_btc(budget.investor_locked_sats)} decurtati dal conto riserva."
   rescue Budgets::ActivateService::Error => e
     redirect_to @budget, alert: e.message
   end

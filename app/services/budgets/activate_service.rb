@@ -28,9 +28,14 @@ module Budgets
 
         total_locked_sats = collateral_sats + budget.borrower_locked_sats
 
+        genesis_height = ChainState.block_height
+        maturity_height = genesis_height + budget.symbolic_months_duration * Budget::BLOCKS_PER_MONTH
+
         budget.update!(
           investor: investor,
           investor_locked_sats: collateral_sats,
+          genesis_block_height: genesis_height,
+          maturity_block_height: maturity_height,
           status: :active
         )
 

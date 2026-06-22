@@ -4,6 +4,27 @@
   <div class="card mb-4 border-info">
     <div class="card-header bg-info-subtle">Pannello admin</div>
     <div class="card-body">
+      <h2 class="h6">Catena Bitcoin (simulata)</h2>
+      <p class="text-muted small mb-3">
+        Altezza blocco: <strong><%= number_with_delimiter(@market_rate.bitcoin_block_height) %></strong>
+        — i deal si chiudono automaticamente al raggiungimento del blocco maturity.
+      </p>
+
+      <%= form_with url: admin_chain_state_path, method: :patch, class: "row g-2 align-items-end mb-4" do %>
+        <div class="col-auto">
+          <%= label_tag :bitcoin_block_height, "Altezza blocco", class: "form-label" %>
+          <%= number_field_tag :bitcoin_block_height,
+            @market_rate.bitcoin_block_height,
+            class: "form-control form-control-sm",
+            min: 0,
+            step: 1,
+            required: true %>
+        </div>
+        <div class="col-auto">
+          <%= submit_tag "Aggiorna blocco", class: "btn btn-sm btn-outline-info" %>
+        </div>
+      <% end %>
+
       <h2 class="h6">Cambio BTC/€ corrente</h2>
       <%= form_with url: admin_market_rate_path, method: :patch, class: "row g-2 align-items-end mb-4" do %>
         <div class="col-auto">
@@ -31,13 +52,21 @@
             <li class="list-group-item d-flex justify-content-between align-items-center flex-wrap gap-2">
               <span>
                 #<%= budget.id %> — peg <%= number_with_delimiter(budget.peg_eur_per_btc) %> €/BTC
+                <% if budget.maturity_block_height %>
+                  <span class="text-muted small d-block">
+                    Maturity blocco <strong><%= number_with_delimiter(budget.maturity_block_height) %></strong>
+                    (<%= number_with_delimiter(budget.blocks_remaining) %> rimanenti)
+                  </span>
+                <% end %>
                 <% if ltv.present? %>
                   <span class="badge text-bg-<%= ltv >= Budget::LIQUIDATION_LTV_THRESHOLD ? "danger" : ltv < Budget::INVESTOR_YIELD_LTV_THRESHOLD ? "info" : "secondary" %>">
                     LTV <%= number_to_percentage(ltv * 100, precision: 0) %>
                   </span>
                 <% end %>
               </span>
-              <%= link_to "Settlement", new_budget_settlement_path(budget), class: "btn btn-sm btn-danger" %>
+              <%= link_to "Settlement", new_budget_settlement_path(budget),
+                class: "btn btn-sm btn-danger #{'disabled' unless budget.ready_for_settlement?}",
+                aria: { disabled: !budget.ready_for_settlement? } %>
             </li>
           <% end %>
         </ul>
@@ -84,7 +113,12 @@
         <% if @spending_budget_total_cents.positive? %>
           <p class="display-6 mb-1"><%= format_eur(@spending_budget_total_cents) %></p>
           <% @spending_budgets.each do |budget| %>
-            <p class="text-muted mb-0">Scadenza: <%= l(budget.period_end, format: :long) %></p>
+            <p class="text-muted mb-0">
+              Scadenza: <%= l(budget.period_end, format: :long) %>
+              <% if budget.maturity_block_height %>
+                — maturity blocco <%= number_with_delimiter(budget.maturity_block_height) %>
+              <% end %>
+            </p>
           <% end %>
         <% else %>
           <p class="mb-0 text-muted">Nessun saldo sul conto spesa / risparmio.</p>

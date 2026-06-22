@@ -36,6 +36,8 @@ RSpec.describe Budgets::ActivateService do
     expect(alice.btc_account.reload.balance_sats).to eq(alice_sats_after_create)
     expect(bob.btc_account.reload.balance_sats).to eq(starting_bob_sats - bob_collateral_sats)
     expect(alice.token_accounts.find_by(budget: budget).balance_cents).to eq(100_000)
+    expect(budget.genesis_block_height).to eq(ChainState.block_height)
+    expect(budget.maturity_block_height).to eq(budget.genesis_block_height + budget.symbolic_months_duration * Budget::BLOCKS_PER_MONTH)
   end
 
   it "uses create-time peg for collateral even if market moved before activation" do

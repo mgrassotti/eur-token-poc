@@ -1,33 +1,32 @@
 <h1 class="h3 mb-4">Settlement completato</h1>
 
 <div class="card mb-4">
-  <div class="card-header">Riepilogo</div>
+  <div class="card-header">Riepilogo FloorEUR</div>
   <div class="card-body">
-    <p>Peg iniziale budget: <strong><%= number_with_delimiter(@result.peg_eur_per_btc) %> €/BTC</strong></p>
-    <p>Cambio corrente (fine mese): <strong><%= number_with_delimiter(@result.end_btc_eur_rate) %> €/BTC</strong></p>
-    <% if @result.market_rate_updated %>
+    <p>Strike (peg) budget: <strong><%= number_with_delimiter(@result.peg_eur_per_btc) %> €/BTC</strong></p>
+    <p>Spot oracle (settlement): <strong><%= number_with_delimiter(@result.end_btc_eur_rate) %> €/BTC</strong></p>
+    <p>Passività totale deal: <strong><%= format_eur(@result.payoff.liability_eur_cents) %></strong>
+      (<%= @result.payoff.months_elapsed %> mesi × <%= @budget.rate_bps_monthly / 100.0 %>%/mese)</p>
+    <p>Payout holder (lordo): <strong><%= format_sats(@result.payoff.gross_holder_sats) %></strong>
+      — effettivo dopo cap escrow: <strong><%= format_sats(@result.payoff.total_holder_sats) %></strong></p>
+    <% if @result.payoff.insolvent %>
+      <p class="text-warning mb-0">Escrow insufficiente: payout holder limitato al distributable (PAYOFF-SPEC §7).</p>
+    <% elsif @result.market_rate_updated %>
       <p class="text-success mb-0">Cambio BTC/€ in dashboard aggiornato a fine settlement.</p>
-    <% end %>
-    <% if @result.total_fx_to_investor_sats.positive? %>
-      <p class="mb-0 text-muted">Differenza FX totale sui token (peg vs cambio corrente): <strong><%= format_sats(@result.total_fx_to_investor_sats) %></strong></p>
-    <% else %>
-      <p class="mb-0 text-muted">Cambio uguale al peg: nessun aggiustamento FX sui token.</p>
     <% end %>
   </div>
 </div>
 
 <div class="card mb-4">
-  <div class="card-header">Detentori token — BTC al cambio corrente</div>
+  <div class="card-header">Detentori token — quota liability € in sats</div>
   <div class="table-responsive">
     <table class="table mb-0">
       <thead>
         <tr>
           <th>Utente</th>
           <th>Token bruciati</th>
-          <th>Al peg</th>
-          <th>Al cambio corrente</th>
+          <th>Quota € a maturity</th>
           <th>BTC accreditati</th>
-          <th>FX → investitore</th>
         </tr>
       </thead>
       <tbody>
@@ -35,10 +34,8 @@
           <tr>
             <td><%= payout.user.name %></td>
             <td><%= format_eur(payout.token_cents) %></td>
-            <td><%= format_sats(payout.peg_sats) %></td>
-            <td><%= format_sats(payout.current_sats) %></td>
+            <td><%= format_savings_eur(payout.eur_at_settlement) %></td>
             <td><%= format_sats(payout.btc_sats) %></td>
-            <td><%= payout.fx_to_investor_sats.positive? ? format_sats(payout.fx_to_investor_sats) : "—" %></td>
           </tr>
         <% end %>
       </tbody>
@@ -47,11 +44,11 @@
 </div>
 
 <div class="card mb-4 border-warning">
-  <div class="card-header bg-warning-subtle">Investitore — residuo collateral</div>
+  <div class="card-header bg-warning-subtle">Investitore — residuo escrow</div>
   <div class="card-body">
-    <p><%= @result.investor.name %> riceve il residuo del pool dopo i payout ai detentori (compensa il rischio FX):</p>
+    <p><%= @result.investor.name %> riceve il residuo del pool dopo i payout holder e le mining fee stimate:</p>
     <p class="display-6 mb-1"><%= format_sats(@result.investor_btc_sats) %></p>
-    <p class="text-muted mb-0">Valore al cambio corrente: <%= format_savings_eur(@result.investor_eur_at_end) %></p>
+    <p class="text-muted mb-0">Valore allo spot: <%= format_savings_eur(@result.investor_eur_at_end) %></p>
   </div>
 </div>
 

@@ -3,6 +3,12 @@
     <div class="card shadow-sm">
       <div class="card-body">
         <h1 class="h3 mb-4">Login</h1>
+        <% if @demo_users_missing %>
+          <div class="alert alert-warning">
+            Database senza utenti demo. Dalla root del progetto esegui
+            <code>bin/rails db:seed</code> (oppure <code>bin/rails db:setup</code>).
+          </div>
+        <% end %>
         <%= form_with url: session_path do |f| %>
           <div class="mb-3">
             <%= label_tag :email, "Email", class: "form-label" %>

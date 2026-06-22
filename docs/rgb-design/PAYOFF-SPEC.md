@@ -206,7 +206,14 @@ richiedi: max_holder_sats + estimated_settlement_fee_sats ≤ escrow_total_sats
 
 Le fee di **funding** sono sui wallet dei depositanti (PSBT asincrona o consolidamento) — non riducono `escrow_utxo.value`.
 
-Con `hedge_collateral ≥ 2 × peg_collateral` e `liability` che cresce col tempo, **`rate_bps_monthly` e `months_elapsed` entrano nel dimensionamento** del collateral hedge.
+Con `escrow_total ≥ 2 × notional` all’apertura (richiedente 1× + investitore 1×, LTV iniziale 50%) il monitoraggio intraday usa **LTV mark-to-market**:
+
+| Soglia LTV | Azione (simulatore Rails / deal) |
+|------------|----------------------------------|
+| **≥ 70%** | **Margin call** — notifica investitore; può versare collateral aggiuntivo nel multisig |
+| **≥ 90%** | **Liquidazione automatica** FloorEUR (stesso payoff, spot corrente) |
+
+L’investitore può **sempre** aumentare `escrow_total` con top-up (annex UTXO in produzione; stesso `collateral_lock` nel PoC) per abbassare il LTV.
 
 ---
 
@@ -290,11 +297,12 @@ Fase 0 design: **chiusa**. Prossimo lavoro operativo: checklist M0 §11 (fixture
 
 ## 11) Checklist test (M0 done quando)
 
-- [ ] Esempio §5 (6 mesi, 1%/mese, tre spot) riprodotto in spec/fixture.
-- [ ] Transfer 40% a cessionario: pro-rata §5.
-- [ ] `spot > K` → stessi € holder, meno sats.
-- [ ] Cappo escrow §7 con `S` molto basso.
-- [ ] `hedge_collateral_sats ≥ 2 × peg_collateral_sats` (es. demo: 2M / 1M sats).
+- [x] Esempio §5 (6 mesi, 1%/mese, tre spot) riprodotto in spec/fixture.
+- [x] Transfer 40% a cessionario: pro-rata §5.
+- [x] `spot > K` → stessi € holder, meno sats.
+- [x] Cappo escrow §7 con `S` molto basso.
+- [x] Apertura: `escrow_total ≥ 2 × notional` (1× richiedente + 1× investitore); LTV iniziale 50%.
+- [x] LTV ≥ 70% margin call; ≥ 90% liquidazione; top-up investitore nel PoC.
 - [ ] Multisig 2-of-3: matrice firme e recovery package — vedi [`MULTISIG-SPEC.md`](MULTISIG-SPEC.md) §10.
 
 ---
@@ -317,4 +325,4 @@ A maturity ogni holder riceve in sats l’equivalente di:
 notional_€ × (1 + rate_bps_monthly × months / 10_000)
 ```
 
-valutato allo **spot oracle**, **senza** componenti aggiuntive se `spot > K`. L’interesse è sul **notional**; il diritto è frazionabile (`TransferPosition` / EURT); l’investor fornisce collateral `≥ 2×` la parte peg e riceve il residuo dell’escrow dopo il payout holder.
+valutato allo **spot oracle**, **senza** componenti aggiuntive se `spot > K`. L’interesse è sul **notional**; il diritto è frazionabile (`TransferPosition` / EURT). All’apertura: **escrow 2×** il notional (richiedente + investitore); **LTV ≥ 70%** margin call, **≥ 90%** liquidazione; l’investitore può versare collateral aggiuntivo.

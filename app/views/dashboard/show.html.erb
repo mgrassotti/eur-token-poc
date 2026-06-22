@@ -59,9 +59,7 @@
                   </span>
                 <% end %>
                 <% if ltv.present? %>
-                  <span class="badge text-bg-<%= ltv >= Budget::LIQUIDATION_LTV_THRESHOLD ? "danger" : ltv < Budget::INVESTOR_YIELD_LTV_THRESHOLD ? "info" : "secondary" %>">
-                    LTV <%= number_to_percentage(ltv * 100, precision: 0) %>
-                  </span>
+                  <%= budget_ltv_badge(budget, @market_rate.btc_eur_per_btc) %>
                 <% end %>
               </span>
               <%= link_to "Settlement", new_budget_settlement_path(budget),
@@ -88,6 +86,21 @@
         data: { turbo_confirm: "Confermi il reset? Tutti i budget e i token verranno eliminati." } %>
     </div>
   </div>
+<% end %>
+
+<% unless admin? %>
+  <% if @margin_call_budgets.any? %>
+    <div class="alert alert-warning">
+      <strong>Margin call (LTV ≥ <%= (Budget::MARGIN_CALL_LTV_THRESHOLD * 100).to_i %>%):</strong>
+      il collateral del deal non copre più adeguatamente gli EURT al cambio corrente.
+      Versa collateral aggiuntivo per evitare la liquidazione automatica al <%= (Budget::LIQUIDATION_LTV_THRESHOLD * 100).to_i %>%.
+      <ul class="mb-0 mt-2">
+        <% @margin_call_budgets.each do |budget| %>
+          <li><%= link_to "Ricarica ##{budget.id}", budget %> — LTV <%= number_to_percentage(budget.loan_to_value_ratio(@market_rate.btc_eur_per_btc) * 100, precision: 0) %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
 <% end %>
 
 <% unless admin? %>

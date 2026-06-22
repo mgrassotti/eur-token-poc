@@ -14,7 +14,10 @@ Rails.application.routes.draw do
       post :activate
     end
 
+    resource :investor_collateral_deposit, only: :create, controller: "investor_collateral_deposits"
+
     resources :token_transfers, only: %i[new create]
+    resource :investor_collateral_deposit, only: :create
     resource :settlement, only: %i[new create], controller: "settlements"
   end
 

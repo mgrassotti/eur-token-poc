@@ -15,6 +15,7 @@ class DashboardController < ApplicationController
     @pending_budgets = Budget.awaiting_investor.order(created_at: :desc)
     @investable_budgets = @pending_budgets.reject { |b| b.borrower_id == current_user.id }
     @savings_eur = savings_eur_value(@savings_sats, @market_rate)
+    @margin_call_budgets = Budgets::MarginCall.budgets_for(current_user, market_rate: @market_rate)
 
     return unless admin?
 

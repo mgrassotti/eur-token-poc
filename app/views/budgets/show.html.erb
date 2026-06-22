@@ -53,6 +53,11 @@
           <% end %>
         </dd>
       <% end %>
+      <% if @budget.active? && @market_rate.set? %>
+        <% ltv = @budget.loan_to_value_ratio(@market_rate.btc_eur_per_btc) %>
+        <dt class="col-sm-3">LTV corrente</dt>
+        <dd class="col-sm-9"><%= budget_ltv_badge(@budget, @market_rate.btc_eur_per_btc) %></dd>
+      <% end %>
     </dl>
   </div>
 </div>
@@ -84,6 +89,31 @@
 <% end %>
 
 <% if @budget.active? %>
+  <% if @budget.investor_id == current_user.id && @market_rate.set? && @budget.margin_call_threshold_reached?(@market_rate.btc_eur_per_btc) %>
+    <div class="alert alert-warning">
+      <strong>Margin call:</strong> LTV ≥ <%= (Budget::MARGIN_CALL_LTV_THRESHOLD * 100).to_i %>%.
+      Versa collateral aggiuntivo nel multisig per abbassare il LTV ed evitare la liquidazione automatica al <%= (Budget::LIQUIDATION_LTV_THRESHOLD * 100).to_i %>%.
+    </div>
+  <% end %>
+
+  <% if @budget.investor_id == current_user.id && @market_rate.set? %>
+    <div class="card mb-4 border-secondary">
+      <div class="card-header">Versa collateral aggiuntivo</div>
+      <div class="card-body">
+        <p class="text-muted small">Top-up sullo stesso escrow del deal (simula annex multisig). Riduce il LTV immediatamente.</p>
+        <%= form_with url: budget_investor_collateral_deposit_path(@budget), class: "row g-2 align-items-end" do %>
+          <div class="col-auto">
+            <%= label_tag :amount_eur, "Importo (€)", class: "form-label" %>
+            <%= number_field_tag :amount_eur, nil, class: "form-control form-control-sm", step: 0.01, min: 0.01, required: true %>
+          </div>
+          <div class="col-auto">
+            <%= submit_tag "Versa", class: "btn btn-sm btn-outline-secondary" %>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+
   <div class="card mb-4">
     <div class="card-header">Token in circolazione</div>
     <div class="table-responsive">

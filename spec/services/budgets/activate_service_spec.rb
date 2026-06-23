@@ -64,4 +64,17 @@ RSpec.describe Budgets::ActivateService do
       described_class.call(budget: budget, investor: bob)
     end.to raise_error(Budgets::ActivateService::Error, "Saldo insufficiente sul conto di riserva")
   end
+
+  it "rejects activation when L1 is enabled but bitcoind is down" do
+    previous = ENV["L1_ENABLED"]
+    ENV["L1_ENABLED"] = "1"
+    unavailable = instance_double(L1::Bitcoind::Client, available?: false)
+    allow(L1::Bitcoind::Client).to receive(:new).and_return(unavailable)
+
+    expect do
+      described_class.call(budget: budget, investor: bob)
+    end.to raise_error(Budgets::ActivateService::Error, /bitcoind regtest/)
+  ensure
+    ENV["L1_ENABLED"] = previous
+  end
 end

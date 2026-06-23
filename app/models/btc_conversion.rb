@@ -25,6 +25,10 @@ module BtcConversion
     [holder_sats, fx_to_investor_sats]
   end
 
+  def btc_to_sats(btc)
+    (btc.to_d * SATS_PER_BTC).round
+  end
+
   def sats_to_btc(sats)
     sats.to_d / SATS_PER_BTC
   end

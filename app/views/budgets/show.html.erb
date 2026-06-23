@@ -58,7 +58,33 @@
         <dt class="col-sm-3">LTV corrente</dt>
         <dd class="col-sm-9"><%= budget_ltv_badge(@budget, @market_rate.btc_eur_per_btc) %></dd>
       <% end %>
+      <% if @budget.l1_multisig_provisioned? %>
+        <dt class="col-sm-3">Escrow L1</dt>
+        <dd class="col-sm-9">
+          <code><%= @budget.escrow_outpoint %></code>
+          <% if @budget.recovery_package.dig("escrow", "address") %>
+            <span class="text-muted small d-block"><%= @budget.recovery_package.dig("escrow", "address") %></span>
+          <% end %>
+        </dd>
+        <dt class="col-sm-3">Pubkeys (2-of-3)</dt>
+        <dd class="col-sm-9">
+          <span class="text-muted small d-block">peg: <code><%= truncate_hex(@budget.peg_party_pubkey) %></code></span>
+          <span class="text-muted small d-block">investor: <code><%= truncate_hex(@budget.investor_pubkey) %></code></span>
+          <span class="text-muted small d-block">bot: <code><%= truncate_hex(@budget.bot_pubkey) %></code></span>
+        </dd>
+      <% elsif l1_enabled? && @budget.active? %>
+        <dt class="col-sm-3">Escrow L1</dt>
+        <dd class="col-sm-9"><span class="text-warning">Non provisionato</span></dd>
+      <% end %>
     </dl>
+    <% if @budget.recovery_package.present? && (admin? || @budget.borrower_id == current_user.id || @budget.investor_id == current_user.id) %>
+      <div class="mt-3 pt-3 border-top">
+        <%= link_to "Scarica recovery package (JSON)", budget_recovery_package_path(@budget),
+          class: "btn btn-sm btn-outline-primary",
+          data: { turbo: false } %>
+        <span class="text-muted small ms-2">MULTISIG-SPEC §6 — deal params, outpoint, refund locktime</span>
+      </div>
+    <% end %>
   </div>
 </div>
 
@@ -75,6 +101,12 @@
         <strong><%= format_sats(@budget.collateral_sats_at_peg(@market_rate.btc_eur_per_btc)) %></strong>
         (collateral <%= format_eur(@budget.collateral_eur_cents) %>).
       </p>
+      <% if l1_enabled? %>
+        <p class="text-muted small mb-3">
+          <strong>L1 attivo:</strong> all'attivazione verrà creato un escrow multisig 2-of-3 su regtest
+          (richiede <code>./bin/regtest up</code>).
+        </p>
+      <% end %>
       <%= button_to "Accetta rischio e attiva la richiesta", activate_budget_path(@budget), method: :post, class: "btn btn-warning" %>
     </div>
   </div>

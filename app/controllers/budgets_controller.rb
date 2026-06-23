@@ -53,8 +53,12 @@ class BudgetsController < ApplicationController
       budget: @budget,
       investor: current_user
     )
-    redirect_to budget, notice: "Budget attivato. #{BtcConversion.format_btc(budget.investor_locked_sats)} decurtati dal conto di riserva."
-  rescue Budgets::ActivateService::Error => e
+    notice = "Budget attivato. #{BtcConversion.format_btc(budget.investor_locked_sats)} decurtati dal conto di riserva."
+    if budget.l1_multisig_provisioned?
+      notice += " Escrow L1 provisionato (#{budget.escrow_outpoint})."
+    end
+    redirect_to budget, notice: notice
+  rescue Budgets::ActivateService::Error, L1::ProvisionEscrowService::Error => e
     redirect_to @budget, alert: e.message
   end
 

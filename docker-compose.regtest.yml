@@ -1,0 +1,30 @@
+# Bitcoin Core regtest for M1 multisig integration tests.
+# Usage: docker compose -f docker-compose.regtest.yml up -d
+services:
+  bitcoind:
+    image: bitcoin/bitcoin:28.0
+    command:
+      - -regtest=1
+      - -server=1
+      - -fallbackfee=0.0002
+      - -txindex=1
+      - -rpcbind=0.0.0.0:18443
+      - -rpcallowip=0.0.0.0/0
+      - -rpcuser=regtest
+      - -rpcpassword=regtest
+    ports:
+      - "18443:18443"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "bitcoin-cli",
+          "-regtest",
+          "-rpcconnect=127.0.0.1",
+          "-rpcuser=regtest",
+          "-rpcpassword=regtest",
+          "getblockchaininfo"
+        ]
+      interval: 2s
+      timeout: 5s
+      retries: 30

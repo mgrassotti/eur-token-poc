@@ -305,7 +305,7 @@ Fase 0 design: **chiusa**. Checklist M0 §11 **completata in Rails** (46 spec ve
 - [x] Cappo escrow §7 con `S` molto basso.
 - [x] Apertura: `escrow_total ≥ 2 × notional` (1× richiedente + 1× investitore); LTV iniziale 50%.
 - [x] LTV ≥ 70% margin call; ≥ 90% liquidazione; top-up investitore nel PoC.
-- [ ] Multisig 2-of-3: matrice firme e recovery package — vedi [`MULTISIG-SPEC.md`](MULTISIG-SPEC.md) §10.
+- [ ] Multisig 2-of-3 L1: matrice firme e recovery package — **M1 regtest** in `lib/l1/` (wiring activate opzionale).
 
 ---
 

@@ -77,6 +77,20 @@
       <% end %>
 
       <hr>
+      <h2 class="h6">Multisig L1 (regtest)</h2>
+      <% if l1_enabled? %>
+        <p class="text-muted small mb-2">
+          <span class="badge text-bg-success">L1_ENABLED</span>
+          — wallet regtest per utente; depositi dal <%= L1::ExchangeWallet::DISPLAY_NAME %> (<code><%= L1::ExchangeWallet::WALLET_NAME %></code>).
+          Ogni deposito avanza la catena simulata di <%= L1::DepositReserveService::BLOCKS_PER_DEPOSIT %> blocchi.
+        </p>
+      <% else %>
+        <p class="text-muted small mb-2">
+          Disabilitato. Avvia il server con <code>L1_ENABLED=1 bin/rails server</code> e <code>./bin/regtest up</code>.
+        </p>
+      <% end %>
+
+      <hr>
       <h2 class="h6">Reset demo</h2>
       <p class="text-muted small">Cancella budget, token e settlement. Imposta Alice a 0.1 BTC, Bob a 0.2 BTC, gli altri a 0.</p>
       <%= button_to "Reset demo DB",
@@ -89,6 +103,8 @@
 <% end %>
 
 <% unless admin? %>
+  <h1 class="h3 mb-4">Ciao, <%= current_user.name %></h1>
+
   <% if @margin_call_budgets.any? %>
     <div class="alert alert-warning">
       <strong>Margin call (LTV ≥ <%= (Budget::MARGIN_CALL_LTV_THRESHOLD * 100).to_i %>%):</strong>
@@ -113,8 +129,14 @@
           <p class="display-6 mb-1"><%= format_savings_eur(@savings_eur) %></p>
           <p class="text-muted mb-0">= <%= format_sats(@savings_sats) %></p>
         <% else %>
-          <p class="display-6 mb-1"><%= format_sats(current_user.balance_sats) %></p>
-          <p class="text-muted small mb-0">Cambio BTC/€ non impostato dall'admin.</p>
+          <p class="display-6 mb-1"><%= format_sats(@savings_sats) %></p>
+        <% end %>
+        <% if l1_enabled? && current_user.btc_account.bitcoind_wallet_name.present? %>
+          <p class="text-muted small mb-0 mt-1">Wallet regtest: <code><%= current_user.btc_account.bitcoind_wallet_name %></code></p>
+        <% elsif l1_enabled? %>
+          <p class="text-muted small mb-0 mt-1">Nessun wallet L1 — premi «Deposita su conto riserva».</p>
+        <% elsif !@market_rate.set? %>
+          <p class="text-muted small mb-0 mt-1">Cambio BTC/€ non impostato dall'admin.</p>
         <% end %>
       </div>
     </div>
@@ -154,8 +176,11 @@
 </div>
 <% end %>
 
-<div class="d-flex gap-2 mb-4">
+<div class="d-flex gap-2 mb-4 flex-wrap">
   <% unless admin? %>
+    <% if l1_enabled? %>
+      <%= link_to "Deposita su conto riserva", new_reserve_deposit_path, class: "btn btn-success" %>
+    <% end %>
     <%= link_to "Ricarica conto corrente", new_budget_path, class: "btn btn-primary" %>
     <% if @spendable_token_cents.positive? %>
       <%= link_to "Invia Denaro", new_token_transfer_path, class: "btn btn-outline-primary" %>
@@ -232,6 +257,52 @@
             <td><%= balance_cents.positive? ? format_eur(balance_cents) : "—" %></td>
             <td><%= balance_cents.positive? ? format_eur(budget.holder_interest_at_maturity_cents(balance_cents)) : "—" %></td>
             <td><%= link_to "Apri", budget, class: "btn btn-sm btn-outline-primary" %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card mt-4">
+  <div class="card-header">I miei fondi</div>
+  <div class="table-responsive">
+    <table class="table mb-0">
+      <thead>
+        <tr>
+          <th>Importo</th>
+          <th>Ricevuto</th>
+          <th>Scadenza</th>
+          <th>Importo rimanente</th>
+          <th>Interessi alla scadenza</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if @my_fund_accounts.any? %>
+          <% @my_fund_accounts.each do |account| %>
+            <% budget = account.budget %>
+            <% balance_cents = account.balance_cents %>
+            <tr>
+              <td><%= format_eur(received_token_amount_cents(current_user, budget)) %></td>
+              <td>
+                <% received_at = first_token_received_at(current_user, budget) %>
+                <%= received_at ? l(received_at, format: :long) : "—" %>
+              </td>
+              <td>
+                <%= l(budget.period_end, format: :long) %>
+                <% if budget.maturity_block_height %>
+                  <span class="text-muted d-block small">blocco <%= number_with_delimiter(budget.maturity_block_height) %></span>
+                <% end %>
+              </td>
+              <td><%= balance_cents.positive? ? format_eur(balance_cents) : "—" %></td>
+              <td><%= balance_cents.positive? ? format_eur(budget.holder_interest_at_maturity_cents(balance_cents)) : "—" %></td>
+              <td><%= link_to "Apri", budget, class: "btn btn-sm btn-outline-primary" %></td>
+            </tr>
+          <% end %>
+        <% else %>
+          <tr>
+            <td colspan="6" class="text-muted">Nessun token EURT ricevuto.</td>
           </tr>
         <% end %>
       </tbody>

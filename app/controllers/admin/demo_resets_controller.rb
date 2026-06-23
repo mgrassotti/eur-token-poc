@@ -8,7 +8,7 @@ module Admin
 
     def create
       DemoData::ResetService.call
-      redirect_to root_path, notice: "Demo resettata: Alice 0.1 BTC, Bob 0.2 BTC, gli altri a 0."
+      redirect_to root_path, notice: "Demo resettata"
     end
 
     private

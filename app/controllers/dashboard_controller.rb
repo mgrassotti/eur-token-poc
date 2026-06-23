@@ -17,6 +17,15 @@ class DashboardController < ApplicationController
     @savings_eur = savings_eur_value(@savings_sats, @market_rate)
     @margin_call_budgets = Budgets::MarginCall.budgets_for(current_user, market_rate: @market_rate)
 
+    unless admin?
+      @my_fund_accounts = current_user.token_accounts
+        .includes(:budget)
+        .joins(:budget)
+        .where(budget_id: current_user.received_token_transfers.select(:budget_id))
+        .where.not(budgets: { borrower_id: current_user.id })
+        .order(created_at: :desc)
+    end
+
     return unless admin?
 
     @active_budgets = Budget.active.order(created_at: :desc)

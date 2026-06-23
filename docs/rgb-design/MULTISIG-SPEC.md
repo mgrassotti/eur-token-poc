@@ -329,13 +329,13 @@ protocol_fee_sats = 0    # MVP: nessun output verso il bot dall’escrow
 
 Legenda: `[x]` fatto in Rails PoC · `[~]` parziale / simulato in DB · `[ ]` M1+ L1.
 
-- [~] Parametri §2: subset su `Budget` (`peg_eur_per_btc`, `genesis_block_height`, `maturity_block_height`, `borrower_locked_sats`, `investor_locked_sats`, `CollateralLock#amount_sats`, `ESTIMATED_SETTLEMENT_FEE_SATS`). Mancano pubkeys, `escrow_outpoint`, `refund_delay_blocks`.
-- [ ] Matrice firme §4 coperta da test documentali / unitari (M1 regtest).
-- [ ] Recovery package §6 elencato e serializzabile (M1).
-- [~] Path B: `refund_delay_blocks` e split pro-rata definiti in spec (§6–§7); non implementati on-chain né in DB.
-- [~] Funding: un solo escrow simulato (`CollateralLock` a activate); versamenti separati non modellati come PSBT.
-- [x] Settlement: `total_holder = min(gross, escrow − fees)` — `Payoffs::FloorEurCalculator` + spec §11.
-- [ ] Verifica L1: nessuna spend possibile con **solo** `bot_pubkey` (M1).
+- [~] Parametri §2: subset su `Budget` (+ L1: pubkeys, `escrow_txid`/`vout`, `refund_delay_blocks`, `recovery_package` json).
+- [x] Matrice firme §4 — `L1::SignatureMatrix` + spec regtest (2-of-3 pairs; bot-only incompleto).
+- [x] Recovery package §6 serializzabile — `L1::RecoveryPackage` + `L1::RecordEscrowService`.
+- [~] Path B: refund tx con `locktime` costruita in regtest; broadcast post-maturity da automatizzare.
+- [x] Funding: un UTXO P2WSH via consolidamento §3.3 — `L1::RegtestHarness#fund_escrow!`.
+- [x] Settlement: `total_holder = min(gross, escrow − fees)` — `Payoffs::FloorEurCalculator` + spend regtest.
+- [x] Verifica L1: spend con **solo** bot → `complete: false` — spec regtest.
 
 ---
 

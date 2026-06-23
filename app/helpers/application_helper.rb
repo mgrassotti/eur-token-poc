@@ -13,6 +13,19 @@ module ApplicationHelper
     BtcConversion.format_eur_amount(amount)
   end
 
+  def l1_enabled?
+    L1.enabled?
+  end
+
+  def truncate_hex(value, leading: 8, trailing: 8)
+    return "—" if value.blank?
+
+    str = value.to_s
+    return str if str.length <= leading + trailing + 1
+
+    "#{str.first(leading)}…#{str.last(trailing)}"
+  end
+
   def budget_status_badge(budget)
     color = { "pending" => "warning", "active" => "success", "settled" => "secondary" }[budget.status]
     label = { "pending" => "In attesa", "active" => "Attiva", "settled" => "Chiusa" }[budget.status]
@@ -41,5 +54,13 @@ module ApplicationHelper
     return budget.amount_eur_cents unless budget.settled?
 
     0
+  end
+
+  def received_token_amount_cents(user, budget)
+    user.received_token_transfers.where(budget: budget).sum(:amount_cents)
+  end
+
+  def first_token_received_at(user, budget)
+    user.received_token_transfers.where(budget: budget).minimum(:created_at)
   end
 end

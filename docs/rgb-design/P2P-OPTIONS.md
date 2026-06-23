@@ -353,7 +353,8 @@ Stato **M6 parziale** (branch `deal-per-budget`):
 - [x] **Settlement per budget** a `maturity_block_height` (`AutoSettleService` + `ExecuteService`).
 - [x] Transfer token multi-budget (`WalletTransferService`) come proxy di `TransferPosition`.
 - [x] Test numerici PAYOFF-SPEC §11 (Alice/Bob 1× ciascuno, escrow 2×, FloorEUR settlement).
-- [ ] Multisig L1, pubkeys, recovery package, Path B timelock — M1.
+- [x] Wiring L1 in `ActivateService` (`L1_ENABLED=1`) + download recovery package JSON.
+- [ ] PSBT asincrona §3.2 + Path B broadcast end-to-end.
 - [ ] `Deal` model / rename formale da `Budget` (opzionale, cosmetico).
 
 ---
@@ -362,7 +363,7 @@ Stato **M6 parziale** (branch `deal-per-budget`):
 
 ```text
 M0  Spec payoff + multisig 2-of-3 + timelock refund + escrow 2× + LTV 70/90
-M1  Prototipo L1: regtest, 1 deal (Alice 1M / Bob 1M), settlement oracle mock
+M1  Prototipo L1: regtest, 1 deal (Alice 1M / Bob 1M), settlement oracle mock  ← **lib/l1 + spec regtest**
 M2  Bot: match + PSBT template + recovery package export
 M3  RGB FloorEURPosition + TransferPosition (split) + rgb-lib mobile
 M4  DLC/adaptor (opz.) — settlement L1 più ricco del multisig cooperativo

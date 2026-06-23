@@ -54,6 +54,8 @@ module Budgets
       end
 
       budget.reload
+      L1::ProvisionEscrowService.call(budget: budget) if L1.enabled?
+      budget.reload
     end
 
     private
@@ -64,6 +66,12 @@ module Budgets
       raise Error, "Budget is not pending" unless budget.pending?
       raise Error, "L'investitore non può essere il richiedente" if investor.id == budget.borrower_id
       raise Error, "L'admin deve impostare il cambio BTC/€ corrente" unless MarketRate.current.set?
+
+      return unless L1.enabled?
+
+      unless L1::Bitcoind::Client.new.available?
+        raise Error, "L1 abilitato ma bitcoind regtest non raggiungibile. Avvia: ./bin/regtest up"
+      end
     end
   end
 end

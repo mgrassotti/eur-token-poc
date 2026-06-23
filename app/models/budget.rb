@@ -10,6 +10,7 @@ class Budget < ApplicationRecord
   LIQUIDATION_LTV_THRESHOLD = 0.9
   BLOCKS_PER_MONTH = 4356
   DAYS_PER_SYMBOLIC_MONTH = 30.25
+  REFUND_DELAY_BLOCKS = 1008
 
   belongs_to :borrower, class_name: "User"
   belongs_to :investor, class_name: "User", optional: true
@@ -164,6 +165,20 @@ class Budget < ApplicationRecord
   def yield_eligible?(btc_eur_per_btc)
     ltv = loan_to_value_ratio(btc_eur_per_btc)
     ltv.present? && ltv < INVESTOR_YIELD_LTV_THRESHOLD
+  end
+
+  def escrow_outpoint
+    return unless escrow_txid.present? && !escrow_vout.nil?
+
+    "#{escrow_txid}:#{escrow_vout}"
+  end
+
+  def l1_multisig_provisioned?
+    peg_party_pubkey.present? && investor_pubkey.present? && bot_pubkey.present? && escrow_outpoint.present?
+  end
+
+  def refund_locktime_height
+    maturity_block_height.to_i + refund_delay_blocks
   end
 
   private

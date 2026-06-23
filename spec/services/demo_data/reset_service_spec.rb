@@ -9,7 +9,7 @@ RSpec.describe DemoData::ResetService do
   let!(:claude) { create(:user, email: "claude@example.com", name: "Claude") }
 
   before do
-    alice.btc_account.update!(balance_sats: 10_000_000)
+    alice.btc_account.update!(balance_sats: 10_000_000, bitcoind_wallet_name: "user_1")
     bob.btc_account.update!(balance_sats: 5_000_000)
     MarketRate.current.update!(btc_eur_per_btc: 60_000)
     budget = Budgets::CreateService.call(
@@ -21,15 +21,16 @@ RSpec.describe DemoData::ResetService do
     Budgets::ActivateService.call(budget: budget, investor: bob)
   end
 
-  it "clears ledger and sets demo balances" do
+  it "clears ledger and zeros all reserve balances" do
     described_class.call
 
     expect(Budget.count).to eq(0)
     expect(Settlement.count).to eq(0)
     expect(TokenAccount.count).to eq(0)
 
-    expect(alice.btc_account.reload.balance_sats).to eq(10_000_000)
-    expect(bob.btc_account.reload.balance_sats).to eq(20_000_000)
+    expect(alice.btc_account.reload.balance_sats).to eq(0)
+    expect(alice.btc_account.bitcoind_wallet_name).to be_nil
+    expect(bob.btc_account.reload.balance_sats).to eq(0)
     expect(claude.btc_account.reload.balance_sats).to eq(0)
     expect(admin.btc_account.reload.balance_sats).to eq(0)
     expect(MarketRate.current.btc_eur_per_btc).to eq(50_000)
@@ -49,6 +50,6 @@ RSpec.describe DemoData::ResetService do
     described_class.call
 
     expect(User.count).to eq(DemoData::ResetService::DEMO_USERS.size)
-    expect(User.find_by!(email: "alice@example.com").btc_account.balance_sats).to eq(10_000_000)
+    expect(User.find_by!(email: "alice@example.com").btc_account.balance_sats).to eq(0)
   end
 end

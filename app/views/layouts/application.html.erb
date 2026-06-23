@@ -15,7 +15,6 @@
         <%= link_to "BTC wallet PoC", root_path, class: "navbar-brand" %>
         <% if logged_in? %>
           <div class="navbar-nav ms-auto align-items-lg-center gap-lg-3">
-            <span class="navbar-text text-white-50"><%= current_user.name %></span>
             <% if Rails.env.development? %>
               <%= form_with url: dev_user_switch_path, method: :post, class: "d-flex align-items-center" do %>
                 <%= select_tag :user_id,

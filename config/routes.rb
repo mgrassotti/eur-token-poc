@@ -8,11 +8,14 @@ Rails.application.routes.draw do
   root "dashboard#show"
 
   resource :token_transfer, only: %i[new create], controller: "token_transfers"
+  resource :reserve_deposit, only: %i[new create]
 
   resources :budgets, only: %i[index show new create] do
     member do
       post :activate
     end
+
+    resource :recovery_package, only: :show, controller: "budget_recovery_packages"
 
     resource :investor_collateral_deposit, only: :create, controller: "investor_collateral_deposits"
 

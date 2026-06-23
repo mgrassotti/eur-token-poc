@@ -10,8 +10,11 @@ Specifiche di design: [`docs/rgb-design/`](docs/rgb-design/) (`PAYOFF-SPEC`, `P2
 cd ~/dev/eur-token-poc
 bundle install
 bin/rails db:setup
-bin/rails server
+bin/dev
 ```
+
+`bin/dev` avvia **bitcoind regtest** (`./bin/regtest up`) e **Rails** con `L1_ENABLED=1`.  
+Senza L1: `bin/rails server` come prima.
 
 Apri http://localhost:3000 e accedi con:
 
@@ -152,6 +155,34 @@ bundle exec rspec
   - `Tokens::WalletTransferService`
   - `Payoffs::FloorEurCalculator`, `Settlements::ExecuteService`
 - **Gap verso M1+:** multisig 2-of-3, PSBT, recovery package, RGB — vedi checklist in `docs/rgb-design/`
+
+## M1 — multisig regtest (L1)
+
+Modulo `lib/l1/` per escrow **2-of-3 P2WSH** su Bitcoin Core regtest (JSON-RPC, nessuna gem nativa).
+
+```bash
+bin/dev   # regtest + Rails L1
+```
+
+Ogni utente ha un **wallet regtest personale** (`user_<id>`). I depositi arrivano dal **Wallet esterno** (`l1_external_wallet`, 1 BTC demo).  
+**«Deposita su conto riserva»** apre un form (default Alice 0,1 · Bob 0,2 BTC) e avanza la catena simulata di **6 blocchi**.
+
+| Componente | Ruolo |
+|------------|--------|
+| `L1::UserWallet` | `createwallet` / `loadwallet` per utente |
+| `L1::ExchangeWallet` | Wallet esterno regtest (`l1_external_wallet`, 1 BTC) → transfer utente |
+| `L1::DepositReserveService` | transfer Wallet esterno + accredito DB + **+6 blocchi** catena simulata |
+| `L1::SyncReserveBalanceService` | `getbalance` → `BtcAccount#balance_sats` |
+| `POST /reserve_deposit` | bottone dashboard |
+| `L1::ProvisionEscrowService` | chiamato da `ActivateService` se `L1_ENABLED=1` |
+| `L1::RegtestHarness` | funding §3.3, settlement, refund timelock, bot-only probe |
+| `L1::RecoveryPackage` | export JSON §6 (deal params, outpoint, locktime) |
+| `L1::RecordEscrowService` | persiste pubkeys + `recovery_package` su `Budget` |
+| `GET /budgets/:id/recovery_package` | download JSON (richiedente, investitore, admin) |
+
+Campi DB su `Budget`: `peg_party_pubkey`, `investor_pubkey`, `bot_pubkey`, `escrow_txid`, `escrow_vout`, `refund_delay_blocks` (default 1008).
+
+Senza `L1_ENABLED` il demo resta solo ledger Rails (comportamento predefinito).
 
 ## Console walkthrough
 

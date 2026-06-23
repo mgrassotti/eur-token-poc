@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+case "${1:-up}" in
+  up)
+    docker compose -f docker-compose.regtest.yml up -d
+    echo "Waiting for bitcoind regtest on :18443..."
+    for _ in $(seq 1 60); do
+      if curl -sf --user regtest:regtest \
+        --data-binary '{"jsonrpc":"1.0","id":1,"method":"getblockchaininfo","params":[]}' \
+        -H "content-type: application/json" \
+        http://127.0.0.1:18443/ >/dev/null 2>&1; then
+        echo "bitcoind regtest ready"
+        exit 0
+      fi
+      sleep 1
+    done
+    echo "bitcoind did not become ready in time" >&2
+    exit 1
+    ;;
+  down)
+    docker compose -f docker-compose.regtest.yml down
+    ;;
+  logs)
+    docker compose -f docker-compose.regtest.yml logs -f bitcoind
+    ;;
+  *)
+    echo "Usage: $0 {up|down|logs}" >&2
+    exit 1
+    ;;
+esac

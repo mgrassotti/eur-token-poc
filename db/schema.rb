@@ -10,12 +10,14 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_15_140100) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_15_160000) do
   create_table "btc_accounts", force: :cascade do |t|
     t.bigint "balance_sats", default: 0, null: false
+    t.string "bitcoind_wallet_name"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.integer "user_id", null: false
+    t.index ["bitcoind_wallet_name"], name: "index_btc_accounts_on_bitcoind_wallet_name", unique: true, where: "bitcoind_wallet_name IS NOT NULL"
     t.index ["user_id"], name: "index_btc_accounts_on_user_id", unique: true
   end
 
@@ -23,16 +25,23 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_15_140100) do
     t.integer "amount_eur_cents", null: false
     t.integer "borrower_id", null: false
     t.bigint "borrower_locked_sats", default: 0, null: false
+    t.string "bot_pubkey"
     t.integer "collateral_eur_cents", null: false
     t.datetime "created_at", null: false
+    t.string "escrow_txid"
+    t.integer "escrow_vout"
     t.bigint "genesis_block_height"
     t.integer "investor_id"
     t.bigint "investor_locked_sats", default: 0, null: false
+    t.string "investor_pubkey"
     t.bigint "maturity_block_height"
     t.decimal "peg_eur_per_btc", precision: 16, scale: 2
+    t.string "peg_party_pubkey"
     t.date "period_end", null: false
     t.date "period_start", null: false
     t.integer "rate_bps_monthly", default: 100, null: false
+    t.json "recovery_package"
+    t.integer "refund_delay_blocks", default: 1008, null: false
     t.integer "status", default: 0, null: false
     t.datetime "updated_at", null: false
     t.index ["borrower_id"], name: "index_budgets_on_borrower_id"

@@ -2,18 +2,16 @@
 
 module DemoData
   class ResetService
-    ALICE_SATS = 10_000_000 # 0.1 BTC
-    BOB_SATS = 20_000_000   # 0.2 BTC
-    DEFAULT_BTC_EUR_PER_BTC = 50_000
-    DEMO_PASSWORD = "password"
-
     DEMO_USERS = [
-      { name: "Admin", email: "admin@example.com", sats: 0, admin: true },
-      { name: "Alice", email: "alice@example.com", sats: ALICE_SATS, admin: false },
-      { name: "Bob", email: "bob@example.com", sats: BOB_SATS, admin: false },
-      { name: "Claude", email: "claude@example.com", sats: 0, admin: false },
-      { name: "David", email: "david@example.com", sats: 0, admin: false }
+      { name: "Admin", email: "admin@example.com", admin: true },
+      { name: "Alice", email: "alice@example.com", admin: false },
+      { name: "Bob", email: "bob@example.com", admin: false },
+      { name: "Claude", email: "claude@example.com", admin: false },
+      { name: "David", email: "david@example.com", admin: false }
     ].freeze
+
+    DEMO_PASSWORD = "password"
+    DEFAULT_BTC_EUR_PER_BTC = 50_000
 
     def self.call
       new.call
@@ -54,11 +52,7 @@ module DemoData
     end
 
     def reset_balances!
-      BtcAccount.update_all(balance_sats: 0)
-
-      DEMO_USERS.each do |attrs|
-        demo_users.fetch(attrs[:email]).btc_account.update!(balance_sats: attrs[:sats])
-      end
+      BtcAccount.update_all(balance_sats: 0, bitcoind_wallet_name: nil)
     end
 
     def reset_market_rate!

@@ -18,11 +18,15 @@ class DashboardController < ApplicationController
     @margin_call_budgets = Budgets::MarginCall.budgets_for(current_user, market_rate: @market_rate)
 
     unless admin?
+      fund_budget_ids = (
+        current_user.borrowed_budgets.where.not(status: :pending).pluck(:id) +
+        current_user.received_token_transfers.distinct.pluck(:budget_id)
+      ).uniq
+
       @my_fund_accounts = current_user.token_accounts
         .includes(:budget)
-        .joins(:budget)
-        .where(budget_id: current_user.received_token_transfers.select(:budget_id))
-        .where.not(budgets: { borrower_id: current_user.id })
+        .where(budget_id: fund_budget_ids)
+        .where("balance_cents > 0")
         .order(created_at: :desc)
     end
 

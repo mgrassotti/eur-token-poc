@@ -48,19 +48,22 @@ module ApplicationHelper
     tag.span "LTV #{number_to_percentage(ltv * 100, precision: 0)}", class: "badge text-bg-#{color}"
   end
 
-  def ricarica_balance_cents(budget, user)
-    account = user.token_accounts.find_by(budget: budget)
-    return account.balance_cents if account&.balance_cents.to_i.positive?
-    return budget.amount_eur_cents unless budget.settled?
-
-    0
-  end
-
-  def received_token_amount_cents(user, budget)
-    user.received_token_transfers.where(budget: budget).sum(:amount_cents)
+  def fund_importo_cents(user, budget)
+    if budget.borrower_id == user.id && !budget.pending?
+      budget.amount_eur_cents
+    else
+      user.received_token_transfers.where(budget: budget).sum(:amount_cents)
+    end
   end
 
   def first_token_received_at(user, budget)
-    user.received_token_transfers.where(budget: budget).minimum(:created_at)
+    transfer_at = user.received_token_transfers.where(budget: budget).minimum(:created_at)
+
+    if budget.borrower_id == user.id && !budget.pending?
+      mint_at = user.token_accounts.find_by(budget: budget)&.created_at
+      [mint_at, transfer_at].compact.min
+    else
+      transfer_at
+    end
   end
 end

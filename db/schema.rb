@@ -10,11 +10,13 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_15_160000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_23_113408) do
   create_table "btc_accounts", force: :cascade do |t|
     t.bigint "balance_sats", default: 0, null: false
     t.string "bitcoind_wallet_name"
     t.datetime "created_at", null: false
+    t.string "escrow_identity_pubkey"
+    t.string "escrow_identity_wif"
     t.datetime "updated_at", null: false
     t.integer "user_id", null: false
     t.index ["bitcoind_wallet_name"], name: "index_btc_accounts_on_bitcoind_wallet_name", unique: true, where: "bitcoind_wallet_name IS NOT NULL"

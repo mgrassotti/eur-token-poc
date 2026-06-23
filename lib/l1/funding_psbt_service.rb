@@ -49,6 +49,7 @@ module L1
       )
 
       txid = @global_client.call("sendrawtransaction", signed_tx.fetch(:hex))
+      confirm_regtest_block!
 
       RegtestHarness::FundingResult.new(
         txid: txid,
@@ -76,7 +77,11 @@ module L1
     end
 
     def wallet_party(wallet, label)
-      WalletParty.new(label: label, public_key_hex: wallet.identity_pubkey)
+      WalletParty.new(
+        label: label,
+        public_key_hex: wallet.identity_pubkey,
+        wif: wallet.escrow_identity_wif
+      )
     end
 
     def validate_on_chain_balances!(peg_wallet, investor_wallet, peg_sats, investor_sats)
@@ -128,6 +133,10 @@ module L1
 
     def btc(sats)
       format("%.8f", sats / 100_000_000.0)
+    end
+
+    def confirm_regtest_block!
+      RegtestHarness.new(wallet_name: L1::SHARED_REGTEST_WALLET).mine_blocks(1)
     end
   end
 end

@@ -145,6 +145,17 @@ bin/rails db:schema:load RAILS_ENV=test
 bundle exec rspec
 ```
 
+### Test integrazione flusso demo (L1)
+
+Replica i passi manuali della demo (reset, depositi, deal, transfer, settlement automatico):
+
+```bash
+./bin/demo-spec
+# oppure: L1_ENABLED=1 bundle exec rspec spec/integration/demo_end_to_end_flow_spec.rb
+```
+
+Richiede bitcoind regtest (`./bin/regtest up`). Eseguilo dopo ogni modifica a payoff, settlement L1 o saldi dashboard.
+
 ## Architettura
 
 - **Ledger simulato** — saldi BTC e token in PostgreSQL/SQLite, nessun UTXO L1
@@ -174,7 +185,8 @@ Ogni utente ha un **wallet regtest personale** (`user_<id>`). I depositi arrivan
 | `L1::DepositReserveService` | transfer Wallet esterno + sync saldo wallet + **+6 blocchi** catena simulata |
 | `L1::SyncReserveBalanceService` | Allinea `BtcAccount#balance_sats` al saldo spendibile on-chain del wallet utente (L1 on) |
 | `L1::RegtestResetService` | Ricrea bitcoind regtest al reset demo (`./bin/regtest reset`) |
-| `POST /reserve_deposit` | bottone dashboard |
+| `L1::SettlementSpendService` | Spend cooperativo escrow → holder/investor wallets; sync saldi dopo settlement |
+| `L1::SettlementPsbtTemplateService` | Aggiorna recovery package con template maturity post-settlement |
 | `L1::FundingPsbtService` | §3.2 PSBT asincrona: wallet utente peg + investor → escrow 2-of-3 (broadcast solo a firme complete) |
 | `L1::ProvisionEscrowService` | chiamato da `ActivateService` se `L1_ENABLED=1` |
 | `L1::RegtestHarness` | harness integration regtest (settlement, refund, bot-only probe) |

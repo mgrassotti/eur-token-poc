@@ -354,7 +354,7 @@ Stato **M6 parziale** (branch `deal-per-budget`):
 - [x] Transfer token multi-budget (`WalletTransferService`) come proxy di `TransferPosition`.
 - [x] Test numerici PAYOFF-SPEC §11 (Alice/Bob 1× ciascuno, escrow 2×, FloorEUR settlement).
 - [x] Wiring L1 in `ActivateService` (`L1_ENABLED=1`) + download recovery package JSON.
-- [ ] PSBT asincrona §3.2 + Path B broadcast end-to-end.
+- [x] PSBT asincrona §3.2 (`L1::FundingPsbtService`) + Path B broadcast end-to-end (regtest harness).
 - [ ] `Deal` model / rename formale da `Budget` (opzionale, cosmetico).
 
 ---

@@ -46,7 +46,7 @@ RSpec.describe L1::ProvisionEscrowService do
         recovery_package: { "version" => 1 }
       )
 
-      expect(L1::RegtestHarness).not_to receive(:new)
+      expect(L1::FundingPsbtService).not_to receive(:call)
       described_class.call(budget: budget)
     end
   end

@@ -1,11 +1,24 @@
 # frozen_string_literal: true
 
 module L1
-  # Il conto di riserva in DB è il saldo mostrato in UI; si accredita solo su deposito confermato.
-  # (Il wallet regtest può contenere UTXO legacy da test — non usare getbalance come fonte di verità.)
+  # Con L1 attivo, allinea il conto di riserva DB al saldo spendibile del wallet regtest utente.
   class SyncReserveBalanceService
     def self.call(user:)
-      user.btc_account
+      new(user:).call
     end
+
+    def initialize(user:)
+      @user = user
+    end
+
+    def call
+      return user.btc_account unless L1.enabled?
+
+      UserWallet.for(user).sync_balance_to_account!
+    end
+
+    private
+
+    attr_reader :user
   end
 end

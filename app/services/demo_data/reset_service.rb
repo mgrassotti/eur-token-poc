@@ -20,10 +20,13 @@ module DemoData
     def call
       ActiveRecord::Base.transaction do
         clear_ledger!
+        remove_non_demo_users!
         ensure_demo_users!
         reset_balances!
         reset_market_rate!
       end
+
+      L1::RegtestResetService.call if L1.enabled?
     end
 
     private
@@ -35,6 +38,12 @@ module DemoData
       TokenAccount.delete_all
       CollateralLock.delete_all
       Budget.delete_all
+    end
+
+    def remove_non_demo_users!
+      demo_emails = DEMO_USERS.pluck(:email)
+      MarketRate.update_all(set_by_id: nil)
+      User.where.not(email: demo_emails).destroy_all
     end
 
     def ensure_demo_users!
@@ -52,7 +61,16 @@ module DemoData
     end
 
     def reset_balances!
-      BtcAccount.update_all(balance_sats: 0, bitcoind_wallet_name: nil)
+      BtcAccount.find_each do |account|
+        account.update!(
+          balance_sats: 0,
+          bitcoind_wallet_name: fresh_wallet_name_for(account.user_id)
+        )
+      end
+    end
+
+    def fresh_wallet_name_for(user_id)
+      "user_#{user_id}_#{Time.current.to_i}"
     end
 
     def reset_market_rate!

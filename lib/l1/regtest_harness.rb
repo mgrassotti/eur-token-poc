@@ -12,7 +12,8 @@ module L1
       :peg_party,
       :investor,
       :bot,
-      :escrow
+      :escrow,
+      :funding_psbt
     )
 
     SettlementResult = Data.define(:txid, :holder_sats, :investor_sats)
@@ -55,7 +56,7 @@ module L1
     FUNDING_FEE_BUFFER_SATS = 10_000
     ESTIMATED_TX_FEE_SATS = 1_000
 
-    # §3.3 consolidation: peg + investor → un UTXO P2WSH 2-of-3.
+    # Integration-test shortcut: atomic funding tx (not §3.3 sequential deposit).
     def fund_escrow!(peg_sats:, investor_sats:)
       required_wallet_sats = peg_sats + investor_sats + (2 * FUNDING_FEE_BUFFER_SATS) + (3 * ESTIMATED_TX_FEE_SATS)
       ensure_spendable_balance!(required_wallet_sats)
@@ -97,8 +98,16 @@ module L1
         peg_party: peg_party,
         investor: investor,
         bot: bot,
-        escrow: escrow
+        escrow: escrow,
+        funding_psbt: nil
       )
+    end
+
+    def broadcast_refund!(signed_hex:, locktime_height:)
+      decoded = @global_client.call("decoderawtransaction", signed_hex)
+      raise Bitcoind::Error, "Refund before locktime" if current_height < locktime_height
+
+      @global_client.call("sendrawtransaction", signed_hex)
     end
 
     def spend_escrow!(funding:, holder_sats:, investor_sats:, signers:)

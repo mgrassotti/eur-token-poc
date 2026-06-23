@@ -75,7 +75,7 @@ module Settlements
 
         market_rate_updated = update_market_rate!
 
-        Result.new(
+        result = Result.new(
           settlement: settlement,
           payouts: payouts,
           payoff: payoff,
@@ -88,6 +88,10 @@ module Settlements
           end_btc_eur_rate: end_btc_eur_rate,
           market_rate_updated: market_rate_updated
         )
+
+        record_l1_settlement_template!(payoff: payoff)
+
+        result
       end
     end
 
@@ -127,6 +131,13 @@ module Settlements
 
       market_rate.update!(btc_eur_per_btc: end_btc_eur_rate, set_by: set_by)
       true
+    end
+
+    def record_l1_settlement_template!(payoff:)
+      return unless L1.enabled?
+      return unless budget.l1_multisig_provisioned?
+
+      L1::SettlementPsbtTemplateService.call(budget: budget, payoff: payoff)
     end
   end
 end

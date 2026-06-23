@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 module L1
-  # Persists on-chain escrow metadata on a Budget after regtest funding.
   class RecordEscrowService
     def self.call(budget:, funding:, escrow:, peg_party:, investor:, bot:)
       new(budget:, funding:, escrow:, peg_party:, investor:, bot:).call
@@ -17,13 +16,16 @@ module L1
     end
 
     def call
+      refund_psbt = build_refund_psbt
+
       package = RecoveryPackage.build(
         budget: budget,
         funding: funding,
         escrow: escrow,
         peg_party: peg_party,
         investor: investor,
-        bot: bot
+        bot: bot,
+        refund_psbt: refund_psbt
       )
 
       budget.update!(
@@ -42,6 +44,38 @@ module L1
     private
 
     attr_reader :budget, :funding, :escrow, :peg_party, :investor, :bot
+
+    def build_refund_psbt
+      return unsigned_refund_metadata unless refund_signable?
+
+      RefundPsbtBuilder.call(
+        funding: funding,
+        escrow: escrow,
+        peg_party: peg_party,
+        investor: investor,
+        bot: bot,
+        budget: budget,
+        signers: [peg_party, investor]
+      )
+    end
+
+    def refund_signable?
+      signer_wif?(peg_party) && signer_wif?(investor)
+    end
+
+    def signer_wif?(party)
+      party.respond_to?(:wif_for_signing) || party.respond_to?(:wif)
+    end
+
+    def unsigned_refund_metadata
+      {
+        locktime_height: budget.refund_locktime_height,
+        hex: nil,
+        complete: false,
+        peg_sats: funding.peg_sats,
+        investor_sats: nil
+      }
+    end
 
     def pubkey_hex(party)
       party.public_key_hex

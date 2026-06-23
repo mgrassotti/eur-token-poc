@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 module L1
-  # Funds regtest 2-of-3 escrow after budget activation and stores recovery package.
   class ProvisionEscrowService
     class Error < StandardError; end
 
@@ -19,21 +18,19 @@ module L1
 
       validate_bitcoind!
 
-      harness = RegtestHarness.new(wallet_name: wallet_name)
-      harness.ensure_chain_ready!
+      ensure_chain_ready!
 
-      funding = harness.fund_escrow!(
-        peg_sats: budget.borrower_locked_sats,
-        investor_sats: budget.investor_locked_sats
-      )
+      funding = FundingPsbtService.call(budget: budget)
+
+      sync_wallet_balances!
 
       RecordEscrowService.call(
         budget: budget,
         funding: funding,
-        escrow: harness.escrow,
-        peg_party: harness.peg_party,
-        investor: harness.investor,
-        bot: harness.bot
+        escrow: funding.escrow,
+        peg_party: funding.peg_party,
+        investor: funding.investor,
+        bot: funding.bot
       )
     rescue Bitcoind::Error => e
       raise Error, "Escrow L1 non provisionato: #{e.message}"
@@ -43,8 +40,13 @@ module L1
 
     attr_reader :budget
 
-    def wallet_name
-      L1::SHARED_REGTEST_WALLET
+    def ensure_chain_ready!
+      RegtestHarness.new(wallet_name: L1::SHARED_REGTEST_WALLET).ensure_chain_ready!
+    end
+
+    def sync_wallet_balances!
+      SyncReserveBalanceService.call(user: budget.borrower)
+      SyncReserveBalanceService.call(user: budget.investor)
     end
 
     def validate_bitcoind!

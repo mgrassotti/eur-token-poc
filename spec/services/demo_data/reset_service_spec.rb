@@ -9,6 +9,7 @@ RSpec.describe DemoData::ResetService do
   let!(:claude) { create(:user, email: "claude@example.com", name: "Claude") }
 
   before do
+    allow(L1::RegtestResetService).to receive(:call)
     alice.btc_account.update!(balance_sats: 10_000_000, bitcoind_wallet_name: "user_1")
     bob.btc_account.update!(balance_sats: 5_000_000)
     MarketRate.current.update!(btc_eur_per_btc: 60_000)
@@ -29,12 +30,20 @@ RSpec.describe DemoData::ResetService do
     expect(TokenAccount.count).to eq(0)
 
     expect(alice.btc_account.reload.balance_sats).to eq(0)
-    expect(alice.btc_account.bitcoind_wallet_name).to be_nil
+    expect(alice.btc_account.bitcoind_wallet_name).to match(/\Auser_#{alice.id}_\d+\z/)
     expect(bob.btc_account.reload.balance_sats).to eq(0)
     expect(claude.btc_account.reload.balance_sats).to eq(0)
     expect(admin.btc_account.reload.balance_sats).to eq(0)
     expect(MarketRate.current.btc_eur_per_btc).to eq(50_000)
     expect(MarketRate.current.bitcoin_block_height).to eq(ChainState.estimate_block_height)
+  end
+
+  it "resets regtest when L1 is enabled" do
+    allow(L1).to receive(:enabled?).and_return(true)
+
+    described_class.call
+
+    expect(L1::RegtestResetService).to have_received(:call)
   end
 
   it "creates demo users when they are missing" do
@@ -51,5 +60,16 @@ RSpec.describe DemoData::ResetService do
 
     expect(User.count).to eq(DemoData::ResetService::DEMO_USERS.size)
     expect(User.find_by!(email: "alice@example.com").btc_account.balance_sats).to eq(0)
+  end
+
+  it "removes users outside the demo roster" do
+    stray = create(:user, name: "A", email: "stray-a-#{SecureRandom.hex(4)}@example.com")
+    create(:user, name: "B", email: "stray-b-#{SecureRandom.hex(4)}@example.com")
+
+    described_class.call
+
+    expect(User.exists?(stray.id)).to be(false)
+    expect(User.count).to eq(DemoData::ResetService::DEMO_USERS.size)
+    expect(User.pluck(:name)).to contain_exactly("Admin", "Alice", "Bob", "Claude", "David")
   end
 end

@@ -2,6 +2,7 @@
 
 module L1
   # Simulated external wallet ("Wallet esterno") — funds user reserve wallets via on-chain transfer.
+  # Il mining regtest (coinbase) avviene solo qui, mai sui wallet utente.
   class ExchangeWallet
     WALLET_NAME = "l1_external_wallet"
     DISPLAY_NAME = "Wallet esterno"

@@ -62,7 +62,7 @@ Il seed esegue `DemoData::ResetService` e crea una ricarica **pending** da Alice
 1. Login come **Admin**
 2. Dashboard → pannello admin
 3. Verifica **Cambio BTC/€** (default 50_000) e **Altezza blocco**
-4. Opzionale: **Reset demo DB** per ripartire da zero
+4. Opzionale: **Reset demo** per ripartire da zero (con `L1_ENABLED=1` azzera anche bitcoind regtest via `./bin/regtest reset`)
 
 L’admin **non** imposta un peg per singolo budget: il peg del deal è il cambio corrente al momento in cui l’investitore attiva.
 
@@ -154,7 +154,7 @@ bundle exec rspec
   - `Budgets::InvestorCollateralTopUpService`, `Budgets::AutoLiquidationService`, `Budgets::AutoSettleService`
   - `Tokens::WalletTransferService`
   - `Payoffs::FloorEurCalculator`, `Settlements::ExecuteService`
-- **Gap verso M1+:** multisig 2-of-3, PSBT, recovery package, RGB — vedi checklist in `docs/rgb-design/`
+- **Gap verso M2+:** settlement L1 cooperativo da Rails, CLTV script Path B, RGB — vedi checklist in `docs/rgb-design/`
 
 ## M1 — multisig regtest (L1)
 
@@ -170,12 +170,14 @@ Ogni utente ha un **wallet regtest personale** (`user_<id>`). I depositi arrivan
 | Componente | Ruolo |
 |------------|--------|
 | `L1::UserWallet` | `createwallet` / `loadwallet` per utente |
-| `L1::ExchangeWallet` | Wallet esterno regtest (`l1_external_wallet`, 1 BTC) → transfer utente |
-| `L1::DepositReserveService` | transfer Wallet esterno + accredito DB + **+6 blocchi** catena simulata |
-| `L1::SyncReserveBalanceService` | `getbalance` → `BtcAccount#balance_sats` |
+| `L1::ExchangeWallet` | Wallet esterno: mining regtest + transfer verso wallet utente |
+| `L1::DepositReserveService` | transfer Wallet esterno + sync saldo wallet + **+6 blocchi** catena simulata |
+| `L1::SyncReserveBalanceService` | Allinea `BtcAccount#balance_sats` al saldo spendibile on-chain del wallet utente (L1 on) |
+| `L1::RegtestResetService` | Ricrea bitcoind regtest al reset demo (`./bin/regtest reset`) |
 | `POST /reserve_deposit` | bottone dashboard |
+| `L1::FundingPsbtService` | §3.2 PSBT asincrona: wallet utente peg + investor → escrow 2-of-3 (broadcast solo a firme complete) |
 | `L1::ProvisionEscrowService` | chiamato da `ActivateService` se `L1_ENABLED=1` |
-| `L1::RegtestHarness` | funding §3.3, settlement, refund timelock, bot-only probe |
+| `L1::RegtestHarness` | harness integration regtest (settlement, refund, bot-only probe) |
 | `L1::RecoveryPackage` | export JSON §6 (deal params, outpoint, locktime) |
 | `L1::RecordEscrowService` | persiste pubkeys + `recovery_package` su `Budget` |
 | `GET /budgets/:id/recovery_package` | download JSON (richiedente, investitore, admin) |

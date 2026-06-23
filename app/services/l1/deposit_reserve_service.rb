@@ -35,9 +35,8 @@ module L1
       address = user_wallet.receive_address(label: "external_deposit")
 
       ExchangeWallet.new.transfer_to!(address: address, amount_sats: @amount_sats)
-      credit_reserve_account!(@amount_sats)
-
       advance_simulated_chain!
+      user_wallet.sync_balance_to_account!
 
       user.btc_account.reload
     end
@@ -45,11 +44,6 @@ module L1
     private
 
     attr_reader :user
-
-    def credit_reserve_account!(amount_sats)
-      account = user.btc_account.lock!
-      account.update!(balance_sats: account.balance_sats + amount_sats)
-    end
 
     def advance_simulated_chain!
       ChainState.update_block_height!(ChainState.block_height + BLOCKS_PER_DEPOSIT)

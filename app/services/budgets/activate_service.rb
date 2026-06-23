@@ -21,10 +21,13 @@ module Budgets
       ActiveRecord::Base.transaction do
         investor_btc = investor.btc_account.lock!
         collateral_sats = budget.collateral_sats_at_peg(peg_eur_per_btc)
+        available_sats = reserve_sats_for(investor, investor_btc)
 
-        raise Error, "Saldo insufficiente sul conto di riserva" if investor_btc.balance_sats < collateral_sats
+        raise Error, "Saldo insufficiente sul conto di riserva" if available_sats < collateral_sats
 
-        investor_btc.update!(balance_sats: investor_btc.balance_sats - collateral_sats)
+        unless l1_enabled?
+          investor_btc.update!(balance_sats: investor_btc.balance_sats - collateral_sats)
+        end
 
         total_locked_sats = collateral_sats + budget.borrower_locked_sats
 
@@ -72,6 +75,16 @@ module Budgets
       unless L1::Bitcoind::Client.new.available?
         raise Error, "L1 abilitato ma bitcoind regtest non raggiungibile. Avvia: ./bin/regtest up"
       end
+    end
+
+    def l1_enabled?
+      L1.enabled?
+    end
+
+    def reserve_sats_for(user, btc_account)
+      return btc_account.balance_sats unless l1_enabled?
+
+      L1::UserWallet.for(user).spendable_sats
     end
   end
 end

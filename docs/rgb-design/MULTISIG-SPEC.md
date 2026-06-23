@@ -56,17 +56,19 @@ deal funded ⇔ escrow_utxo confermato con importo pieno (peg + hedge)
 
 ## 3) Struttura UTXO e funding (MVP L1)
 
-### 3.1 Obiettivo: un UTXO, depositi in momenti separati
+### 3.1 Obiettivo: un UTXO, firme prima del broadcast
 
 | Cosa | Regola |
 |------|--------|
 | **Escrow funded** | **Un solo** UTXO `2-of-3` con `peg_collateral_sats + hedge_collateral_sats` |
-| **Timing** | Peg_party e investor possono contribuire in **momenti diversi** |
+| **Timing** | Peg_party e investor aggiungono input e firmano in **sequenza off-chain** (PSBT) |
+| **Broadcast** | Solo quando **entrambi** hanno firmato — nessun escrow parziale on-chain |
 | **Non** | Due UTXO genesis permanenti (peg e hedge separati on-chain) |
+| **Non** | Deposito peg da solo on-chain in attesa dell’investitore (rischio fondi bloccati) |
 
-Il bot fornisce `escrow_script` / indirizzo multisig. Le mining fee di funding restano sui **wallet** dei depositanti (non sull’escrow finché non è funded).
+Il bot fornisce `escrow_script` / indirizzo multisig. Le mining fee di funding restano sui **wallet** dei depositanti.
 
-### 3.2 Path preferito — PSBT asincrona (una tx, un UTXO)
+### 3.2 Path unico MVP — PSBT asincrona (una tx, un UTXO)
 
 Una **sola** transazione di funding; le parti aggiungono input e firme in sequenza **prima** del broadcast.
 
@@ -94,32 +96,9 @@ Una **sola** transazione di funding; le parti aggiungono input e firme in sequen
   T₂ Bob firma   ──┘
 ```
 
-### 3.3 Path alternativo — deposito sequenziale + consolidamento
+**MVP M1:** solo §3.2. Implementazione: `L1::FundingPsbtService` (wallet utente peg + investor, broadcast atomico).
 
-Se peg_party versa **prima** da sola (tx già on-chain):
-
-```text
-T₁ — peg_party (firma singola):
-  wallet → escrow_script   peg_collateral_sats     (es. 1M)
-  → escrow_utxo_partial    stato: peg_deposited
-
-T₂ — consolidamento (2-of-3 sulla partial + input investor):
-  Input:  escrow_utxo_partial + wallet investor
-  Output: escrow_script → peg_collateral + hedge_collateral   (es. 3M)
-  Firme:  2-of-3 sulla partial (tipicamente peg_party + investor) + investor sui propri input
-  → escrow_utxo definitivo; partial spenta
-```
-
-| Proprietà | Dettaglio |
-|-----------|-----------|
-| Fee T₁ | Wallet peg_party |
-| Fee T₂ | Principalmente wallet investor (consolidation) |
-| Bot | Può fornire template PSBT consolidamento |
-| Rischio intermedio | UTXO partial è escrow reale ma **sotto-collateralizzato** fino a T₂ |
-
-**MVP M1:** preferire §3.2 (PSBT asincrona); §3.3 per recovery se peg_party ha già broadcast da sola.
-
-### 3.4 Escrow a regime e annex
+### 3.3 Escrow a regime e annex
 
 ```text
                     ┌─────────────────────────────┐
@@ -145,9 +124,7 @@ Implementazione M1 (regtest): P2WSH `OP_2 <pk1> <pk2> <pk3> OP_3 OP_CHECKMULTISI
 
 | Evento | Firmatari (2-of-3) | Bot obbligatorio? | Note |
 |--------|-------------------|-------------------|------|
-| **Funding PSBT** (§3.2) | Ognuno sui **propri input** | No | PSBT asincrona; broadcast quando completa |
-| **Deposit peg solo** (§3.3 T₁) | `peg_party` sola | No | UTXO partial; fee wallet peg_party |
-| **Consolidamento** (§3.3 T₂) | `peg_party` + `investor` (2-of-3 sulla partial) | No | Unico `escrow_utxo` definitivo |
+| **Funding PSBT** (§3.2) | Ognuno sui **propri input** | No | PSBT asincrona; broadcast quando entrambi hanno firmato |
 | **Apertura deal (funded)** | — | No | `escrow_utxo` pieno on-chain; mint stato / RGB |
 | **Cancel cooperativo** | `peg_party` + `investor` | No | Refund pro-rata collateral prima di maturity |
 | **Settlement maturity** | tipicamente `bot` + `peg_party` **oppure** `bot` + `investor` | No* | *Path felice: bot costruisce PSBT payout + attestation oracle; serve 1 chiave utente |
@@ -329,12 +306,13 @@ protocol_fee_sats = 0    # MVP: nessun output verso il bot dall’escrow
 
 Legenda: `[x]` fatto in Rails PoC · `[~]` parziale / simulato in DB · `[ ]` M1+ L1.
 
-- [~] Parametri §2: subset su `Budget` (+ L1: pubkeys, `escrow_txid`/`vout`, `refund_delay_blocks`, `recovery_package` json).
+- [x] Parametri §2: subset su `Budget` (+ L1: pubkeys, `escrow_txid`/`vout`, `refund_delay_blocks`, `recovery_package` json).
 - [x] Matrice firme §4 — `L1::SignatureMatrix` + spec regtest (2-of-3 pairs; bot-only incompleto).
 - [x] Recovery package §6 serializzabile — `L1::RecoveryPackage` + `L1::RecordEscrowService`.
-- [~] Path B: refund tx con `locktime` costruita in regtest; broadcast post-maturity da automatizzare.
-- [x] Funding: un UTXO P2WSH via consolidamento §3.3 — `L1::RegtestHarness#fund_escrow!`.
-- [x] Settlement: `total_holder = min(gross, escrow − fees)` — `Payoffs::FloorEurCalculator` + spend regtest.
+- [x] Funding §3.2 PSBT asincrona — `L1::FundingPsbtService` + spec `psbt_user_wallet_funding_spec`.
+- [~] Path B: refund tx con `nLockTime` + broadcast post-locktime in regtest; CLTV script branch opzionale M2+.
+- [x] Funding: un UTXO P2WSH — `FundingPsbtService` / harness integration shortcut.
+- [x] Settlement: `total_holder = min(gross, escrow − fees)` — `Payoffs::FloorEurCalculator` + spend regtest harness.
 - [x] Verifica L1: spend con **solo** bot → `complete: false` — spec regtest.
 
 ---

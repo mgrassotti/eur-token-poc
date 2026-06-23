@@ -31,16 +31,20 @@ RSpec.describe L1::DepositReserveService do
     before do
       allow(L1::Bitcoind::Client).to receive(:new).and_return(instance_double(L1::Bitcoind::Client, available?: true))
       allow(L1::UserWallet).to receive(:for).with(user).and_return(user_wallet)
+      allow(user_wallet).to receive(:sync_balance_to_account!) do
+        user.btc_account.update!(balance_sats: 10_000_000)
+      end
       allow(L1::ExchangeWallet).to receive(:new).and_return(exchange)
       allow(ChainState).to receive(:block_height).and_return(800_000)
       allow(ChainState).to receive(:update_block_height!)
       user.btc_account.update!(balance_sats: 0)
     end
 
-    it "transfers from exchange, credits DB and advances chain by 6 blocks" do
+    it "transfers from exchange, syncs wallet balance and advances chain by 6 blocks" do
       result = described_class.call(user: user, amount_sats: 10_000_000)
 
       expect(exchange).to have_received(:transfer_to!).with(address: "bcrt1test", amount_sats: 10_000_000)
+      expect(user_wallet).to have_received(:sync_balance_to_account!)
       expect(ChainState).to have_received(:update_block_height!).with(800_006)
       expect(result.balance_sats).to eq(10_000_000)
     end

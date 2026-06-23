@@ -26,7 +26,26 @@ module L1
         decoderawtransaction
         deriveaddresses
         getdescriptorinfo
+        createpsbt
+        finalizepsbt
+        utxoupdatepsbt
+        combinepsbt
+        joinpsbt
+        converttopsbt
+      ].freeze
+
+      WALLET_METHODS = %w[
+        getnewaddress
+        getbalance
+        sendtoaddress
         getaddressinfo
+        signrawtransactionwithwallet
+        walletcreatefundedpsbt
+        walletprocesspsbt
+        generatetoaddress
+        listunspent
+        signrawtransactionwithwallet
+        getrawchangeaddress
       ].freeze
 
       def initialize(url: ENV.fetch("BITCOIND_RPC_URL", DEFAULT_URL), wallet: nil)
@@ -67,7 +86,8 @@ module L1
       private
 
       def rpc_uri(method)
-        return @root_uri if @wallet.nil? || GLOBAL_METHODS.include?(method.to_s)
+        return @root_uri if @wallet.nil?
+        return @root_uri if GLOBAL_METHODS.include?(method.to_s)
 
         uri = @root_uri.dup
         uri.path = "/wallet/#{@wallet}"

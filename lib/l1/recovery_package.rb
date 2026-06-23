@@ -36,7 +36,11 @@ module L1
         psbt_funding: funding_psbt_section,
         psbt_maturity_template: { note: "Build at maturity with Payoffs::FloorEurCalculator outputs" },
         psbt_refund_timelock: refund_psbt_section,
-        bot_signing: { wif: bot_wif },
+        bot_signing: { wif: bot_wif, public_key_hex: pubkey(@bot) },
+        party_signing: {
+          peg_party: party_signing_entry(@peg_party),
+          investor: party_signing_entry(@investor)
+        },
         oracle_policy: { feeds: ["admin_market_rate"], median: true }
       }
     end
@@ -93,6 +97,20 @@ module L1
 
     def bot_wif
       return @bot.wif if @bot.respond_to?(:wif)
+
+      nil
+    end
+
+    def party_signing_entry(party)
+      {
+        public_key_hex: pubkey(party),
+        wif: party_signing_wif(party)
+      }
+    end
+
+    def party_signing_wif(party)
+      return party.wif if party.respond_to?(:wif) && party.wif.present?
+      return party.wif_for_signing if party.respond_to?(:wif_for_signing) && party.wif_for_signing.present?
 
       nil
     end

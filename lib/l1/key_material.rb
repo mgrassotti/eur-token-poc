@@ -46,6 +46,16 @@ module L1
         encode_base58(payload + checksum)
       end
 
+      def decode(string)
+        data = decode_base58(string)
+        payload = data[0...-4]
+        checksum = data[-4, 4]
+        expected = Digest::SHA256.digest(Digest::SHA256.digest(payload))[0, 4]
+        raise ArgumentError, "checksum mismatch" unless checksum == expected
+
+        payload
+      end
+
       def encode_base58(data)
         int = data.bytes.inject(0) { |memo, byte| (memo << 8) + byte }
         encoded = +""
@@ -55,6 +65,17 @@ module L1
         end
         data.each_byte { |byte| break unless byte.zero?; encoded << ALPHABET[0] }
         encoded.reverse
+      end
+
+      def decode_base58(string)
+        int = string.each_char.inject(0) { |memo, char| (memo * 58) + ALPHABET.index(char) }
+        bytes = []
+        while int.positive?
+          int, remainder = int.divmod(256)
+          bytes << remainder
+        end
+        leading_zeros = string.chars.take_while { |char| char == ALPHABET[0] }.length
+        ([0] * leading_zeros + bytes.reverse).pack("C*")
       end
     end
   end

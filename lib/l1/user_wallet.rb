@@ -2,6 +2,7 @@
 
 module L1
   class UserWallet
+    EscrowIdentity = Data.define(:wif, :public_key_hex)
     def self.for(user)
       new(user)
     end
@@ -45,8 +46,11 @@ module L1
     end
 
     def identity_pubkey
-      address = receive_address(label: "escrow_identity")
-      client.call("getaddressinfo", address).fetch("pubkey")
+      escrow_identity_key!.public_key_hex
+    end
+
+    def escrow_identity_wif
+      escrow_identity_key!.wif
     end
 
     # Solo UTXO da transfer (es. Wallet esterno): esclude coinbase da mining di test legacy.
@@ -93,6 +97,22 @@ module L1
 
     def default_wallet_name
       "user_#{@user.id}"
+    end
+
+    def escrow_identity_key!
+      if @btc_account.escrow_identity_wif.present?
+        return EscrowIdentity.new(
+          wif: @btc_account.escrow_identity_wif,
+          public_key_hex: @btc_account.escrow_identity_pubkey
+        )
+      end
+
+      key = KeyMaterial.generate
+      @btc_account.update!(
+        escrow_identity_wif: key.wif,
+        escrow_identity_pubkey: key.public_key_hex
+      )
+      EscrowIdentity.new(wif: key.wif, public_key_hex: key.public_key_hex)
     end
 
     def transfer_unspent

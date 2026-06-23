@@ -64,7 +64,9 @@ module DemoData
       BtcAccount.find_each do |account|
         account.update!(
           balance_sats: 0,
-          bitcoind_wallet_name: fresh_wallet_name_for(account.user_id)
+          bitcoind_wallet_name: fresh_wallet_name_for(account.user_id),
+          escrow_identity_wif: nil,
+          escrow_identity_pubkey: nil
         )
       end
     end

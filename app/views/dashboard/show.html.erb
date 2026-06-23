@@ -236,27 +236,28 @@
           <th>Importo</th>
           <th>Stato</th>
           <th>Scadenza</th>
-          <th>Importo rimanente</th>
-          <th>Interessi alla scadenza</th>
           <th></th>
         </tr>
       </thead>
       <tbody>
-        <% @borrowed_budgets.each do |budget| %>
-          <% balance_cents = ricarica_balance_cents(budget, current_user) %>
+        <% if @borrowed_budgets.any? %>
+          <% @borrowed_budgets.each do |budget| %>
+            <tr>
+              <td>#<%= budget.id %></td>
+              <td><%= format_eur(budget.amount_eur_cents) %></td>
+              <td><%= budget_status_badge(budget) %></td>
+              <td>
+                <%= l(budget.period_end, format: :long) %>
+                <% if budget.maturity_block_height %>
+                  <span class="text-muted d-block small">blocco <%= number_with_delimiter(budget.maturity_block_height) %></span>
+                <% end %>
+              </td>
+              <td><%= link_to "Apri", budget, class: "btn btn-sm btn-outline-primary" %></td>
+            </tr>
+          <% end %>
+        <% else %>
           <tr>
-            <td>#<%= budget.id %></td>
-            <td><%= format_eur(budget.amount_eur_cents) %></td>
-            <td><%= budget_status_badge(budget) %></td>
-            <td>
-              <%= l(budget.period_end, format: :long) %>
-              <% if budget.maturity_block_height %>
-                <span class="text-muted d-block small">blocco <%= number_with_delimiter(budget.maturity_block_height) %></span>
-              <% end %>
-            </td>
-            <td><%= balance_cents.positive? ? format_eur(balance_cents) : "—" %></td>
-            <td><%= balance_cents.positive? ? format_eur(budget.holder_interest_at_maturity_cents(balance_cents)) : "—" %></td>
-            <td><%= link_to "Apri", budget, class: "btn btn-sm btn-outline-primary" %></td>
+            <td colspan="5" class="text-muted">Nessuna ricarica effettuata.</td>
           </tr>
         <% end %>
       </tbody>
@@ -284,7 +285,7 @@
             <% budget = account.budget %>
             <% balance_cents = account.balance_cents %>
             <tr>
-              <td><%= format_eur(received_token_amount_cents(current_user, budget)) %></td>
+              <td><%= format_eur(fund_importo_cents(current_user, budget)) %></td>
               <td>
                 <% received_at = first_token_received_at(current_user, budget) %>
                 <%= received_at ? l(received_at, format: :long) : "—" %>

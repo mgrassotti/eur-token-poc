@@ -51,8 +51,8 @@ services:
   rgb-proxy:
     profiles: [rgb]
     image: ghcr.io/rgb-tools/rgb-proxy-server:0.3.0
-    ports:
-      - "3000:3000"
+    # No host port: sidecar reaches rgb-proxy:3000 on the compose network only.
+    # Exposing 3000 here conflicted with Rails (bin/dev).
 
   rgb-sidecar:
     profiles: [rgb]

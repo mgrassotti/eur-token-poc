@@ -30,7 +30,7 @@ Rails.application.routes.draw do
     resource :chain_state, only: :update
   end
 
-  if Rails.env.development?
+  if Rails.env.development? || Rails.env.test?
     namespace :dev do
       post "user_switch", to: "user_switches#create"
     end

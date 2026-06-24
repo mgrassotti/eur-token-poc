@@ -7,6 +7,9 @@ module Rgb
   class SidecarClient
     class Error < StandardError; end
 
+    DEFAULT_READ_TIMEOUT = 120
+    DASHBOARD_READ_TIMEOUT = 5
+
     def self.instance
       @instance ||= new
     end
@@ -31,31 +34,37 @@ module Rgb
     end
 
     def create_wallet(wallet_id:, mnemonic: nil)
-      post("/wallets", wallet_id: wallet_id, mnemonic: mnemonic)
+      post("/wallets", { wallet_id: wallet_id, mnemonic: mnemonic })
     end
 
     def setup_wallet(wallet_id)
-      post("/wallets/#{wallet_id}/setup", {})
+      post("/wallets/#{wallet_id}/setup")
     end
 
     def reset_all_wallets!
-      post("/wallets/reset-all", {})
+      post("/wallets/reset-all")
       @last_check_at = nil
       @available = false
     end
 
-    def list_assets(wallet_id)
-      get("/wallets/#{wallet_id}/assets")
+    def list_assets(wallet_id, read_timeout: DEFAULT_READ_TIMEOUT)
+      get("/wallets/#{wallet_id}/assets", read_timeout: read_timeout)
     end
 
     def issue(wallet_id:, ticker:, name:, precision:, amounts:)
-      post("/issue", wallet_id: wallet_id, ticker: ticker, name: name, precision: precision, amounts: amounts)
+      post("/issue", {
+        wallet_id: wallet_id,
+        ticker: ticker,
+        name: name,
+        precision: precision,
+        amounts: amounts
+      })
     end
 
     def blind_receive(wallet_id:, asset_id:, amount:)
       raise Error, "wallet_id mancante per blind_receive" if wallet_id.blank?
 
-      post("/receive/blind", wallet_id: wallet_id, asset_id: asset_id, amount: amount)
+      post("/receive/blind", { wallet_id: wallet_id, asset_id: asset_id, amount: amount })
     end
 
     def send_asset(sender_wallet_id:, recipient_wallet_id:, asset_id:, recipient_id:, amount:)
@@ -64,29 +73,31 @@ module Rgb
 
       post(
         "/send",
-        sender_wallet_id: sender_wallet_id,
-        recipient_wallet_id: recipient_wallet_id,
-        asset_id: asset_id,
-        recipient_id: recipient_id,
-        amount: amount
+        {
+          sender_wallet_id: sender_wallet_id,
+          recipient_wallet_id: recipient_wallet_id,
+          asset_id: asset_id,
+          recipient_id: recipient_id,
+          amount: amount
+        }
       )
     end
 
     private
 
-    def get(path)
-      request(:get, path)
+    def get(path, read_timeout: DEFAULT_READ_TIMEOUT)
+      request(:get, path, read_timeout: read_timeout)
     end
 
-    def post(path, body)
-      request(:post, path, body)
+    def post(path, body = {}, read_timeout: DEFAULT_READ_TIMEOUT)
+      request(:post, path, body, read_timeout: read_timeout)
     end
 
-    def request(method, path, body = nil)
+    def request(method, path, body = nil, read_timeout: DEFAULT_READ_TIMEOUT)
       uri = URI.parse("#{@base_url}#{path}")
       http = Net::HTTP.new(uri.host, uri.port)
       http.open_timeout = 2
-      http.read_timeout = 120
+      http.read_timeout = read_timeout
 
       response = case method
                  when :get
@@ -106,6 +117,8 @@ module Rgb
       raise Error, "RGB sidecar error #{response.code}: #{snippet.presence || 'invalid JSON'}"
     rescue Errno::ECONNREFUSED, SocketError
       raise Error, "RGB sidecar unreachable at #{@base_url}"
+    rescue Net::ReadTimeout, Net::OpenTimeout
+      raise Error, "RGB sidecar timeout at #{@base_url}"
     end
 
     def error_detail(parsed)

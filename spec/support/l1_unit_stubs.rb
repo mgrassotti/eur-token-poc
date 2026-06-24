@@ -16,6 +16,15 @@ module L1UnitStubs
     example.metadata[:rgb_lib] == true
   end
 
+  def regtest_stack_spec?(example)
+    example.metadata[:regtest] == true && (
+      l1_integration_spec?(example) ||
+      rgb_lib_spec?(example) ||
+      example.metadata[:demo_flow] == true ||
+      example.metadata[:type] == :system
+    )
+  end
+
   def real_rgb_spec?(example)
     rgb_lib_spec?(example) || example.metadata[:demo_flow] == true
   end
@@ -118,11 +127,11 @@ RSpec.configure do |config|
   config.include L1UnitStubs
 
   config.before do |example|
-    stub_rgb_mirror! unless real_rgb_spec?(example)
+    stub_rgb_mirror! unless regtest_stack_spec?(example)
   end
 
   config.before do |example|
-    next if l1_integration_spec?(example) || real_rgb_spec?(example)
+    next if regtest_stack_spec?(example)
 
     stub_l1_unit_operations!
   end

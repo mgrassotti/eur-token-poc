@@ -129,6 +129,7 @@ Con **transfer parziale** il payout holder segue le quote correnti — vedi `spe
 ```bash
 bundle exec rspec          # unit + integration (RGB lib se sidecar attivo)
 ./bin/demo-spec            # flusso demo end-to-end su regtest
+./bin/system-spec          # stesso flusso via browser (Capybara + sidecar reale)
 ```
 
 Per suite pulite senza dati seed che alterano i conteggi:
@@ -139,6 +140,8 @@ bundle exec rspec
 ```
 
 `bin/demo-spec` richiede regtest + sidecar RGB (`./bin/regtest up`). Eseguilo dopo modifiche a payoff, settlement L1, RGB o saldi dashboard.
+
+`bin/system-spec` replica lo stesso flusso nell'UI (login, switch utente dev, depositi, attivazione deal, transfer, settlement admin). Utile per debuggare errori sidecar su **Accetta rischio e attiva** con screenshot in `tmp/capybara/` al fallimento. Esempio rapido: `./bin/system-spec --example "attiva un deal"`.
 
 ### RGB (M3) — rgb-lib via sidecar (obbligatorio)
 

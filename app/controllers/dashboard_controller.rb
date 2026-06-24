@@ -40,8 +40,11 @@ class DashboardController < ApplicationController
   def rgb_assets_for(user)
     wallet_id = user.btc_account&.rgb_wallet_id
     return [] if wallet_id.blank?
+    return [] unless user.rgb_assignments.exists?
 
-    Rgb::SidecarClient.instance.list_assets(wallet_id).fetch("nia", [])
+    Rgb::SidecarClient.instance
+      .list_assets(wallet_id, read_timeout: Rgb::SidecarClient::DASHBOARD_READ_TIMEOUT)
+      .fetch("nia", [])
   rescue Rgb::SidecarClient::Error
     nil
   end

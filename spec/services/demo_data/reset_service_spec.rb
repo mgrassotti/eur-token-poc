@@ -10,6 +10,7 @@ RSpec.describe DemoData::ResetService do
 
   before do
     allow(L1::RegtestResetService).to receive(:call)
+    allow(Rgb::SidecarClient.instance).to receive(:available?).and_return(false)
     alice.btc_account.update!(balance_sats: 10_000_000, bitcoind_wallet_name: "user_1")
     bob.btc_account.update!(balance_sats: 5_000_000)
     MarketRate.current.update!(btc_eur_per_btc: 60_000)
@@ -31,6 +32,8 @@ RSpec.describe DemoData::ResetService do
 
     expect(alice.btc_account.reload.balance_sats).to eq(0)
     expect(alice.btc_account.bitcoind_wallet_name).to match(/\Auser_#{alice.id}_\d+\z/)
+    expect(alice.btc_account.rgb_wallet_id).to be_nil
+    expect(alice.btc_account.rgb_mnemonic).to be_nil
     expect(bob.btc_account.reload.balance_sats).to eq(0)
     expect(claude.btc_account.reload.balance_sats).to eq(0)
     expect(admin.btc_account.reload.balance_sats).to eq(0)

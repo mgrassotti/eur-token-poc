@@ -27,6 +27,7 @@ module DemoData
       end
 
       L1::RegtestResetService.call
+      reset_rgb_wallets!
     end
 
     private
@@ -67,7 +68,9 @@ module DemoData
           balance_sats: 0,
           bitcoind_wallet_name: fresh_wallet_name_for(account.user_id),
           escrow_identity_wif: nil,
-          escrow_identity_pubkey: nil
+          escrow_identity_pubkey: nil,
+          rgb_wallet_id: nil,
+          rgb_mnemonic: nil
         )
       end
     end
@@ -88,6 +91,14 @@ module DemoData
       @demo_users ||= DEMO_USERS.to_h do |attrs|
         [attrs[:email], User.find_by!(email: attrs[:email])]
       end
+    end
+
+    def reset_rgb_wallets!
+      return unless Rgb::SidecarClient.instance.available?
+
+      Rgb::SidecarClient.instance.reset_all_wallets!
+    rescue Rgb::SidecarClient::Error => e
+      Rails.logger.warn("RGB wallet reset skipped after demo reset: #{e.message}")
     end
   end
 end

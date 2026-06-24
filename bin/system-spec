@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+bitcoind_up() {
+  curl -sf --user regtest:regtest \
+    --data-binary '{"jsonrpc":"1.0","id":1,"method":"getblockchaininfo","params":[]}' \
+    -H "content-type: application/json" \
+    http://127.0.0.1:18443/ >/dev/null 2>&1
+}
+
+sidecar_up() {
+  curl -sf http://127.0.0.1:3030/health >/dev/null 2>&1
+}
+
+if ! bitcoind_up || ! sidecar_up; then
+  echo "→ Avvio regtest + RGB sidecar…"
+  ./bin/regtest up
+fi
+
+exec bundle exec rspec spec/system/demo_end_to_end_flow_spec.rb --format documentation "$@"

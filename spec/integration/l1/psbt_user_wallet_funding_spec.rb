@@ -9,11 +9,6 @@ RSpec.describe "L1 PSBT user-wallet funding", :regtest do
 
   before do
     skip "Start regtest: docker compose -f docker-compose.regtest.yml up -d" unless bitcoind_available?
-    ENV["L1_ENABLED"] = "1"
-  end
-
-  after do
-    ENV.delete("L1_ENABLED")
   end
 
   it "funds escrow via §3.2 PSBT from borrower and investor wallets" do

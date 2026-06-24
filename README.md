@@ -1,6 +1,6 @@
 # FloorEUR PoC (Rails)
 
-Proof-of-concept Rails che simula **deal P2P bilaterali** (un `Budget` = un deal): token EUR nominale spendibili, collateral BTC in escrow simulato, settlement **FloorEUR** a scadenza. Nessuna blockchain reale — solo ledger in database.
+Proof-of-concept Rails che simula **deal P2P bilaterali** (un `Budget` = un deal): token EUR nominale spendibili, collateral BTC in escrow **on-chain (regtest)** con sync del saldo riserva, settlement **FloorEUR** a scadenza.
 
 Specifiche di design: [`docs/rgb-design/`](docs/rgb-design/) (`PAYOFF-SPEC`, `P2P-OPTIONS`, `MULTISIG-SPEC`, `MARGIN-SPEC`).
 
@@ -13,8 +13,7 @@ bin/rails db:setup
 bin/dev
 ```
 
-`bin/dev` avvia **bitcoind regtest** (`./bin/regtest up`) e **Rails** con `L1_ENABLED=1`.  
-Senza L1: `bin/rails server` come prima.
+`bin/dev` avvia **bitcoind regtest** (`./bin/regtest up`) e **Rails**.
 
 Apri http://localhost:3000 e accedi con:
 
@@ -62,7 +61,7 @@ Il seed esegue `DemoData::ResetService` e crea una ricarica **pending** da Alice
 1. Login come **Admin**
 2. Dashboard → pannello admin
 3. Verifica **Cambio BTC/€** (default 50_000) e **Altezza blocco**
-4. Opzionale: **Reset demo** per ripartire da zero (con `L1_ENABLED=1` azzera anche bitcoind regtest via `./bin/regtest reset`)
+4. Opzionale: **Reset demo** per ripartire da zero (azzera anche bitcoind regtest via `./bin/regtest reset`)
 
 L’admin **non** imposta un peg per singolo budget: il peg del deal è il cambio corrente al momento in cui l’investitore attiva.
 
@@ -151,7 +150,7 @@ Replica i passi manuali della demo (reset, depositi, deal, transfer, settlement 
 
 ```bash
 ./bin/demo-spec
-# oppure: L1_ENABLED=1 bundle exec rspec spec/integration/demo_end_to_end_flow_spec.rb
+# oppure: bin/demo-spec
 ```
 
 Richiede bitcoind regtest (`./bin/regtest up`). Eseguilo dopo ogni modifica a payoff, settlement L1 o saldi dashboard.
@@ -188,7 +187,7 @@ Ogni utente ha un **wallet regtest personale** (`user_<id>`). I depositi arrivan
 | `L1::SettlementSpendService` | Spend cooperativo escrow → holder/investor wallets; sync saldi dopo settlement |
 | `L1::SettlementPsbtTemplateService` | Aggiorna recovery package con template maturity post-settlement |
 | `L1::FundingPsbtService` | §3.2 PSBT asincrona: wallet utente peg + investor → escrow 2-of-3 (broadcast solo a firme complete) |
-| `L1::ProvisionEscrowService` | chiamato da `ActivateService` se `L1_ENABLED=1` |
+| `L1::ProvisionEscrowService` | chiamato da `ActivateService` dopo l'attivazione |
 | `L1::RegtestHarness` | harness integration regtest (settlement, refund, bot-only probe) |
 | `L1::RecoveryPackage` | export JSON §6 (deal params, outpoint, locktime) |
 | `L1::RecordEscrowService` | persiste pubkeys + `recovery_package` su `Budget` |
@@ -196,7 +195,7 @@ Ogni utente ha un **wallet regtest personale** (`user_<id>`). I depositi arrivan
 
 Campi DB su `Budget`: `peg_party_pubkey`, `investor_pubkey`, `bot_pubkey`, `escrow_txid`, `escrow_vout`, `refund_delay_blocks` (default 1008).
 
-Senza `L1_ENABLED` il demo resta solo ledger Rails (comportamento predefinito).
+Il PoC richiede **bitcoind regtest** (`./bin/regtest up`) per depositi, funding escrow e settlement on-chain.
 
 ## Console walkthrough
 

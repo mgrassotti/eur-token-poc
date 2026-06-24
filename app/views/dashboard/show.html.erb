@@ -78,17 +78,10 @@
 
       <hr>
       <h2 class="h6">Multisig L1 (regtest)</h2>
-      <% if l1_enabled? %>
-        <p class="text-muted small mb-2">
-          <span class="badge text-bg-success">L1_ENABLED</span>
-          — wallet regtest per utente; depositi dal <%= L1::ExchangeWallet::DISPLAY_NAME %> (<code><%= L1::ExchangeWallet::WALLET_NAME %></code>).
-          Ogni deposito avanza la catena simulata di <%= L1::DepositReserveService::BLOCKS_PER_DEPOSIT %> blocchi.
-        </p>
-      <% else %>
-        <p class="text-muted small mb-2">
-          Disabilitato. Avvia il server con <code>L1_ENABLED=1 bin/rails server</code> e <code>./bin/regtest up</code>.
-        </p>
-      <% end %>
+      <p class="text-muted small mb-2">
+        Wallet regtest per utente; depositi dal <%= L1::ExchangeWallet::DISPLAY_NAME %> (<code><%= L1::ExchangeWallet::WALLET_NAME %></code>).
+        Ogni deposito avanza la catena simulata di <%= L1::DepositReserveService::BLOCKS_PER_DEPOSIT %> blocchi.
+      </p>
 
       <hr>
       <%= button_to "Reset demo DB",
@@ -129,12 +122,10 @@
         <% else %>
           <p class="display-6 mb-1"><%= format_sats(@savings_sats) %></p>
         <% end %>
-        <% if l1_enabled? && current_user.btc_account.bitcoind_wallet_name.present? %>
+        <% if current_user.btc_account.bitcoind_wallet_name.present? %>
           <p class="text-muted small mb-0 mt-1">Wallet regtest: <code><%= current_user.btc_account.bitcoind_wallet_name %></code></p>
-        <% elsif l1_enabled? %>
-          <p class="text-muted small mb-0 mt-1">Nessun wallet L1 — premi «Deposita su conto riserva».</p>
-        <% elsif !@market_rate.set? %>
-          <p class="text-muted small mb-0 mt-1">Cambio BTC/€ non impostato dall'admin.</p>
+        <% else %>
+          <p class="text-muted small mb-0 mt-1">Nessun wallet — premi «Deposita su conto riserva».</p>
         <% end %>
       </div>
     </div>
@@ -176,9 +167,7 @@
 
 <div class="d-flex gap-2 mb-4 flex-wrap">
   <% unless admin? %>
-    <% if l1_enabled? %>
-      <%= link_to "Deposita su conto riserva", new_reserve_deposit_path, class: "btn btn-success" %>
-    <% end %>
+    <%= link_to "Deposita su conto riserva", new_reserve_deposit_path, class: "btn btn-success" %>
     <%= link_to "Ricarica conto corrente", new_budget_path, class: "btn btn-primary" %>
     <% if @spendable_token_cents.positive? %>
       <%= link_to "Invia Denaro", new_token_transfer_path, class: "btn btn-outline-primary" %>

@@ -14,9 +14,15 @@ class BudgetsController < ApplicationController
   end
 
   def new
+    @market_rate = MarketRate.current
+    @max_borrowable_eur = Budgets::ReserveRequirement.max_eur_for(current_user)
+    default_eur = [@max_borrowable_eur, 1_000.0].min
+    default_eur = 1_000.0 if default_eur <= 0
+
     @budget = current_user.borrowed_budgets.build(
       period_start: Date.current,
-      period_end: Date.current + 1.month
+      period_end: Date.current + 1.month,
+      amount_eur_cents: (default_eur * 100).round
     )
   end
 
@@ -29,6 +35,8 @@ class BudgetsController < ApplicationController
     )
     redirect_to @budget, notice: "Budget spesa creato. In attesa di un investitore."
   rescue Budgets::CreateService::Error => e
+    @market_rate = MarketRate.current
+    @max_borrowable_eur = Budgets::ReserveRequirement.max_eur_for(current_user)
     @budget = current_user.borrowed_budgets.build(
       period_start: budget_params[:period_start],
       period_end: budget_params[:period_end]

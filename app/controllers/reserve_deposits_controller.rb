@@ -2,7 +2,6 @@
 
 class ReserveDepositsController < ApplicationController
   before_action :require_login
-  before_action :require_l1!
 
   def new
     @default_btc = L1::DepositReserveService.default_btc_amount_for(current_user)
@@ -18,13 +17,5 @@ class ReserveDepositsController < ApplicationController
                          "Catena simulata +#{L1::DepositReserveService::BLOCKS_PER_DEPOSIT} blocchi."
   rescue L1::DepositReserveService::Error => e
     redirect_to new_reserve_deposit_path, alert: e.message
-  end
-
-  private
-
-  def require_l1!
-    return if L1.enabled?
-
-    redirect_to root_path, alert: "Deposito L1 disponibile solo con L1_ENABLED=1 e ./bin/regtest up"
   end
 end

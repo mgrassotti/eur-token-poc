@@ -18,10 +18,19 @@ module Budgets
       validate!
 
       ActiveRecord::Base.transaction do
-        investor_btc = investor.btc_account.lock!
-        raise Error, "Saldo insufficiente sul conto di riserva" if investor_btc.balance_sats < amount_sats
+        investor.btc_account.lock!
+        L1::SyncReserveBalanceService.call(user: investor)
 
-        investor_btc.update!(balance_sats: investor_btc.balance_sats - amount_sats)
+        available_sats = ReserveRequirement.available_sats_for(investor)
+        if available_sats < amount_sats
+          raise Error,
+                ReserveRequirement.insufficient_message(
+                  label: "l'investitore",
+                  required_sats: amount_sats,
+                  available_sats: available_sats,
+                  eur_per_btc: MarketRate.current.btc_eur_per_btc
+                )
+        end
 
         collateral = budget.collateral_lock.lock!
         collateral.update!(amount_sats: collateral.amount_sats + amount_sats)
@@ -39,6 +48,7 @@ module Budgets
       raise Error, "Il deal non è attivo" unless budget.active?
       raise Error, "Solo l'investitore del deal può versare collateral aggiuntivo" unless budget.investor_id == investor.id
       raise Error, "Importo non valido" unless amount_sats.positive?
+      raise Error, "L'admin deve impostare il cambio BTC/€ corrente" unless MarketRate.current.set?
     end
   end
 end

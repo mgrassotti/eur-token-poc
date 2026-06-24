@@ -27,7 +27,6 @@ module L1
     end
 
     def call
-      raise Error, "L1 non abilitato (imposta L1_ENABLED=1)" unless L1.enabled?
       raise Error, "Importo non valido" unless @amount_sats.positive?
       validate_bitcoind!
 

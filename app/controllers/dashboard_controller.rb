@@ -9,7 +9,7 @@ class DashboardController < ApplicationController
     @investment_sats = current_user.invested_budgets.active.sum(:investor_locked_sats)
     @investment_budgets = current_user.invested_budgets.active.where("investor_locked_sats > 0").order(:period_end)
     @investment_eur = savings_eur_value(@investment_sats, @market_rate)
-    @savings_sats = current_user.balance_sats
+    @savings_sats = Budgets::ReserveRequirement.available_sats_for(current_user)
     @spendable_token_cents = Tokens::Spendable.total_cents_for(current_user)
     @borrowed_budgets = current_user.borrowed_budgets.order(created_at: :desc)
     @pending_budgets = Budget.awaiting_investor.order(created_at: :desc)

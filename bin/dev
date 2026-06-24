@@ -5,6 +5,5 @@ cd "$(dirname "$0")/.."
 echo "→ Avvio bitcoind regtest (Docker)…"
 ./bin/regtest up
 
-export L1_ENABLED=1
-echo "→ Avvio Rails (L1_ENABLED=1)…"
+echo "→ Avvio Rails…"
 exec ./bin/rails server "$@"

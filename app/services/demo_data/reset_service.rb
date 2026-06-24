@@ -26,7 +26,7 @@ module DemoData
         reset_market_rate!
       end
 
-      L1::RegtestResetService.call if L1.enabled?
+      L1::RegtestResetService.call
     end
 
     private

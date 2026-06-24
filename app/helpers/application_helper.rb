@@ -13,9 +13,7 @@ module ApplicationHelper
     BtcConversion.format_eur_amount(amount)
   end
 
-  def l1_enabled?
-    L1.enabled?
-  end
+  alias format_eur_amount format_savings_eur
 
   def truncate_hex(value, leading: 8, trailing: 8)
     return "—" if value.blank?

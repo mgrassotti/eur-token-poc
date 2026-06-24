@@ -72,7 +72,7 @@
           <span class="text-muted small d-block">investor: <code><%= truncate_hex(@budget.investor_pubkey) %></code></span>
           <span class="text-muted small d-block">bot: <code><%= truncate_hex(@budget.bot_pubkey) %></code></span>
         </dd>
-      <% elsif l1_enabled? && @budget.active? %>
+      <% elsif @budget.active? %>
         <dt class="col-sm-3">Escrow L1</dt>
         <dd class="col-sm-9"><span class="text-warning">Non provisionato</span></dd>
       <% end %>
@@ -97,16 +97,17 @@
         <span class="text-muted small">(cambio corrente)</span>
       </p>
       <p class="text-muted mb-3">
+        <% investor_required_sats = Budgets::ReserveRequirement.investor_sats_for(@budget, @market_rate.btc_eur_per_btc) %>
+        <% investor_available_sats = Budgets::ReserveRequirement.available_sats_for(current_user) %>
         Dal conto di riserva verranno decurtati
-        <strong><%= format_sats(@budget.collateral_sats_at_peg(@market_rate.btc_eur_per_btc)) %></strong>
-        (collateral <%= format_eur(@budget.collateral_eur_cents) %>).
+        <strong><%= format_sats(investor_required_sats) %></strong>
+        (collateral <%= format_eur(@budget.collateral_eur_cents) %>, inclusa fee stimata funding L1).
+        Disponibili sul conto: <strong><%= format_sats(investor_available_sats) %></strong>.
       </p>
-      <% if l1_enabled? %>
-        <p class="text-muted small mb-3">
-          <strong>L1 attivo:</strong> all'attivazione verrà creato un escrow multisig 2-of-3 su regtest
-          (richiede <code>./bin/regtest up</code>).
-        </p>
-      <% end %>
+      <p class="text-muted small mb-3">
+        All'attivazione verrà creato un escrow multisig 2-of-3 su regtest
+        (richiede <code>./bin/regtest up</code>).
+      </p>
       <%= button_to "Accetta rischio e attiva la richiesta", activate_budget_path(@budget), method: :post, class: "btn btn-warning" %>
     </div>
   </div>

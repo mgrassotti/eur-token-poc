@@ -83,6 +83,60 @@
         Ogni deposito avanza la catena simulata di <%= L1::DepositReserveService::BLOCKS_PER_DEPOSIT %> blocchi.
       </p>
 
+      <h3 class="h6 mt-3">Wallet on-chain</h3>
+      <% if @on_chain_wallets.available %>
+        <% if @on_chain_wallets.rows.any? %>
+          <div class="table-responsive mb-3">
+            <table class="table table-sm table-striped align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Wallet</th>
+                  <th>Nome</th>
+                  <th class="text-end">Saldo</th>
+                  <th class="text-end">Equivalente €</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% @on_chain_wallets.rows.each do |row| %>
+                  <tr>
+                    <td><code><%= row.wallet_name %></code></td>
+                    <td><%= row.label %></td>
+                    <td class="text-end"><%= format_sats(row.sats) %></td>
+                    <td class="text-end">
+                      <% if row.eur.present? %>
+                        <%= format_savings_eur(row.eur) %>
+                      <% else %>
+                        <span class="text-muted">—</span>
+                      <% end %>
+                    </td>
+                  </tr>
+                <% end %>
+              </tbody>
+              <tfoot>
+                <tr class="fw-semibold">
+                  <td colspan="2">Totale</td>
+                  <td class="text-end"><%= format_sats(@on_chain_wallets.total_sats) %></td>
+                  <td class="text-end">
+                    <% if @on_chain_wallets.total_eur.present? %>
+                      <%= format_savings_eur(@on_chain_wallets.total_eur) %>
+                    <% else %>
+                      <span class="text-muted">—</span>
+                    <% end %>
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          <% unless @market_rate.set? %>
+            <p class="text-muted small mb-0">Imposta il cambio BTC/€ per l'equivalente in euro.</p>
+          <% end %>
+        <% else %>
+          <p class="text-muted small mb-3">Nessun wallet caricato su bitcoind.</p>
+        <% end %>
+      <% else %>
+        <p class="text-warning small mb-3"><%= @on_chain_wallets.error_message %></p>
+      <% end %>
+
       <hr>
       <%= button_to "Reset demo DB",
         admin_demo_reset_path,

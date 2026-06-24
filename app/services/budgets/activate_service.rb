@@ -19,14 +19,21 @@ module Budgets
       peg_eur_per_btc = MarketRate.current.btc_eur_per_btc
 
       ActiveRecord::Base.transaction do
-        investor_btc = investor.btc_account.lock!
-        collateral_sats = budget.collateral_sats_at_peg(peg_eur_per_btc)
-        available_sats = reserve_sats_for(investor, investor_btc)
+        investor.btc_account.lock!
+        L1::SyncReserveBalanceService.call(user: investor)
 
-        raise Error, "Saldo insufficiente sul conto di riserva" if available_sats < collateral_sats
+        collateral_sats = ReserveRequirement.investor_collateral_sats_for(budget, peg_eur_per_btc)
+        required_sats = ReserveRequirement.investor_sats_for(budget, peg_eur_per_btc)
+        available_sats = ReserveRequirement.available_sats_for(investor)
 
-        unless l1_enabled?
-          investor_btc.update!(balance_sats: investor_btc.balance_sats - collateral_sats)
+        if available_sats < required_sats
+          raise Error,
+                ReserveRequirement.insufficient_message(
+                  label: "l'investitore",
+                  required_sats: required_sats,
+                  available_sats: available_sats,
+                  eur_per_btc: peg_eur_per_btc
+                )
         end
 
         total_locked_sats = collateral_sats + budget.borrower_locked_sats
@@ -57,7 +64,7 @@ module Budgets
       end
 
       budget.reload
-      L1::ProvisionEscrowService.call(budget: budget) if L1.enabled?
+      L1::ProvisionEscrowService.call(budget: budget)
       budget.reload
     end
 
@@ -70,21 +77,9 @@ module Budgets
       raise Error, "L'investitore non può essere il richiedente" if investor.id == budget.borrower_id
       raise Error, "L'admin deve impostare il cambio BTC/€ corrente" unless MarketRate.current.set?
 
-      return unless L1.enabled?
+      return if L1::Bitcoind::Client.new.available?
 
-      unless L1::Bitcoind::Client.new.available?
-        raise Error, "L1 abilitato ma bitcoind regtest non raggiungibile. Avvia: ./bin/regtest up"
-      end
-    end
-
-    def l1_enabled?
-      L1.enabled?
-    end
-
-    def reserve_sats_for(user, btc_account)
-      return btc_account.balance_sats unless l1_enabled?
-
-      L1::UserWallet.for(user).spendable_sats
+      raise Error, "bitcoind regtest non raggiungibile. Avvia: ./bin/regtest up"
     end
   end
 end

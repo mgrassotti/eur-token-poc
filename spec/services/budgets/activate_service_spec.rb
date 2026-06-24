@@ -34,7 +34,7 @@ RSpec.describe Budgets::ActivateService do
     expect(budget.collateral_lock.amount_sats).to eq(bob_collateral_sats + budget.borrower_locked_sats)
     expect(budget.investor_locked_sats).to eq(bob_collateral_sats)
     expect(alice.btc_account.reload.balance_sats).to eq(alice_sats_after_create)
-    expect(bob.btc_account.reload.balance_sats).to eq(starting_bob_sats - bob_collateral_sats)
+    expect(bob.btc_account.reload.balance_sats).to eq(starting_bob_sats)
     expect(alice.token_accounts.find_by(budget: budget).balance_cents).to eq(100_000)
     expect(budget.genesis_block_height).to eq(ChainState.block_height)
     expect(budget.maturity_block_height).to eq(budget.genesis_block_height + budget.symbolic_months_duration * Budget::BLOCKS_PER_MONTH)
@@ -62,19 +62,15 @@ RSpec.describe Budgets::ActivateService do
 
     expect do
       described_class.call(budget: budget, investor: bob)
-    end.to raise_error(Budgets::ActivateService::Error, "Saldo insufficiente sul conto di riserva")
+    end.to raise_error(Budgets::ActivateService::Error, /Saldo insufficiente sul conto di riserva/)
   end
 
-  it "rejects activation when L1 is enabled but bitcoind is down" do
-    previous = ENV["L1_ENABLED"]
-    ENV["L1_ENABLED"] = "1"
+  it "rejects activation when bitcoind is down" do
     unavailable = instance_double(L1::Bitcoind::Client, available?: false)
     allow(L1::Bitcoind::Client).to receive(:new).and_return(unavailable)
 
     expect do
       described_class.call(budget: budget, investor: bob)
     end.to raise_error(Budgets::ActivateService::Error, /bitcoind regtest/)
-  ensure
-    ENV["L1_ENABLED"] = previous
   end
 end

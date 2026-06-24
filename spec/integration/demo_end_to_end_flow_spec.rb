@@ -2,9 +2,7 @@
 
 require "rails_helper"
 
-# Flusso demo manuale (regtest + L1): eseguire con
-#   L1_ENABLED=1 bundle exec rspec spec/integration/demo_end_to_end_flow_spec.rb
-# oppure: bin/demo-spec
+# Flusso demo manuale (regtest): eseguire con bin/demo-spec
 RSpec.describe "Demo end-to-end flow", :regtest, :demo_flow do
   def bitcoind_available?
     L1::Bitcoind::Client.new.available?
@@ -12,12 +10,7 @@ RSpec.describe "Demo end-to-end flow", :regtest, :demo_flow do
 
   before do
     skip "Start regtest: ./bin/regtest up" unless bitcoind_available?
-    ENV["L1_ENABLED"] = "1"
     reset_demo_with_regtest!
-  end
-
-  after do
-    ENV.delete("L1_ENABLED")
   end
 
   it "percorre reset → depositi → deal → transfer → settlement automatico con saldi attesi" do
@@ -108,5 +101,29 @@ RSpec.describe "Demo end-to-end flow", :regtest, :demo_flow do
     # Conservazione sats nell'escrow
     total_out = payoff.total_holder_sats + payoff.investor_remainder_sats + payoff.mining_fee_sats
     expect(total_out).to eq(budget.collateral_lock.amount_sats)
+
+    # Alice riusa la riserva post-settlement per una nuova ricarica da 500 € (@ 55k)
+    alice_reserve_sats = reserve_sats(alice)
+    second_budget_eur_cents = 50_000
+    required_sats = BtcConversion.eur_cents_to_sats(
+      second_budget_eur_cents,
+      DemoFlowHelpers::SETTLEMENT_EUR_PER_BTC
+    )
+    expect(alice_reserve_sats).to be >= required_sats
+
+    second_budget = Budgets::CreateService.call(
+      borrower: alice,
+      amount_eur_cents: second_budget_eur_cents,
+      period_start: period_start + 2.months,
+      period_end: period_start + 3.months
+    )
+    expect(second_budget).to be_pending
+    expect(second_budget.borrower_locked_sats).to eq(required_sats)
+
+    Budgets::ActivateService.call(budget: second_budget, investor: bob)
+    second_budget.reload
+
+    expect(second_budget).to be_active
+    expect(second_budget.l1_multisig_provisioned?).to be(true)
   end
 end

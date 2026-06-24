@@ -25,7 +25,7 @@ RSpec.describe Budgets::InvestorYieldService do
     expect(results.size).to eq(1)
     expect(results.first.user).to eq(bob)
     expect(budget.reload.loan_to_value_ratio(120_000)).to be_within(0.01).of(0.3)
-    expect(bob.btc_account.reload.balance_sats).to be > bob_savings_before
+    expect(bob.btc_account.reload.balance_sats).to eq(bob_savings_before)
     expect(budget.investor_yield_payouts.sum(:btc_sats)).to eq(results.sum(&:btc_sats))
     expect(budget.pool_sats).to eq(budget.borrower_locked_sats + budget.investor_locked_sats)
   end

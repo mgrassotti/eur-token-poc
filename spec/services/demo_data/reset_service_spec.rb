@@ -38,9 +38,7 @@ RSpec.describe DemoData::ResetService do
     expect(MarketRate.current.bitcoin_block_height).to eq(ChainState.estimate_block_height)
   end
 
-  it "resets regtest when L1 is enabled" do
-    allow(L1).to receive(:enabled?).and_return(true)
-
+  it "resets regtest" do
     described_class.call
 
     expect(L1::RegtestResetService).to have_received(:call)

@@ -14,7 +14,6 @@ module L1
 
     def call
       return budget if budget.l1_multisig_provisioned?
-      return budget unless L1.enabled?
 
       validate_bitcoind!
 
@@ -52,7 +51,7 @@ module L1
     def validate_bitcoind!
       return if Bitcoind::Client.new.available?
 
-      raise Error, "L1 abilitato ma bitcoind regtest non raggiungibile. Avvia: ./bin/regtest up"
+      raise Error, "bitcoind regtest non raggiungibile. Avvia: ./bin/regtest up"
     end
   end
 end

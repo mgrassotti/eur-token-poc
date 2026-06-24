@@ -9,14 +9,6 @@ RSpec.describe ReserveDepositsController, type: :request do
     post session_path, params: { email: user.email, password: "password" }
   end
 
-  around do |example|
-    previous = ENV["L1_ENABLED"]
-    ENV["L1_ENABLED"] = "1"
-    example.run
-  ensure
-    ENV["L1_ENABLED"] = previous
-  end
-
   it "shows the deposit form with Alice default" do
     log_in(alice)
 

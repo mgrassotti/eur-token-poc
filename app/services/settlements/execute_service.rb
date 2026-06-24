@@ -40,20 +40,11 @@ module Settlements
       payouts = []
 
       ActiveRecord::Base.transaction do
-        if l1_settlement?
-          payouts = settle_via_l1!(token_accounts, payoff)
-        else
-          payouts = settle_via_ledger!(token_accounts, payoff)
-        end
+        payouts = settle!(token_accounts, payoff)
 
         budget.collateral_lock.lock!
 
         raise Error, "Collateral insufficient for token redemptions" if payoff.investor_remainder_sats.negative?
-
-        unless l1_settlement?
-          investor_btc = budget.investor.btc_account.lock!
-          investor_btc.update!(balance_sats: investor_btc.balance_sats + payoff.investor_remainder_sats)
-        end
 
         settlement = Settlement.create!(
           budget: budget,
@@ -81,7 +72,7 @@ module Settlements
           market_rate_updated: market_rate_updated
         )
 
-        record_l1_settlement_template!(payoff: payoff)
+        record_settlement_template!(payoff: payoff)
 
         result
       end
@@ -125,30 +116,15 @@ module Settlements
       true
     end
 
-    def record_l1_settlement_template!(payoff:)
-      return unless L1.enabled?
+    def record_settlement_template!(payoff:)
       return unless budget.l1_multisig_provisioned?
 
       L1::SettlementPsbtTemplateService.call(budget: budget, payoff: payoff)
     end
 
-    def l1_settlement?
-      L1.enabled? && budget.l1_multisig_provisioned?
-    end
+    def settle!(token_accounts, payoff)
+      raise Error, "Escrow L1 non provisionato" unless budget.l1_multisig_provisioned?
 
-    def settle_via_ledger!(token_accounts, payoff)
-      token_accounts.each_with_index.map do |token_account, index|
-        allocation = payoff.holder_allocations[index]
-        btc_account = token_account.user.btc_account.lock!
-
-        btc_account.update!(balance_sats: btc_account.balance_sats + allocation.btc_sats)
-        payout_for(token_account, allocation, payoff).tap do
-          token_account.update!(balance_cents: 0)
-        end
-      end
-    end
-
-    def settle_via_l1!(token_accounts, payoff)
       holder_payouts = []
       payouts = token_accounts.each_with_index.map do |token_account, index|
         allocation = payoff.holder_allocations[index]
@@ -161,7 +137,7 @@ module Settlements
       L1::SettlementSpendService.call(budget: budget, payoff: payoff, holder_payouts: holder_payouts)
 
       users_to_sync = holder_payouts.map { |p| p[:user] }.uniq
-      users_to_sync << budget.investor if payoff.investor_remainder_sats.positive?
+      users_to_sync << budget.investor
       users_to_sync.uniq.each { |user| L1::SyncReserveBalanceService.call(user: user) }
 
       payouts

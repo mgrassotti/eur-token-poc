@@ -22,7 +22,7 @@ RSpec.describe Budgets::CreateService do
     expect(budget.borrower_locked_sats).to eq(locked_sats)
     expect(budget.collateral_eur_cents).to eq(100_000)
     expect(budget.peg_eur_per_btc).to be_nil
-    expect(alice.btc_account.reload.balance_sats).to eq(10_000_000 - locked_sats)
+    expect(alice.btc_account.reload.balance_sats).to eq(10_000_000)
     expect(budget).to be_pending
   end
 
@@ -36,6 +36,6 @@ RSpec.describe Budgets::CreateService do
         period_start: Date.current,
         period_end: Date.current + 1.month
       )
-    end.to raise_error(Budgets::CreateService::Error, "Saldo insufficiente sul conto di riserva")
+    end.to raise_error(Budgets::CreateService::Error, /Saldo insufficiente sul conto di riserva/)
   end
 end

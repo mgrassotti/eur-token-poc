@@ -1,5 +1,12 @@
 <h1 class="h3 mb-4">Ricarica conto corrente</h1>
 
+<% if @market_rate&.set? && @max_borrowable_eur.positive? %>
+  <p class="text-muted mb-3">
+    Conto di riserva: massimo <strong><%= format_eur_amount(@max_borrowable_eur) %></strong>
+    (<%= format_sats(Budgets::ReserveRequirement.available_sats_for(current_user)) %> @ <%= number_with_delimiter(@market_rate.btc_eur_per_btc) %> €/BTC).
+  </p>
+<% end %>
+
 <div class="card">
   <div class="card-body">
     <%= form_with model: @budget, url: budgets_path do |f| %>
@@ -15,7 +22,13 @@
 
       <div class="mb-3">
         <%= f.label :amount_eur, "Importo (€)", class: "form-label" %>
-        <%= f.number_field :amount_eur, value: @budget.amount_eur_cents ? @budget.amount_eur : 1000, class: "form-control", step: 0.01, min: 0.01, required: true %>
+        <%= f.number_field :amount_eur,
+          value: @budget.amount_eur_cents ? @budget.amount_eur : nil,
+          class: "form-control",
+          step: 0.01,
+          min: 0.01,
+          max: (@max_borrowable_eur.positive? ? @max_borrowable_eur : nil),
+          required: true %>
         <div class="form-text">
           Dal conto di riserva verranno bloccati BTC per 1× l'importo (collateral del contratto, non rimborsato al settlement).
           Un investitore dovrà bloccare altrettanto per coprire il rischio di cambio sui token.

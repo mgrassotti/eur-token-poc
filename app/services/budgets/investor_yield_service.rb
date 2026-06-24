@@ -56,9 +56,6 @@ module Budgets
         collateral.update!(amount_sats: collateral.amount_sats - sats_to_pay)
         budget.update!(investor_locked_sats: budget.investor_locked_sats - sats_to_pay)
 
-        investor_btc = investor.btc_account.lock!
-        investor_btc.update!(balance_sats: investor_btc.balance_sats + sats_to_pay)
-
         InvestorYieldPayout.create!(
           budget: budget,
           user: investor,

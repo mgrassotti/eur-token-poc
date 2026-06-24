@@ -10,5 +10,4 @@ if ! curl -sf --user regtest:regtest \
   ./bin/regtest up
 fi
 
-export L1_ENABLED=1
 exec bundle exec rspec spec/integration/demo_end_to_end_flow_spec.rb --format documentation "$@"

@@ -187,7 +187,7 @@
   <div class="col-md-4">
     <div class="card h-100">
       <div class="card-body">
-        <h2 class="h6 text-muted">Conto corrente (spesa / risparmio)</h2>
+        <h2 class="h6 text-muted">Conto spesa / risparmio</h2>
         <% if @spending_budget_total_cents.positive? %>
           <p class="display-6 mb-0"><%= format_eur(@spending_budget_total_cents) %></p>
         <% else %>
@@ -222,7 +222,7 @@
 <div class="d-flex gap-2 mb-4 flex-wrap">
   <% unless admin? %>
     <%= link_to "Deposita su conto riserva", new_reserve_deposit_path, class: "btn btn-success" %>
-    <%= link_to "Ricarica conto corrente", new_budget_path, class: "btn btn-primary" %>
+    <%= link_to "Ricarica conto spesa", new_budget_path, class: "btn btn-primary" %>
     <% if @spendable_token_cents.positive? %>
       <%= link_to "Invia Denaro", new_token_transfer_path, class: "btn btn-outline-primary" %>
     <% else %>

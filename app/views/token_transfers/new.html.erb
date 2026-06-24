@@ -2,7 +2,7 @@
 
 <p class="text-muted mb-2">
   Saldo spendibile: <strong><%= format_eur(@spendable_total_cents) %></strong>
-  su <%= @spendable_accounts.size %> <%= @spendable_accounts.size == 1 ? "deal" : "deal" %>.
+  su <%= @spendable_accounts.size %> <%= @spendable_accounts.size == 1 ? "budget" : "budget" %>.
 </p>
 
 <% if @spendable_accounts.many? %>

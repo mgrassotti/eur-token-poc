@@ -293,7 +293,7 @@ Validazione client-side (rgb-lib):
 | — | Funding escrow | **Momenti separati**, **un UTXO** — [`MULTISIG-SPEC.md`](MULTISIG-SPEC.md) §3 |
 | — | Mining fee settlement | **Prima del payout holder** (`distributable = escrow − fees`) |
 
-Fase 0 design: **chiusa**. Checklist M0 §11 **completata in Rails** (46 spec verdi); resta aperto solo multisig L1 (M1) — vedi [`MULTISIG-SPEC.md`](MULTISIG-SPEC.md) §10.
+Fase 0 design: **chiusa**. Checklist M0 §11 **completata in Rails**; multisig L1 regtest in `lib/l1/` — vedi [`MULTISIG-SPEC.md`](MULTISIG-SPEC.md) §10 e README PoC.
 
 ---
 
@@ -305,7 +305,7 @@ Fase 0 design: **chiusa**. Checklist M0 §11 **completata in Rails** (46 spec ve
 - [x] Cappo escrow §7 con `S` molto basso.
 - [x] Apertura: `escrow_total ≥ 2 × notional` (1× richiedente + 1× investitore); LTV iniziale 50%.
 - [x] LTV ≥ 70% margin call; ≥ 90% liquidazione; top-up investitore nel PoC.
-- [ ] Multisig 2-of-3 L1: matrice firme e recovery package — **M1 regtest** in `lib/l1/` (wiring activate opzionale).
+- [x] Multisig 2-of-3 L1: matrice firme, recovery package, funding §3.2, settlement on-chain — `lib/l1/` + `bin/demo-spec`.
 
 ---
 
@@ -314,7 +314,7 @@ Fase 0 design: **chiusa**. Checklist M0 §11 **completata in Rails** (46 spec ve
 - [`P2P-OPTIONS.md`](P2P-OPTIONS.md) — architettura P2P, RGB, multisig, roadmap
 - [`MULTISIG-SPEC.md`](MULTISIG-SPEC.md) — escrow 2-of-3, recovery, timelock refund
 - [`MARGIN-SPEC.md`](MARGIN-SPEC.md) — margin intraday, top-up annex
-- [`eur-token-poc` README](../../README.md) — simulatore Rails
+- [`eur-token-poc` README](../../README.md) — PoC Rails ibrido (token DB + escrow L1 regtest)
 - [rgb-lib](https://github.com/RGB-Tools/rgb-lib) — validazione client-side
 
 ---

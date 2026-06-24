@@ -265,24 +265,24 @@ protocol_fee_sats = 0    # MVP: nessun output verso il bot dall’escrow
 
 ### Simulatore Rails (`eur-token-poc`)
 
-| Concetto MULTISIG | Modello Rails (PoC attuale) | Gap verso L1 |
-|-------------------|-----------------------------|--------------|
-| `multisig_policy` | Implicito `2-of-3` (non persistito) | Enum + pubkeys |
-| Pubkeys | — | `Budget` / `Deal` con hex keys |
-| `escrow_utxo` | `CollateralLock` (1 riga, `amount_sats`) | Outpoint reale |
-| `escrow_utxos` | Stesso pool DB (+ top-up investitore, no annex) | Array outpoint |
+| Concetto MULTISIG | Modello Rails (PoC attuale) | Note |
+|-------------------|-----------------------------|------|
+| `multisig_policy` | Implicito `2-of-3` | Enum persistito opzionale M2+ |
+| Pubkeys | `Budget#peg_party_pubkey`, `investor_pubkey`, `bot_pubkey` | **Fatto** L1 |
+| `escrow_utxo` | `escrow_txid`/`escrow_vout` + `CollateralLock` | **Fatto** on-chain |
+| `escrow_utxos` | Un UTXO genesis (+ top-up DB, no annex) | Annex margin → M2+ |
 | `estimated_settlement_fee_sats` | `Budget::ESTIMATED_SETTLEMENT_FEE_SATS` (5_000) | — |
-| `refund_delay_blocks` | Solo in spec (default 1008), non in DB | CLTV Path B |
-| Recovery package | — | JSON export wallet |
-| Stato funding | `Budget` `pending` → `active` → `settled` | PSBT async / consolidate |
+| `refund_delay_blocks` | `Budget#refund_delay_blocks` (default 1008) | Path B harness; CLTV produzione M2+ |
+| Recovery package | `recovery_package` JSON + download | **Fatto** |
+| Stato funding | `pending` → `active` → `settled` | Funding §3.2 PSBT; settlement spend cooperativo |
 
-### Bitcoin L1 (M1 regtest)
+### Bitcoin L1 (M1 regtest) — stato implementazione
 
-1. Generare 3 chiavi (regtest).
-2. Funding: PSBT asincrona (§3.2) o sequenziale + consolidamento (§3.3) → **un** UTXO 2-of-3.
-3. A `maturity_height`, PSBT settlement multi-input con oracle mock.
-4. Test: bot offline → `peg_party + investor` spendono comunque.
-5. Test: no settlement → refund CLTV dopo `refund_delay_blocks`.
+1. [x] Tre chiavi (peg, investor, bot) — regtest.
+2. [x] Funding PSBT asincrona §3.2 → un UTXO 2-of-3.
+3. [x] Settlement maturity: spend cooperativo + template recovery (`SettlementSpendService`).
+4. [x] Test: bot-only → firma incompleta (spec regtest).
+5. [~] Refund timelock Path B — harness regtest; integrazione prodotto / CLTV script M2+.
 
 ---
 
@@ -304,15 +304,15 @@ protocol_fee_sats = 0    # MVP: nessun output verso il bot dall’escrow
 
 ## 10) Checklist test (M0 — multisig)
 
-Legenda: `[x]` fatto in Rails PoC · `[~]` parziale / simulato in DB · `[ ]` M1+ L1.
+Legenda: `[x]` fatto · `[~]` parziale / harness · `[ ]` M2+.
 
-- [x] Parametri §2: subset su `Budget` (+ L1: pubkeys, `escrow_txid`/`vout`, `refund_delay_blocks`, `recovery_package` json).
-- [x] Matrice firme §4 — `L1::SignatureMatrix` + spec regtest (2-of-3 pairs; bot-only incompleto).
-- [x] Recovery package §6 serializzabile — `L1::RecoveryPackage` + `L1::RecordEscrowService`.
-- [x] Funding §3.2 PSBT asincrona — `L1::FundingPsbtService` + spec `psbt_user_wallet_funding_spec`.
-- [~] Path B: refund tx con `nLockTime` + broadcast post-locktime in regtest; CLTV script branch opzionale M2+.
-- [x] Funding: un UTXO P2WSH — `FundingPsbtService` / harness integration shortcut.
-- [x] Settlement: `total_holder = min(gross, escrow − fees)` — `Payoffs::FloorEurCalculator` + spend regtest harness.
+- [x] Parametri §2: `Budget` (+ pubkeys, `escrow_txid`/`vout`, `refund_delay_blocks`, `recovery_package`).
+- [x] Matrice firme §4 — `L1::SignatureMatrix` + spec regtest.
+- [x] Recovery package §6 — `L1::RecoveryPackage` + download HTTP.
+- [x] Funding §3.2 PSBT asincrona — `L1::FundingPsbtService` + spec integration.
+- [~] Path B: refund timelock in regtest harness; CLTV script branch M2+.
+- [x] Funding: un UTXO P2WSH per deal.
+- [x] Settlement on-chain — `L1::SettlementSpendService` + `bin/demo-spec`.
 - [x] Verifica L1: spend con **solo** bot → `complete: false` — spec regtest.
 
 ---

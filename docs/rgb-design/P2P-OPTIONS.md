@@ -318,20 +318,19 @@ Apertura deal, maturity e refund timelock restano su **L1**.
 
 ## 10) Mapping `eur-token-poc` → modello P2P
 
-Il demo Rails **`eur-token-poc`** simula la stessa economia in DB centralizzato, **un budget = un deal** con escrow dedicato simulato (`CollateralLock`).
+Il demo Rails **`eur-token-poc`** replica la stessa economia con **un budget = un deal**: token in DB, escrow BTC **multisig on-chain** (regtest) + `CollateralLock` per tracking.
 
 | `eur-token-poc` (Rails) | Servizio / modello | `FloorBTC` P2P | Gap principale |
 |-------------------------|-------------------|----------------|----------------|
-| Apertura posizione Alice | `Budgets::CreateService` + `ActivateService` | Genesis deal: Alice collateral + mint `notional` | Escrow **multisig L1** per deal (M1) |
+| Apertura posizione Alice | `Budgets::CreateService` + `ActivateService` | Genesis deal: Alice collateral + mint `notional` | **Fatto** — escrow L1 per deal |
 | Strike al mint | `Budget#peg_eur_per_btc` (fissato all’activate) | `strike_eur_per_btc` | Stesso concetto |
-| Collateral apertura | 1× richiedente + 1× investitore (`OPENING_COLLATERAL_MULTIPLIER = 2`) | `escrow_total ≥ 2 × notional` | LTV 70% margin call, 90% liquidazione (PoC) |
-| Investor hedger | `InvestorDeposits::CreateService` + `InvestorCollateralTopUpService` | `hedge_collateral_sats` in escrow | Top-up DB, non annex UTXO |
-| Token € fungibile | `TokenAccount#balance_cents` post-activate | `notional_share` RGB (cent = unità nominale) | DB account → assignment |
-| Transfer | `Tokens::WalletTransferService` | `TransferPosition` (anche parziale); L1 o LN | Validazione server → client-side RGB |
-| Maturity | `Budget#maturity_block_height` | `maturity_height` per deal | **Fatto** per deal (no epoch globale) |
-| Settlement | `Settlements::ExecuteService` + `Payoffs::FloorEurCalculator` | Payoff a T con oracle (`spot` vs `K`) | **Fatto** per budget; PSBT L1 in M1 |
-| Ritiro anticipato | — | Opzionale: uscita cooperativa pre-T | Non nel MVP P2P core |
-| Catena / oracle | `ChainState` + `MarketRate` (admin) + `Budgets::AutoSettleService` | `maturity_height` + attestation mediana | Admin DB → oracle firmato |
+| Collateral apertura | 1× richiedente + 1× investitore | `escrow_total ≥ 2 × notional` | LTV 70% / 90% (PoC ledger) |
+| Investor hedger | `L1::DepositReserveService` + `InvestorCollateralTopUpService` | `hedge_collateral_sats` in escrow | Top-up DB, non annex UTXO (M2+) |
+| Token € fungibile | `TokenAccount#balance_cents` post-activate | `notional_share` RGB (cent = unità nominale) | DB → assignment RGB (M3) |
+| Transfer | `Tokens::WalletTransferService` | `TransferPosition` (anche parziale) | Validazione server → RGB client (M3) |
+| Maturity | `Budget#maturity_block_height` | `maturity_height` per deal | **Fatto** |
+| Settlement | `ExecuteService` + `SettlementSpendService` | Payoff a T con oracle | **Fatto** on-chain; PSBT maturity async wallet (M2) |
+| Catena / oracle | `ChainState` + `MarketRate` (admin) | `maturity_height` + attestation mediana | Admin DB → oracle firmato |
 | Liquidazione LTV 90% | `Budgets::AutoLiquidationService` | Liquidazione anticipata — vedi [`MARGIN-SPEC.md`](MARGIN-SPEC.md) §6 | LTV PoC, non `coverage_bps` annex |
 | Yield investitori | `Budgets::InvestorYieldService` (LTV &lt; 30%) | `premium_sats` upfront a Bob | Meccanismo diverso |
 | Bot facilitatore | Dashboard admin + auto-activate | Match + PSBT + oracle; chiave 1-of-3 | Admin DB → facilitatore non custode |
@@ -347,7 +346,7 @@ Il demo Rails **`eur-token-poc`** simula la stessa economia in DB centralizzato,
 
 ### 10.2 Evoluzione consigliata del demo Rails
 
-Stato **M6 parziale** (branch `deal-per-budget`):
+Stato **M6** (branch `deal-per-budget`):
 
 - [x] **Budget = deal** con collateral investitori allocato per budget.
 - [x] **Settlement per budget** a `maturity_block_height` (`AutoSettleService` + `ExecuteService`).
@@ -355,7 +354,6 @@ Stato **M6 parziale** (branch `deal-per-budget`):
 - [x] Test numerici PAYOFF-SPEC §11 (Alice/Bob 1× ciascuno, escrow 2×, FloorEUR settlement).
 - [x] Wiring L1 in `ActivateService` + download recovery package JSON.
 - [x] PSBT asincrona §3.2 (`L1::FundingPsbtService`) + Path B broadcast end-to-end (regtest harness).
-- [ ] `Deal` model / rename formale da `Budget` (opzionale, cosmetico).
 
 ---
 
@@ -363,12 +361,12 @@ Stato **M6 parziale** (branch `deal-per-budget`):
 
 ```text
 M0  Spec payoff + multisig 2-of-3 + timelock refund + escrow 2× + LTV 70/90
-M1  Prototipo L1: regtest, 1 deal (Alice 1M / Bob 1M), settlement oracle mock  ← **lib/l1 + spec regtest**
+M1  Prototipo L1: regtest, multisig 2-of-3, settlement on-chain  ← **~fatto** (`lib/l1/`, `bin/demo-spec`)
 M2  Bot: match + PSBT template + recovery package export
 M3  RGB FloorEURPosition + TransferPosition (split) + rgb-lib mobile
 M4  DLC/adaptor (opz.) — settlement L1 più ricco del multisig cooperativo
 M5  TransferPosition over Lightning (instant, ~zero fee marginale)
-M6  (opz.) Refactor eur-token-poc: budget-as-deal + settlement per budget  ← **parziale in PoC Rails**
+M6  Refactor eur-token-poc: budget-as-deal + settlement per budget  ← **fatto** (branch `deal-per-budget`)
 ```
 
 **Ordine fase 0 #5:** dopo M1/M2 si implementa **RGB prima** (diritti transferibili); **DLC** resta enhancement opzionale dello settlement, non prerequisito.
@@ -406,7 +404,7 @@ M6  (opz.) Refactor eur-token-poc: budget-as-deal + settlement per budget  ← *
 - [`PAYOFF-SPEC.md`](PAYOFF-SPEC.md) — peg € + interesse sul notional (FloorEUR), formula settlement
 - [`MULTISIG-SPEC.md`](MULTISIG-SPEC.md) — escrow 2-of-3, matrice firme, recovery, timelock
 - [`MARGIN-SPEC.md`](MARGIN-SPEC.md) — margin intraday, top-up annex, liquidazione anticipata
-- [`eur-token-poc` README](../../README.md) — simulatore Rails (budget per deal, settlement FloorEUR, LTV 70/90)
+- [`eur-token-poc` README](../../README.md) — PoC Rails (budget per deal, L1 regtest, settlement FloorEUR, LTV 70/90)
 - [Hodl Hodl](https://hodlhodl.com/) — multisig per contratto
 - [rgb-lib](https://github.com/RGB-Tools/rgb-lib) — wallet mobile + validazione
 

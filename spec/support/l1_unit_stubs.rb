@@ -3,12 +3,21 @@
 module L1UnitStubs
   L1_INTEGRATION_PATH = %r{
     spec/integration/l1/|
+    spec/integration/rgb_lib_transfer_spec\.rb|
     spec/integration/demo_end_to_end_flow_spec\.rb|
     spec/services/l1/(deposit_reserve|settlement_spend)_service_spec\.rb
   }x
 
   def l1_integration_spec?(example)
     example.metadata[:l1_integration] == true || example.file_path.match?(L1_INTEGRATION_PATH)
+  end
+
+  def rgb_lib_spec?(example)
+    example.metadata[:rgb_lib] == true
+  end
+
+  def real_rgb_spec?(example)
+    rgb_lib_spec?(example) || example.metadata[:demo_flow] == true
   end
 
   def stub_l1_provisioned!(budget)
@@ -20,6 +29,52 @@ module L1UnitStubs
       escrow_vout: 0,
       recovery_package: { "version" => 1, "escrow" => { "address" => "bcrt1stub" } }
     )
+    seed_rgb_genesis!(budget)
+  end
+
+  def seed_rgb_genesis!(budget)
+    return if budget.rgb_assignments.exists?
+    return unless budget.borrower
+
+    budget.update!(rgb_asset_id: "rgb_stub_#{budget.id}") if budget.rgb_asset_id.blank?
+
+    pubkey = budget.borrower.btc_account&.escrow_identity_pubkey || "02#{"a" * 64}"
+    RgbAssignment.create!(
+      budget: budget,
+      user: budget.borrower,
+      assignment_id: SecureRandom.uuid,
+      holder_pubkey: pubkey,
+      notional_share_cents: budget.amount_eur_cents,
+      rgb_asset_id: budget.rgb_asset_id
+    )
+
+    TokenAccount.find_or_create_by!(budget: budget, user: budget.borrower) do |account|
+      account.balance_cents = budget.amount_eur_cents
+    end
+  end
+
+  def stub_rgb_mirror!
+    allow(Rgb::IssueService).to receive(:call) do |budget:|
+      budget.update!(rgb_asset_id: "rgb_stub_#{budget.id}") if budget.rgb_asset_id.blank?
+      rgb_result = Rgb::IssueResult.new(
+        asset_id: budget.rgb_asset_id,
+        ticker: "E#{budget.id}"[0, 8],
+        name: "FloorEUR deal #{budget.id}",
+        recipient_id: "rcp_stub",
+        issue_txid: "stub",
+        amount_cents: budget.amount_eur_cents
+      )
+      Rgb::ProjectionService.apply_issue!(budget:, rgb_result:)
+    end
+
+    allow(Rgb::TransferService).to receive(:call) do |budget:, from_user:, to_user:, amount_cents:|
+      Rgb::TransferResult.new(
+        txid: "stub",
+        recipient_id: "rcp_stub",
+        asset_id: budget.rgb_asset_id,
+        amount: amount_cents
+      )
+    end
   end
 
   def stub_l1_unit_operations!
@@ -63,7 +118,11 @@ RSpec.configure do |config|
   config.include L1UnitStubs
 
   config.before do |example|
-    next if l1_integration_spec?(example)
+    stub_rgb_mirror! unless real_rgb_spec?(example)
+  end
+
+  config.before do |example|
+    next if l1_integration_spec?(example) || real_rgb_spec?(example)
 
     stub_l1_unit_operations!
   end

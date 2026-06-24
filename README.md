@@ -13,7 +13,7 @@ bin/rails db:setup
 bin/dev
 ```
 
-`bin/dev` avvia **bitcoind regtest** (`./bin/regtest up`) e **Rails**. Il PoC **richiede** regtest per depositi, funding escrow e settlement.
+`bin/dev` avvia **regtest + stack RGB** (`./bin/regtest up`: bitcoind, electrs, rgb-proxy, sidecar) e **Rails**. Il PoC **richiede** regtest e sidecar RGB per depositi, escrow, transfer token e settlement.
 
 Apri http://localhost:3000 e accedi con:
 
@@ -38,7 +38,7 @@ Ogni **ricarica** (`Budget`) è un deal autonomo:
 | Escrow | UTXO **2-of-3 P2WSH** on-chain (`escrow_txid`/`vout`) + `CollateralLock` (tracking importi) |
 | Strike | `Budget#peg_eur_per_btc` — fissato **all’attivazione** dal `MarketRate` corrente |
 | Maturity | `Budget#maturity_block_height` (da `genesis_block_height` + durata in blocchi) |
-| Token | `TokenAccount` — 1 cent = 0,01 € nominale sul deal (ledger DB) |
+| Token | `TokenAccount` — proiezione DB; saldi spendibili da `Rgb::BalanceService` |
 | Settlement | `Payoffs::FloorEurCalculator` → `Settlements::ExecuteService` → `L1::SettlementPsbtService` |
 | Transfer | `Tokens::WalletTransferService` — spend da più deal se serve |
 | Riserva BTC | Wallet regtest per utente; saldo **spendibile on-chain** (`L1::UserWallet`) |
@@ -127,7 +127,7 @@ Con **transfer parziale** il payout holder segue le quote correnti — vedi `spe
 ## Test
 
 ```bash
-bundle exec rspec          # 87 esempi (unit + integration)
+bundle exec rspec          # unit + integration (RGB lib se sidecar attivo)
 ./bin/demo-spec            # flusso demo end-to-end su regtest
 ```
 
@@ -138,7 +138,30 @@ bin/rails db:schema:load RAILS_ENV=test
 bundle exec rspec
 ```
 
-`bin/demo-spec` richiede bitcoind (`./bin/regtest up`). Eseguilo dopo modifiche a payoff, settlement L1 o saldi dashboard.
+`bin/demo-spec` richiede regtest + sidecar RGB (`./bin/regtest up`). Eseguilo dopo modifiche a payoff, settlement L1, RGB o saldi dashboard.
+
+### RGB (M3) — rgb-lib via sidecar (obbligatorio)
+
+`./bin/regtest up` avvia sempre **bitcoind**, **electrs**, **rgb-proxy** e **rgb-sidecar** (rgb-lib 0.3 in Docker, porta **3030**).
+
+```bash
+./bin/regtest up
+bundle exec rspec spec/integration/rgb_lib_transfer_spec.rb
+```
+
+Variabili:
+
+| Variabile | Default | Ruolo |
+|-----------|---------|--------|
+| `RGB_SIDECAR_URL` | `http://127.0.0.1:3030` | URL HTTP del sidecar |
+
+`Rgb::IssueService` / `Rgb::TransferService` richiedono il sidecar (`Rgb::Config.ensure_sidecar!`); la dashboard mostra sempre la card **RGB (rgb-lib)** con saldi NIA.
+
+Senza sidecar attivo, activate/transfer falliscono e `bundle exec rspec` salta le spec `:rgb_lib`.
+
+Le spec `:rgb_lib` resettano i wallet sidecar (`POST /wallets/reset-all`) prima di ogni esempio per evitare stati corrotti sul volume Docker.
+
+**Nota Docker:** se `docker pull` / `docker compose build` restano bloccati senza output, il credential helper Desktop può essere in stallo. Workaround: `mkdir -p /tmp/docker-nocreds && echo '{"auths":{}}' > /tmp/docker-nocreds/config.json` poi `DOCKER_CONFIG=/tmp/docker-nocreds docker pull …`.
 
 ## Architettura
 
@@ -149,16 +172,18 @@ bundle exec rspec
   - `Budgets::InvestorCollateralTopUpService`, `Budgets::AutoLiquidationService`, `Budgets::AutoSettleService`
   - `Tokens::WalletTransferService`
   - `Payoffs::FloorEurCalculator`, `Settlements::ExecuteService`
-- **Gap verso M2+:** oracle firmato, Path B CLTV in produzione, margin annex on-chain, RGB — vedi [`docs/rgb-design/`](docs/rgb-design/)
+- **Gap verso M2+:** oracle firmato, Path B CLTV in produzione, margin annex on-chain — vedi [`docs/rgb-design/`](docs/rgb-design/)
+- **RGB (M3):** rgb-lib via sidecar Docker (obbligatorio con `./bin/regtest up`)
 
 ## Stato roadmap (`main`)
 
 | Fase | Stato |
 |------|--------|
 | **M0** | Fatto — payoff FloorEUR, LTV, spec §11 |
-| **M1** | **Fatto** — regtest multisig 2-of-3, funding PSBT §3.2, settlement on-chain FloorEUR via `SettlementPsbtService`, recovery package con `psbt_maturity` unsigned, `bin/demo-spec`, 87 spec |
+| **M1** | **Fatto** — regtest multisig 2-of-3, funding PSBT §3.2, settlement on-chain FloorEUR via `SettlementPsbtService`, recovery package con `psbt_maturity` unsigned, `bin/demo-spec`, 92 spec |
 | **M6** | Fatto — budget-as-deal, settlement per budget, L1 wiring (merged in `main`) |
-| **M2+** | Bot facilitatore / oracle firmato, Path B CLTV in prodotto, margin annex on-chain, RGB (M3) |
+| **M3** | **In corso** — RGB20 NIA via rgb-lib sidecar (`./bin/regtest up`), issue su activate, transfer parziale, card dashboard |
+| **M2+** | Bot facilitatore / oracle firmato, Path B CLTV in prodotto, margin annex on-chain |
 
 ## L1 — multisig regtest
 

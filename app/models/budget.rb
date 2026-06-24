@@ -19,6 +19,7 @@ class Budget < ApplicationRecord
   has_one :settlement, dependent: :destroy
   has_many :token_accounts, dependent: :destroy
   has_many :token_transfers, dependent: :destroy
+  has_many :rgb_assignments, dependent: :destroy
   has_many :investor_yield_payouts, dependent: :destroy
 
   enum :status, { pending: 0, active: 1, settled: 2 }

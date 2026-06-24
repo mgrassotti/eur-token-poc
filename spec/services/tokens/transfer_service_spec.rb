@@ -24,6 +24,8 @@ RSpec.describe Tokens::TransferService do
   end
 
   it "transfers tokens between users" do
+    claude.btc_account.update!(escrow_identity_pubkey: "02#{"c" * 64}")
+
     described_class.call(budget: budget, from_user: alice, to_user: claude, amount_cents: 25_000)
 
     expect(alice.token_accounts.find_by(budget: budget).balance_cents).to eq(75_000)

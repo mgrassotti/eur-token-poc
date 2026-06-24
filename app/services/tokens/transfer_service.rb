@@ -17,23 +17,28 @@ module Tokens
 
     def call
       validate!
+      ensure_rgb_ready!
 
-      ActiveRecord::Base.transaction do
-        from_account = budget.token_accounts.lock.find_by!(user: from_user)
-        to_account = find_or_create_to_account!
+      settled = Rgb::BalanceService.settled(user: from_user, budget: budget)
+      raise Error, "Insufficient token balance" if settled < amount_cents
 
-        raise Error, "Insufficient token balance" if from_account.balance_cents < amount_cents
+      rgb_result = Rgb::TransferService.call(
+        budget: budget,
+        from_user: from_user,
+        to_user: to_user,
+        amount_cents: amount_cents
+      )
 
-        from_account.update!(balance_cents: from_account.balance_cents - amount_cents)
-        to_account.update!(balance_cents: to_account.balance_cents + amount_cents)
-
-        TokenTransfer.create!(
-          budget: budget,
-          from_user: from_user,
-          to_user: to_user,
-          amount_cents: amount_cents
-        )
-      end
+      Rgb::ProjectionService.apply_transfer!(
+        budget: budget,
+        from_user: from_user,
+        to_user: to_user,
+        amount_cents: amount_cents,
+        rgb_result: rgb_result
+      )
+    rescue Rgb::TransferService::Error, Rgb::LibTransferService::Error,
+           Rgb::SidecarClient::Error, Rgb::ProjectionService::Error => e
+      raise Error, e.message
     end
 
     private
@@ -46,8 +51,12 @@ module Tokens
       raise Error, "Cannot transfer to yourself" if from_user.id == to_user.id
     end
 
-    def find_or_create_to_account!
-      budget.token_accounts.lock.find_or_create_by!(user: to_user)
+    def ensure_rgb_ready!
+      raise Error, "Escrow not provisioned" unless budget.l1_multisig_provisioned?
+      raise Error, "RGB asset missing on deal" if budget.rgb_asset_id.blank?
+      raise Error, "RGB genesis missing" unless budget.rgb_assignments.exists?
+
+      Rgb::Config.ensure_sidecar!
     end
   end
 end

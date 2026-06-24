@@ -55,12 +55,6 @@ module Budgets
           amount_sats: total_locked_sats,
           locked_at: Time.current
         )
-
-        TokenAccount.create!(
-          user: budget.borrower,
-          budget: budget,
-          balance_cents: budget.amount_eur_cents
-        )
       end
 
       budget.reload

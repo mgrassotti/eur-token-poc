@@ -31,6 +31,9 @@ module L1
         investor: funding.investor,
         bot: funding.bot
       )
+
+      Rgb::IssueService.call(budget: budget.reload)
+      budget.reload
     rescue Bitcoind::Error => e
       raise Error, "Escrow L1 non provisionato: #{e.message}"
     end

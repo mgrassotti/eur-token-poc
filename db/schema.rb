@@ -10,13 +10,15 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_23_113408) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_24_081500) do
   create_table "btc_accounts", force: :cascade do |t|
     t.bigint "balance_sats", default: 0, null: false
     t.string "bitcoind_wallet_name"
     t.datetime "created_at", null: false
     t.string "escrow_identity_pubkey"
     t.string "escrow_identity_wif"
+    t.string "rgb_mnemonic"
+    t.string "rgb_wallet_id"
     t.datetime "updated_at", null: false
     t.integer "user_id", null: false
     t.index ["bitcoind_wallet_name"], name: "index_btc_accounts_on_bitcoind_wallet_name", unique: true, where: "bitcoind_wallet_name IS NOT NULL"
@@ -44,6 +46,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_23_113408) do
     t.integer "rate_bps_monthly", default: 100, null: false
     t.json "recovery_package"
     t.integer "refund_delay_blocks", default: 1008, null: false
+    t.string "rgb_asset_id"
     t.integer "status", default: 0, null: false
     t.datetime "updated_at", null: false
     t.index ["borrower_id"], name: "index_budgets_on_borrower_id"
@@ -80,6 +83,23 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_23_113408) do
     t.index ["set_by_id"], name: "index_market_rates_on_set_by_id"
   end
 
+  create_table "rgb_assignments", force: :cascade do |t|
+    t.string "assignment_id", null: false
+    t.integer "budget_id", null: false
+    t.datetime "created_at", null: false
+    t.string "holder_pubkey", null: false
+    t.integer "notional_share_cents", default: 0, null: false
+    t.string "parent_assignment_id"
+    t.string "rgb_asset_id"
+    t.string "rgb_recipient_id"
+    t.datetime "updated_at", null: false
+    t.integer "user_id", null: false
+    t.index ["assignment_id"], name: "index_rgb_assignments_on_assignment_id", unique: true
+    t.index ["budget_id", "user_id"], name: "index_rgb_assignments_on_budget_id_and_user_id", unique: true
+    t.index ["budget_id"], name: "index_rgb_assignments_on_budget_id"
+    t.index ["user_id"], name: "index_rgb_assignments_on_user_id"
+  end
+
   create_table "settlements", force: :cascade do |t|
     t.bigint "btc_to_investor_sats", null: false
     t.integer "budget_id", null: false
@@ -107,6 +127,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_23_113408) do
     t.integer "budget_id", null: false
     t.datetime "created_at", null: false
     t.integer "from_user_id", null: false
+    t.json "rgb_consignment"
+    t.string "rgb_transfer_txid"
     t.integer "to_user_id", null: false
     t.datetime "updated_at", null: false
     t.index ["budget_id"], name: "index_token_transfers_on_budget_id"
@@ -131,6 +153,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_23_113408) do
   add_foreign_key "investor_yield_payouts", "budgets"
   add_foreign_key "investor_yield_payouts", "users"
   add_foreign_key "market_rates", "users", column: "set_by_id"
+  add_foreign_key "rgb_assignments", "budgets"
+  add_foreign_key "rgb_assignments", "users"
   add_foreign_key "settlements", "budgets"
   add_foreign_key "token_accounts", "budgets"
   add_foreign_key "token_accounts", "users"

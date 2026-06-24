@@ -30,6 +30,8 @@
 
 /public/assets
 
+/rgb-sidecar/.venv/
+
 # Ignore key files for decrypting credentials and more.
 /config/*.key
 

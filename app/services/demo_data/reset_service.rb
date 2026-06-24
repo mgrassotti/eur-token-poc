@@ -35,6 +35,7 @@ module DemoData
       InvestorYieldPayout.delete_all
       Settlement.delete_all
       TokenTransfer.delete_all
+      RgbAssignment.delete_all
       TokenAccount.delete_all
       CollateralLock.delete_all
       Budget.delete_all

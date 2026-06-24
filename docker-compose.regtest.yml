@@ -1,5 +1,6 @@
 # Bitcoin Core regtest for M1 multisig integration tests.
 # Usage: docker compose -f docker-compose.regtest.yml up -d
+# RGB stack (electrs + proxy + sidecar): always started by ./bin/regtest up
 services:
   bitcoind:
     image: bitcoin/bitcoin:28.0
@@ -28,3 +29,50 @@ services:
       interval: 2s
       timeout: 5s
       retries: 30
+
+  electrs:
+    profiles: [rgb]
+    image: registry.gitlab.com/hashbeam/docker/electrs:0.10.10
+    depends_on:
+      bitcoind:
+        condition: service_healthy
+    environment:
+      # hashbeam/electrs image (start-electrs.sh) — not APP_BITCOIN_*.
+      BTCHOST: bitcoind
+      BTCRPCPORT: 18443
+      BTCP2PPORT: 18444
+      BTCUSER: regtest
+      BTCPASS: regtest
+      PORT: 50001
+      NETWORK: regtest
+    ports:
+      - "50001:50001"
+
+  rgb-proxy:
+    profiles: [rgb]
+    image: ghcr.io/rgb-tools/rgb-proxy-server:0.3.0
+    ports:
+      - "3000:3000"
+
+  rgb-sidecar:
+    profiles: [rgb]
+    build: ./rgb-sidecar
+    depends_on:
+      bitcoind:
+        condition: service_healthy
+      electrs:
+        condition: service_started
+      rgb-proxy:
+        condition: service_started
+    environment:
+      ELECTRUM_URL: tcp://electrs:50001
+      RGB_PROXY_URL: rpc://rgb-proxy:3000/json-rpc
+      BITCOIND_RPC_URL: http://regtest:regtest@bitcoind:18443
+      DATA_ROOT: /data/wallets
+    ports:
+      - "3030:3030"
+    volumes:
+      - rgb_wallet_data:/data/wallets
+
+volumes:
+  rgb_wallet_data:

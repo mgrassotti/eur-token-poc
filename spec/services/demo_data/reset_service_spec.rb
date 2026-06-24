@@ -47,6 +47,7 @@ RSpec.describe DemoData::ResetService do
   it "creates demo users when they are missing" do
     Settlement.delete_all
     TokenTransfer.delete_all
+    RgbAssignment.delete_all
     TokenAccount.delete_all
     CollateralLock.delete_all
     Budget.delete_all

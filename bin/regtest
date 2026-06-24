@@ -2,9 +2,14 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+PROFILE_ARGS=(--profile rgb)
+if [[ "${1:-}" == "--rgb" ]]; then
+  shift
+fi
+
 case "${1:-up}" in
   up)
-    docker compose -f docker-compose.regtest.yml up -d
+    docker compose -f docker-compose.regtest.yml "${PROFILE_ARGS[@]}" up -d
     echo "Waiting for bitcoind regtest on :18443..."
     for _ in $(seq 1 60); do
       if curl -sf --user regtest:regtest \
@@ -12,6 +17,14 @@ case "${1:-up}" in
         -H "content-type: application/json" \
         http://127.0.0.1:18443/ >/dev/null 2>&1; then
         echo "bitcoind regtest ready"
+        echo "Waiting for RGB sidecar on :3030..."
+        for _ in $(seq 1 90); do
+          if curl -sf http://127.0.0.1:3030/health >/dev/null 2>&1; then
+            echo "RGB sidecar ready"
+            break
+          fi
+          sleep 2
+        done
         exit 0
       fi
       sleep 1
@@ -20,17 +33,17 @@ case "${1:-up}" in
     exit 1
     ;;
   down)
-    docker compose -f docker-compose.regtest.yml down
+    docker compose -f docker-compose.regtest.yml --profile rgb down
     ;;
   reset)
-    docker compose -f docker-compose.regtest.yml down
+    docker compose -f docker-compose.regtest.yml --profile rgb down
     exec "$0" up
     ;;
   logs)
     docker compose -f docker-compose.regtest.yml logs -f bitcoind
     ;;
   *)
-    echo "Usage: $0 {up|down|reset|logs}" >&2
+    echo "Usage: $0 [--rgb] {up|down|reset|logs}" >&2
     exit 1
     ;;
 esac

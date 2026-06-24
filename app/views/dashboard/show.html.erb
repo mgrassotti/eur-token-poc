@@ -217,6 +217,38 @@
     </div>
   </div>
 </div>
+<% if @rgb_sidecar_error %>
+  <div class="card mb-4 border-danger">
+    <div class="card-header bg-danger-subtle">RGB (rgb-lib)</div>
+    <div class="card-body">
+      <p class="mb-0 text-danger">Sidecar RGB non raggiungibile. Avvia lo stack con <code>./bin/regtest up</code>.</p>
+    </div>
+  </div>
+<% else %>
+  <div class="card mb-4 border-primary">
+    <div class="card-header bg-primary-subtle">RGB (rgb-lib)</div>
+    <div class="card-body">
+      <p class="text-muted small mb-3">Saldo asset RGB20 on-chain via sidecar regtest. I transfer «Invia Denaro» aggiornano anche il wallet RGB.</p>
+      <% if @rgb_assets.present? %>
+        <ul class="list-group">
+          <% @rgb_assets.each do |asset| %>
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+              <span>
+                <strong><%= asset["ticker"] %></strong> — <%= asset["name"] %>
+                <span class="text-muted small d-block"><code><%= asset["asset_id"] %></code></span>
+              </span>
+              <span class="badge text-bg-primary">
+                <%= number_with_delimiter(asset.dig("balance", "settled") || asset.dig("balance", "future") || 0) %>
+              </span>
+            </li>
+          <% end %>
+        </ul>
+      <% else %>
+        <p class="mb-0 text-muted">Nessun asset RGB sul wallet. Attiva un deal per emettere RGB20.</p>
+      <% end %>
+    </div>
+  </div>
+<% end %>
 <% end %>
 
 <div class="d-flex gap-2 mb-4 flex-wrap">

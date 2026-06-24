@@ -16,18 +16,11 @@ class DashboardController < ApplicationController
     @investable_budgets = @pending_budgets.reject { |b| b.borrower_id == current_user.id }
     @savings_eur = savings_eur_value(@savings_sats, @market_rate)
     @margin_call_budgets = Budgets::MarginCall.budgets_for(current_user, market_rate: @market_rate)
+    @rgb_assets = rgb_assets_for(current_user)
+    @rgb_sidecar_error = @rgb_assets.nil?
 
     unless admin?
-      fund_budget_ids = (
-        current_user.borrowed_budgets.where.not(status: :pending).pluck(:id) +
-        current_user.received_token_transfers.distinct.pluck(:budget_id)
-      ).uniq
-
-      @my_fund_accounts = current_user.token_accounts
-        .includes(:budget)
-        .where(budget_id: fund_budget_ids)
-        .where("balance_cents > 0")
-        .order(created_at: :desc)
+      @my_fund_accounts = Tokens::Spendable.fund_positions_for(current_user)
     end
 
     return unless admin?
@@ -42,5 +35,14 @@ class DashboardController < ApplicationController
     return unless market_rate&.set?
 
     BtcConversion.sats_to_eur(sats, market_rate.btc_eur_per_btc)
+  end
+
+  def rgb_assets_for(user)
+    wallet_id = user.btc_account&.rgb_wallet_id
+    return [] if wallet_id.blank?
+
+    Rgb::SidecarClient.instance.list_assets(wallet_id).fetch("nia", [])
+  rescue Rgb::SidecarClient::Error
+    nil
   end
 end

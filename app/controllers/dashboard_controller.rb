@@ -33,6 +33,7 @@ class DashboardController < ApplicationController
     return unless admin?
 
     @active_budgets = Budget.active.order(created_at: :desc)
+    @on_chain_wallets = L1::WalletInventoryService.call(market_rate: @market_rate)
   end
 
   private

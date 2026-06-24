@@ -199,12 +199,12 @@ Ogni wallet (`peg_party`, `investor`) deve persistere localmente:
 |-----------|-----------|
 | `deal_params.json` | `deal_id`, strike, rate, heights, collateral, pubkeys, `escrow_utxo` |
 | `psbt_funding` | PSBT asincrona §3.2 (o consolidamento §3.3) in corso |
-| `psbt_maturity_template` | Output placeholder; firme parziali opzionali |
+| `psbt_maturity` | PSBT unsigned reale con output holder/investor (da `SettlementPsbtTemplateService`) |
 | `psbt_refund_timelock` | Half-signed CLTV refund Path B |
 | `consignment_rgb` | Assignment `FloorEURPosition` (fase M3) |
 | `oracle_policy` | Feed, soglia mediana, pubkey attestation |
 
-**Checklist M0:** non implementato in Rails PoC (M1: export JSON / PSBT reali; target `Deal#recovery_package` o equivalente su `Budget`).
+**Checklist M1:** export JSON / PSBT reali — **fatto** (`Budget#recovery_package` + download HTTP).
 
 ---
 
@@ -274,13 +274,13 @@ protocol_fee_sats = 0    # MVP: nessun output verso il bot dall’escrow
 | `estimated_settlement_fee_sats` | `Budget::ESTIMATED_SETTLEMENT_FEE_SATS` (5_000) | — |
 | `refund_delay_blocks` | `Budget#refund_delay_blocks` (default 1008) | Path B harness; CLTV produzione M2+ |
 | Recovery package | `recovery_package` JSON + download | **Fatto** |
-| Stato funding | `pending` → `active` → `settled` | Funding §3.2 PSBT; settlement spend cooperativo |
+| Stato funding | `pending` → `active` → `settled` | Funding §3.2 PSBT; settlement PSBT async maturity |
 
 ### Bitcoin L1 (M1 regtest) — stato implementazione
 
 1. [x] Tre chiavi (peg, investor, bot) — regtest.
 2. [x] Funding PSBT asincrona §3.2 → un UTXO 2-of-3.
-3. [x] Settlement maturity: spend cooperativo + template recovery (`SettlementSpendService`).
+3. [x] Settlement maturity: PSBT async (`SettlementPsbtService` + `SettlementTxBuilder`) + `psbt_maturity` unsigned nel recovery package.
 4. [x] Test: bot-only → firma incompleta (spec regtest).
 5. [~] Refund timelock Path B — harness regtest; integrazione prodotto / CLTV script M2+.
 
@@ -312,7 +312,7 @@ Legenda: `[x]` fatto · `[~]` parziale / harness · `[ ]` M2+.
 - [x] Funding §3.2 PSBT asincrona — `L1::FundingPsbtService` + spec integration.
 - [~] Path B: refund timelock in regtest harness; CLTV script branch M2+.
 - [x] Funding: un UTXO P2WSH per deal.
-- [x] Settlement on-chain — `L1::SettlementSpendService` + `bin/demo-spec`.
+- [x] Settlement on-chain — `L1::SettlementPsbtService` + `bin/demo-spec`.
 - [x] Verifica L1: spend con **solo** bot → `complete: false` — spec regtest.
 
 ---

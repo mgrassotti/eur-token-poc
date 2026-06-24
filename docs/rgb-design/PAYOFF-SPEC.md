@@ -293,7 +293,7 @@ Validazione client-side (rgb-lib):
 | — | Funding escrow | **Momenti separati**, **un UTXO** — [`MULTISIG-SPEC.md`](MULTISIG-SPEC.md) §3 |
 | — | Mining fee settlement | **Prima del payout holder** (`distributable = escrow − fees`) |
 
-Fase 0 design: **chiusa**. Checklist M0 §11 **completata in Rails**; multisig L1 regtest in `lib/l1/` — vedi [`MULTISIG-SPEC.md`](MULTISIG-SPEC.md) §10 e README PoC.
+Fase 0 design: **chiusa**. Checklist M0 §11 **completata in Rails**; **M1 L1 regtest completo** (funding §3.2, settlement PSBT async, recovery package) — vedi [`MULTISIG-SPEC.md`](MULTISIG-SPEC.md) §10 e README PoC.
 
 ---
 
@@ -305,7 +305,7 @@ Fase 0 design: **chiusa**. Checklist M0 §11 **completata in Rails**; multisig L
 - [x] Cappo escrow §7 con `S` molto basso.
 - [x] Apertura: `escrow_total ≥ 2 × notional` (1× richiedente + 1× investitore); LTV iniziale 50%.
 - [x] LTV ≥ 70% margin call; ≥ 90% liquidazione; top-up investitore nel PoC.
-- [x] Multisig 2-of-3 L1: matrice firme, recovery package, funding §3.2, settlement on-chain — `lib/l1/` + `bin/demo-spec`.
+- [x] Multisig 2-of-3 L1: matrice firme, recovery package, funding §3.2, settlement on-chain via `SettlementPsbtService` — `lib/l1/` + `bin/demo-spec` (M1 completo, vedi MULTISIG-SPEC §10).
 
 ---
 

@@ -39,7 +39,7 @@ Ogni **ricarica** (`Budget`) è un deal autonomo:
 | Strike | `Budget#peg_eur_per_btc` — fissato **all’attivazione** dal `MarketRate` corrente |
 | Maturity | `Budget#maturity_block_height` (da `genesis_block_height` + durata in blocchi) |
 | Token | `TokenAccount` — 1 cent = 0,01 € nominale sul deal (ledger DB) |
-| Settlement | `Payoffs::FloorEurCalculator` → `Settlements::ExecuteService` → `L1::SettlementSpendService` |
+| Settlement | `Payoffs::FloorEurCalculator` → `Settlements::ExecuteService` → `L1::SettlementPsbtService` |
 | Transfer | `Tokens::WalletTransferService` — spend da più deal se serve |
 | Riserva BTC | Wallet regtest per utente; saldo **spendibile on-chain** (`L1::UserWallet`) |
 | Oracle / catena | `MarketRate` + `ChainState` (admin); auto-settle al maturity block |
@@ -103,7 +103,7 @@ Il settlement **FloorEUR**:
 1. Calcola liability € (notional + interessi)
 2. Converte in sats al **spot** di chiusura
 3. Cap: `total_holder = min(gross, escrow − mining_fee)` (fee default 5_000 sats)
-4. **Spend on-chain** dall’escrow verso wallet holder e investitore (`L1::SettlementSpendService`)
+4. **PSBT maturity async:** `L1::SettlementPsbtService` costruisce la PSBT (`L1::SettlementTxBuilder`), persiste la versione **unsigned** nel recovery package, poi firma in sequenza bot + investitore e broadcast
 5. Sync saldi riserva; brucia i token
 
 ### Esempio numerico — 1000 €, peg 50k, 1 mese @ 1%, spot 50k
@@ -127,7 +127,7 @@ Con **transfer parziale** il payout holder segue le quote correnti — vedi `spe
 ## Test
 
 ```bash
-bundle exec rspec          # 83 esempi (unit + integration)
+bundle exec rspec          # 87 esempi (unit + integration)
 ./bin/demo-spec            # flusso demo end-to-end su regtest
 ```
 
@@ -149,16 +149,16 @@ bundle exec rspec
   - `Budgets::InvestorCollateralTopUpService`, `Budgets::AutoLiquidationService`, `Budgets::AutoSettleService`
   - `Tokens::WalletTransferService`
   - `Payoffs::FloorEurCalculator`, `Settlements::ExecuteService`
-- **Gap verso M2+:** settlement maturity come PSBT async lato wallet, Path B CLTV in produzione, RGB — vedi [`docs/rgb-design/`](docs/rgb-design/)
+- **Gap verso M2+:** oracle firmato, Path B CLTV in produzione, margin annex on-chain, RGB — vedi [`docs/rgb-design/`](docs/rgb-design/)
 
-## Stato roadmap (branch `deal-per-budget`)
+## Stato roadmap (`main`)
 
 | Fase | Stato |
 |------|--------|
 | **M0** | Fatto — payoff FloorEUR, LTV, spec §11 |
-| **M1** | ~95% — regtest multisig, funding §3.2, settlement on-chain, recovery package, `bin/demo-spec` |
-| **M6** | Fatto — budget-as-deal, settlement per budget, L1 wiring |
-| **M2+** | Bot facilitatore, margin annex on-chain, RGB (M3) |
+| **M1** | **Fatto** — regtest multisig 2-of-3, funding PSBT §3.2, settlement on-chain FloorEUR via `SettlementPsbtService`, recovery package con `psbt_maturity` unsigned, `bin/demo-spec`, 87 spec |
+| **M6** | Fatto — budget-as-deal, settlement per budget, L1 wiring (merged in `main`) |
+| **M2+** | Bot facilitatore / oracle firmato, Path B CLTV in prodotto, margin annex on-chain, RGB (M3) |
 
 ## L1 — multisig regtest
 
@@ -174,8 +174,10 @@ Modulo `lib/l1/` per escrow **2-of-3 P2WSH** su Bitcoin Core regtest (JSON-RPC).
 | `L1::RegtestResetService` | Ricrea bitcoind al reset demo (`./bin/regtest reset`) |
 | `L1::FundingPsbtService` | §3.2 PSBT: peg + investor → escrow 2-of-3 |
 | `L1::ProvisionEscrowService` | Chiamato da `ActivateService` dopo l’attivazione |
-| `L1::SettlementSpendService` | Spend cooperativo escrow → holder/investor; sync saldi |
-| `L1::SettlementPsbtTemplateService` | Template maturity nel recovery package |
+| `L1::SettlementPsbtService` | Settlement maturity async: build PSBT → persist unsigned → firma bot+investor → broadcast |
+| `L1::SettlementTxBuilder` | Costruzione tx/PSBT settlement (output holder + investor) |
+| `L1::SettlementSpendService` | Wrapper compat sottile su `SettlementPsbtService`; sync saldi |
+| `L1::SettlementPsbtTemplateService` | PSBT maturity unsigned + output nel recovery package (`psbt_maturity`) |
 | `L1::RecoveryPackage` + `RecordEscrowService` | Export JSON §6 |
 | `GET /budgets/:id/recovery_package` | Download JSON (richiedente, investitore, admin) |
 

@@ -2,7 +2,7 @@
 
 require "rails_helper"
 
-RSpec.describe L1::SettlementSpendService, :l1_integration do
+RSpec.describe L1::SettlementPsbtService, :l1_integration do
   let(:alice) { create(:user) }
   let(:bob) { create(:user) }
   let(:peg) { 50_000 }
@@ -65,21 +65,49 @@ RSpec.describe L1::SettlementSpendService, :l1_integration do
     )
   end
 
-  it "raises when escrow is not provisioned" do
-    budget.update!(escrow_txid: nil, peg_party_pubkey: nil)
+  describe ".build" do
+    it "raises when escrow is not provisioned" do
+      budget.update!(escrow_txid: nil, peg_party_pubkey: nil)
 
-    expect do
-      described_class.call(budget: budget, payoff: payoff, holder_payouts: holder_payouts)
-    end.to raise_error(L1::SettlementSpendService::Error, /Escrow L1 non provisionato/)
+      expect do
+        described_class.build(budget: budget, payoff: payoff, holder_payouts: holder_payouts)
+      end.to raise_error(described_class::Error, /Escrow L1 non provisionato/)
+    end
+
+    it "raises when bot signing key is missing" do
+      package = budget.recovery_package.deep_dup
+      package["bot_signing"] = {}
+      budget.update!(recovery_package: package)
+
+      expect do
+        described_class.build(budget: budget, payoff: payoff, holder_payouts: holder_payouts)
+      end.to raise_error(described_class::Error, /Chiave bot mancante/)
+    end
+
+    it "rejects invalid co-signer pairs" do
+      expect do
+        described_class.build(budget: budget, payoff: payoff, holder_payouts: holder_payouts, co_signer: :borrower)
+      end.to raise_error(described_class::Error, /Co-firmatario/)
+    end
   end
 
-  it "raises when bot signing key is missing" do
-    package = budget.recovery_package.deep_dup
-    package["bot_signing"] = {}
-    budget.update!(recovery_package: package)
+  describe ".broadcast!" do
+    it "requires a complete draft" do
+      draft = described_class::SettlementPsbt.new(
+        budget: budget,
+        payoff: payoff,
+        holder_payouts: [],
+        raw_hex: "00",
+        psbt: "cHNidP8B",
+        hex: "00",
+        complete: false,
+        signatures_applied: [:bot],
+        co_signer: :investor
+      )
 
-    expect do
-      described_class.call(budget: budget, payoff: payoff, holder_payouts: holder_payouts)
-    end.to raise_error(L1::SettlementSpendService::Error, /Chiave bot mancante/)
+      expect do
+        described_class.broadcast!(draft)
+      end.to raise_error(described_class::Error, /incompleta/)
+    end
   end
 end

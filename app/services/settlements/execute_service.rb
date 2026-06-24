@@ -72,8 +72,6 @@ module Settlements
           market_rate_updated: market_rate_updated
         )
 
-        record_settlement_template!(payoff: payoff)
-
         result
       end
     end
@@ -116,12 +114,6 @@ module Settlements
       true
     end
 
-    def record_settlement_template!(payoff:)
-      return unless budget.l1_multisig_provisioned?
-
-      L1::SettlementPsbtTemplateService.call(budget: budget, payoff: payoff)
-    end
-
     def settle!(token_accounts, payoff)
       raise Error, "Escrow L1 non provisionato" unless budget.l1_multisig_provisioned?
 
@@ -134,13 +126,32 @@ module Settlements
         end
       end
 
-      L1::SettlementSpendService.call(budget: budget, payoff: payoff, holder_payouts: holder_payouts)
+      draft = L1::SettlementPsbtService.build(budget: budget, payoff: payoff, holder_payouts: holder_payouts)
+      L1::SettlementPsbtTemplateService.call(
+        budget: budget,
+        payoff: payoff,
+        holder_payouts: holder_payouts,
+        draft: draft,
+        end_btc_eur_rate: end_btc_eur_rate
+      )
+
+      signed = L1::SettlementPsbtService.sign!(draft, :bot)
+      signed = L1::SettlementPsbtService.sign!(signed, draft.co_signer)
+      settlement_txid = L1::SettlementPsbtService.broadcast!(signed)
+      persist_settlement_txid!(settlement_txid)
 
       users_to_sync = holder_payouts.map { |p| p[:user] }.uniq
       users_to_sync << budget.investor
       users_to_sync.uniq.each { |user| L1::SyncReserveBalanceService.call(user: user) }
 
       payouts
+    end
+
+    def persist_settlement_txid!(txid)
+      package = budget.recovery_package.deep_dup
+      package["settlement_txid"] = txid
+      package["psbt_maturity"] = package.fetch("psbt_maturity", {}).merge("broadcast_txid" => txid)
+      budget.update!(recovery_package: package)
     end
 
     def payout_for(token_account, allocation, payoff)

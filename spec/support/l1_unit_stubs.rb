@@ -28,6 +28,22 @@ module L1UnitStubs
     end
 
     allow(L1::SettlementSpendService).to receive(:call)
+    allow(L1::SettlementPsbtService).to receive(:build) do |budget:, payoff:, holder_payouts:, co_signer: L1::SettlementPsbtService::DEFAULT_CO_SIGNER|
+      L1::SettlementPsbtService::SettlementPsbt.new(
+        budget: budget,
+        payoff: payoff,
+        holder_payouts: [],
+        raw_hex: "00",
+        psbt: "cHNidP8B",
+        hex: nil,
+        complete: false,
+        signatures_applied: [],
+        co_signer: co_signer
+      )
+    end
+    allow(L1::SettlementPsbtService).to receive(:sign!) { |draft, _role| draft }
+    allow(L1::SettlementPsbtService).to receive(:broadcast!) { "deadbeef" * 8 }
+    allow(L1::SettlementPsbtTemplateService).to receive(:call) { |budget:, **| budget }
 
     allow(L1::UserWallet).to receive(:for) do |user|
       wallet = instance_double(L1::UserWallet, wallet_name: "user_#{user.id}")

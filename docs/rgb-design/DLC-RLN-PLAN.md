@@ -111,10 +111,12 @@ graph TB
 - [x] A.2 unit spec aggiornati (`redeem_service`, `transfer_service`, `l1_unit_stubs` mirror) — suite unit verde
 - [x] A.2 (regtest) riscrittura spec `:rgb_lib` su nodi RLN reali (`spec/integration/rgb_lib_transfer_spec.rb` con `:regtest`, saldi letti dai nodi) + provisioning/funding nodi in `WalletSetupService` + conferma on-chain transfer/redeem via `Rgb::NodeConfirm` (mining+refresh su regtest) + `indexer_url` `tcp://electrs:50001`. Rimozione completa `rgb-sidecar/` + `Rgb::SidecarClient` + `Config.{sidecar_url,ensure_sidecar!,wallet_id_for}` + servizio compose `rgb-sidecar`/volume + script (`bin/dev`/`bin/demo-spec`/`bin/system-spec` ora sondano `:3001/nodeinfo`)
 - [x] B.1 `lib/dlc/oracle_client.rb` (announce/attest numeric per-digit, REST Kormir) + `lib/dlc/numeric.rb` (decomposizione base-2 per-digit) + `lib/dlc/config.rb` (gate `DLC_ENABLED`, parametri FloorEUR) + spec (HTTP stub)
-- [ ] B.1/B.2 `lib/dlc/node_client.rb` (ddk: funding 2-of-2, CET, adaptor, execute, refund)
-- [ ] B.2 migration + modelli `DlcContract` / `DlcSettlement`
-- [ ] B.2 `Dlc::ContractSetupService` + hook in `L1::ProvisionEscrowService`
-- [ ] B.2 `Dlc::SettlementService` + hook in `Settlements::ExecuteService#settle!`
-- [ ] B.3 `Dlc::Distribution` (on-chain `/sendasset`, poi HODL atomico)
-- [ ] B.3 export recovery package (oracle/contract/CET/refund)
-- [ ] B.3 integration `:regtest` end-to-end + doc (`P2P-OPTIONS`/`MULTISIG-SPEC`/`RGB-FIRST`)
+- [x] B.1/B.2 `lib/dlc/node_client.rb` (shim REST ddk: create/execute/refund — funding 2-of-2, CET, adaptor e refund gestiti dal shim) + `lib/dlc/payout_curve.rb` (schedule FloorEUR per outcome via `FloorEurCalculator`) + spec (HTTP stub). NB: client gRPC ddk reale rinviato a B.3
+- [x] B.2 migration `create_dlc_tables` + modelli `DlcContract` / `DlcSettlement` + associazioni `Budget` (`has_one :dlc_contract/:dlc_settlement`)
+- [x] B.2 `Dlc::ContractSetupService` (announce oracle + payout curve + create contract + persist) + hook in `L1::ProvisionEscrowService` (gated `Dlc::Config.enabled?`) + spec
+- [x] B.2 `Dlc::SettlementService` (attest + execute CET + persist) + hook in `Settlements::ExecuteService#settle!` (gated, broadcast CET con fallback PSBT escrow legacy) + spec
+- [x] B.3 `Dlc::Distribution` (split `peg_pot` pro-rata sull'allocazione corrente + fan-out on-chain via `NodeClient#distribute`, persistito nel recovery package) + hook in `Settlements::ExecuteService#settle_via_dlc!` + spec. NB: variante atomica LN/HODL predisposta nel client ma non disponibile sul nodo vendored
+- [x] B.3 export recovery package DLC (`lib/dlc/recovery_package.rb`: oracle announcement/attestation, contract/funding, CET, refund) + merge in `budget.recovery_package["dlc"]` + spec
+- [~] B.3 integration `:dlc_integration`/`:regtest` end-to-end (`spec/integration/dlc/dlc_settlement_spec.rb`) — scaffold pronto, **skippa** finché Kormir + ddk non sono nello stack compose (infra residua). Doc aggiornati (`RGB-FIRST`/`MULTISIG-SPEC`/`P2P-OPTIONS`)
+
+> **Infra residua (B.3)**: aggiungere oracle Kormir e nodo ddk (shim REST sugli endpoint `/contracts*`) a `docker-compose.regtest.yml`; sostituire la `PayoutCurve` campionata con la payout-function nativa di rust-dlc; sostituire la `RedeemService` best-effort con la distribuzione DLC come meccanismo autorevole (vedi §"Best-effort redemption").

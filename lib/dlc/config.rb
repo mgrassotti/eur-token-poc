@@ -24,6 +24,16 @@ module Dlc
       ENV.fetch("DLC_ENABLED", "false") == "true"
     end
 
+    # --- DLC node (dlcdevkit / ddk shim, REST) ---------------------------
+
+    def self.node_url
+      ENV.fetch("DLC_NODE_URL", "http://127.0.0.1:8090")
+    end
+
+    def self.node_token
+      ENV["DLC_NODE_TOKEN"].presence
+    end
+
     # --- Numeric event parameters (FloorEUR price feed) ------------------
     #
     # FloorEUR settles on the BTC price at maturity. DLC numeric events encode

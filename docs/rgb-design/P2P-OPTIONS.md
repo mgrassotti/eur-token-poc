@@ -420,3 +420,14 @@ bot facilitatore con recovery **Alice+Bob** e **timelock**.
 
 Il demo **`eur-token-poc`** fornisce i casi numerici e il vocabolario (budget-as-deal, peg, transfer, settlement FloorEUR);
 l’implementazione on-chain sostituisce pool/epoch globali con **deal indipendenti**.
+
+---
+
+## DLC reale (Workstream B)
+
+Vedi [`DLC-RLN-PLAN.md`](DLC-RLN-PLAN.md). L'oracle mediano evolve in un **oracle DLC reale**
+(Kormir/Mycelia, announcement/attestation numeric per-digit, `lib/dlc/oracle_client.rb`); il
+settlement diventa una **CET** su funding **2-of-2** via nodo ddk (`lib/dlc/node_client.rb`), con la
+distribuzione del `peg_pot` agli holder via RLN (`Dlc::Distribution`, on-chain baseline; HODL atomico
+predisposto ma non disponibile sul nodo vendored). Tutto è gated da `Dlc::Config.enabled?`; l'escrow
+2-of-3 resta fallback. Infra residua: Kormir + ddk in `docker-compose.regtest.yml`.

@@ -33,6 +33,9 @@ module L1
       )
 
       Rgb::IssueService.call(budget: budget.reload)
+
+      setup_dlc!(budget.reload) if Dlc::Config.enabled?
+
       budget.reload
     rescue Bitcoind::Error => e
       raise Error, "Escrow L1 non provisionato: #{e.message}"
@@ -41,6 +44,13 @@ module L1
     private
 
     attr_reader :budget
+
+    # When the DLC path is enabled, fund the 2-of-2 contract alongside the
+    # legacy escrow (kept as fallback). Setup failures abort activation so the
+    # misconfiguration is visible rather than silently degrading to legacy.
+    def setup_dlc!(budget)
+      Dlc::ContractSetupService.call(budget: budget)
+    end
 
     def ensure_chain_ready!
       RegtestHarness.new(wallet_name: L1::SHARED_REGTEST_WALLET).ensure_chain_ready!

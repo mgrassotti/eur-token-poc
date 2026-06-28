@@ -128,6 +128,42 @@ module Settlements
         end
       end
 
+      settlement_txid =
+        if dlc_active?
+          settle_via_dlc!
+        else
+          settle_via_escrow!(payoff, holder_payouts)
+        end
+      persist_settlement_txid!(settlement_txid)
+
+      users_to_sync = holder_payouts.map { |p| p[:user] }.uniq
+      users_to_sync << budget.investor
+      users_to_sync.uniq.each { |user| L1::SyncReserveBalanceService.call(user: user) }
+
+      payouts
+    end
+
+    # Authoritative path when DLC is enabled and funded: the oracle attestation
+    # executes the CET that pays peg_pot + investor. The legacy 2-of-3 escrow
+    # remains as fallback. Holder-level distribution of peg_pot is Workstream B.3.
+    def dlc_active?
+      Dlc::Config.enabled? && budget.dlc_contract&.funded?
+    end
+
+    def settle_via_dlc!
+      result = Dlc::SettlementService.call(budget: budget, end_btc_eur_rate: end_btc_eur_rate)
+      Dlc::Distribution.call(budget: budget, peg_pot_sats: result.peg_pot_sats)
+      persist_dlc_recovery!
+      result.cet_txid
+    end
+
+    def persist_dlc_recovery!
+      package = budget.reload.recovery_package&.deep_dup || {}
+      package["dlc"] = Dlc::RecoveryPackage.build(budget: budget)
+      budget.update!(recovery_package: package)
+    end
+
+    def settle_via_escrow!(payoff, holder_payouts)
       draft = L1::SettlementPsbtService.build(budget: budget, payoff: payoff, holder_payouts: holder_payouts)
       L1::SettlementPsbtTemplateService.call(
         budget: budget,
@@ -139,14 +175,7 @@ module Settlements
 
       signed = L1::SettlementPsbtService.sign!(draft, :bot)
       signed = L1::SettlementPsbtService.sign!(signed, draft.co_signer)
-      settlement_txid = L1::SettlementPsbtService.broadcast!(signed)
-      persist_settlement_txid!(settlement_txid)
-
-      users_to_sync = holder_payouts.map { |p| p[:user] }.uniq
-      users_to_sync << budget.investor
-      users_to_sync.uniq.each { |user| L1::SyncReserveBalanceService.call(user: user) }
-
-      payouts
+      L1::SettlementPsbtService.broadcast!(signed)
     end
 
     # Best-effort RGB redemption. Settlement finality lives on L1 (the BTC payout

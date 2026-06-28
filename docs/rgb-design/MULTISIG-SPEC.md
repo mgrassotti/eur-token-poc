@@ -330,3 +330,14 @@ Legenda: `[x]` fatto · `[~]` parziale / harness · `[ ]` M2+.
 ## Sintesi
 
 Escrow **2-of-3** per deal: **un UTXO** con peg + hedge; versamenti in **momenti separati** (PSBT asincrona o consolidamento). Mining fee settlement **prima** del payout holder. Bot senza fee protocollo nel MVP.
+
+---
+
+## 12) Evoluzione DLC (Workstream B)
+
+Vedi [`DLC-RLN-PLAN.md`](DLC-RLN-PLAN.md). Il path DLC (`Dlc::Config.enabled?`) sostituisce l'escrow
+2-of-3 con un **funding 2-of-2 {peg, investor}** sul nodo ddk: il bot **esce dal multisig** e resta
+facilitatore/oracle. Il payout è in **CET con adaptor signatures** vincolate all'attestazione
+dell'oracle (numeric per-digit); la `refund` 2-of-2 dopo `refund_delay_blocks` è il fallback
+timelock. L'escrow 2-of-3 di questo documento resta come **fallback legacy** finché B.3 non è
+completo end-to-end. Recovery package DLC: `lib/dlc/recovery_package.rb`.

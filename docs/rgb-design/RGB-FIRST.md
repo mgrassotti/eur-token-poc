@@ -220,3 +220,17 @@ Settlement L1 (PSBT) **resta invariato** — legge solo le quote holder, non il 
 - [`P2P-OPTIONS.md`](P2P-OPTIONS.md) §10 — gap DB → assignment RGB
 - `app/services/tokens/transfer_service.rb` — punto di inversione principale
 - `app/services/settlements/execute_service.rb` — consumer holder shares (Fase D)
+
+---
+
+## 10) DLC + distribuzione (Workstream B)
+
+Vedi [`DLC-RLN-PLAN.md`](DLC-RLN-PLAN.md). Con `Dlc::Config.enabled?` il settlement passa dal
+percorso DLC: la CET (sbloccata dall'attestazione oracle) paga `peg_pot + investor`, poi
+`Dlc::Distribution` ripartisce il `peg_pot` **pro-rata sull'allocazione RGB corrente** agli holder.
+
+- **Baseline**: fan-out on-chain (`NodeClient#distribute`).
+- **Atomico (LN)**: HODL invoice legata al segreto oracle — predisposto nel client ma **non
+  disponibile** sul nodo RLN vendored (vedi caveat nel piano).
+- La redemption RGB resta best-effort; quando il path DLC è autorevole, la distribuzione DLC
+  **sostituisce** la `RedeemService` come meccanismo di consegna.

@@ -66,9 +66,10 @@ class BudgetsController < ApplicationController
       notice += " Escrow L1 provisionato (#{budget.escrow_outpoint})."
     end
     redirect_to budget, notice: notice
-  rescue Budgets::ActivateService::Error, L1::ProvisionEscrowService::Error,
+    rescue Budgets::ActivateService::Error, L1::ProvisionEscrowService::Error,
          Rgb::LightningClient::Error, Rgb::Nodes::Error, Rgb::WalletSetupService::Error,
-         Rgb::LibIssueService::Error, Rgb::IssueService::Error => e
+         Rgb::LibIssueService::Error, Rgb::IssueService::Error,
+         Dlc::ContractSetupService::Error => e
     redirect_to @budget, alert: e.message
   end
 

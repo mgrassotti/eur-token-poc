@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_28_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_28_130000) do
   create_table "btc_accounts", force: :cascade do |t|
     t.bigint "balance_sats", default: 0, null: false
     t.string "bitcoind_wallet_name"
@@ -63,6 +63,40 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_28_120000) do
     t.datetime "locked_at", null: false
     t.datetime "updated_at", null: false
     t.index ["budget_id"], name: "index_collateral_locks_on_budget_id", unique: true
+  end
+
+  create_table "dlc_contracts", force: :cascade do |t|
+    t.integer "budget_id", null: false
+    t.datetime "created_at", null: false
+    t.string "ddk_contract_id"
+    t.string "funding_txid"
+    t.integer "funding_vout"
+    t.bigint "investor_collateral_sats"
+    t.bigint "maturity_epoch"
+    t.integer "num_digits"
+    t.text "oracle_announcement"
+    t.string "oracle_event_id", null: false
+    t.bigint "peg_collateral_sats"
+    t.integer "status", default: 0, null: false
+    t.string "unit"
+    t.datetime "updated_at", null: false
+    t.index ["budget_id"], name: "index_dlc_contracts_on_budget_id", unique: true
+  end
+
+  create_table "dlc_settlements", force: :cascade do |t|
+    t.text "attestation"
+    t.integer "budget_id", null: false
+    t.string "cet_txid"
+    t.datetime "created_at", null: false
+    t.integer "dlc_contract_id", null: false
+    t.datetime "executed_at"
+    t.bigint "investor_sats"
+    t.bigint "outcome"
+    t.bigint "peg_pot_sats"
+    t.integer "status", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.index ["budget_id"], name: "index_dlc_settlements_on_budget_id", unique: true
+    t.index ["dlc_contract_id"], name: "index_dlc_settlements_on_dlc_contract_id"
   end
 
   create_table "investor_yield_payouts", force: :cascade do |t|
@@ -153,6 +187,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_28_120000) do
   add_foreign_key "budgets", "users", column: "borrower_id"
   add_foreign_key "budgets", "users", column: "investor_id"
   add_foreign_key "collateral_locks", "budgets"
+  add_foreign_key "dlc_contracts", "budgets"
+  add_foreign_key "dlc_settlements", "budgets"
+  add_foreign_key "dlc_settlements", "dlc_contracts"
   add_foreign_key "investor_yield_payouts", "budgets"
   add_foreign_key "investor_yield_payouts", "users"
   add_foreign_key "market_rates", "users", column: "set_by_id"

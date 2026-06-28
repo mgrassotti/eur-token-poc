@@ -17,6 +17,8 @@ class Budget < ApplicationRecord
 
   has_one :collateral_lock, dependent: :destroy
   has_one :settlement, dependent: :destroy
+  has_one :dlc_contract, dependent: :destroy
+  has_one :dlc_settlement, dependent: :destroy
   has_many :token_accounts, dependent: :destroy
   has_many :token_transfers, dependent: :destroy
   has_many :rgb_assignments, dependent: :destroy

@@ -1,0 +1,3 @@
+[submodule "vendor/rgb-lightning-node"]
+	path = vendor/rgb-lightning-node
+	url = https://github.com/RGB-Tools/rgb-lightning-node.git

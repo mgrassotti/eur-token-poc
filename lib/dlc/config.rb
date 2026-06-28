@@ -7,15 +7,37 @@ module Dlc
   # gated behind `enabled?` so the legacy 2-of-3 escrow remains the default
   # until Workstream B is wired end-to-end.
   module Config
-    # --- Oracle (Kormir / Mycelia Signal, REST) --------------------------
+    # --- Oracle (Pythia by default; Kormir/Mycelia supported) ------------
 
     def self.oracle_url
-      ENV.fetch("DLC_ORACLE_URL", "http://127.0.0.1:8080")
+      ENV.fetch("DLC_ORACLE_URL", "http://127.0.0.1:8000")
     end
 
-    # Optional bearer token for hardened oracle deployments.
+    # Which oracle implementation to talk to: "pythia" (default) or "kormir".
+    def self.oracle_provider
+      ENV.fetch("DLC_ORACLE_PROVIDER", "pythia")
+    end
+
+    # Pythia asset pair (snake_case) and API version prefix.
+    def self.oracle_asset_pair
+      ENV.fetch("DLC_ORACLE_ASSET_PAIR", "btc_usd")
+    end
+
+    def self.oracle_version
+      ENV.fetch("DLC_ORACLE_VERSION", "v1")
+    end
+
+    # Optional bearer token for hardened oracle deployments (Kormir).
     def self.oracle_token
       ENV["DLC_ORACLE_TOKEN"].presence
+    end
+
+    # Oracle client instance for the configured provider.
+    def self.oracle_client
+      case oracle_provider
+      when "pythia" then PythiaOracleClient.default
+      else OracleClient.default
+      end
     end
 
     # Master switch for the DLC settlement path. While false, settlement uses

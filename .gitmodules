@@ -1,3 +1,6 @@
 [submodule "vendor/rgb-lightning-node"]
 	path = vendor/rgb-lightning-node
 	url = https://github.com/RGB-Tools/rgb-lightning-node.git
+[submodule "vendor/pythia"]
+	path = vendor/pythia
+	url = https://github.com/dlc-markets/pythia

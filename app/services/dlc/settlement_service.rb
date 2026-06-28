@@ -20,7 +20,7 @@ module Dlc
     def initialize(budget:, end_btc_eur_rate:, oracle: nil, node: nil)
       @budget = budget
       @end_btc_eur_rate = end_btc_eur_rate
-      @oracle = oracle || OracleClient.default
+      @oracle = oracle || Config.oracle_client
       @node = node || NodeClient.default
     end
 
@@ -32,7 +32,11 @@ module Dlc
       return result_for(existing) if existing&.executed?
 
       outcome = end_btc_eur_rate.to_i
-      attestation = oracle.attest_numeric(event_id: contract.oracle_event_id, outcome: outcome)
+      attestation = oracle.attest_numeric(
+        event_id: contract.oracle_event_id,
+        outcome: outcome,
+        maturity_epoch: contract.maturity_epoch
+      )
       execution = node.execute_contract(contract_id: contract.ddk_contract_id, attestation: attestation.hex)
 
       settlement = DlcSettlement.create!(

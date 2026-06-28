@@ -16,7 +16,7 @@ module Dlc
 
     def initialize(budget:, oracle: nil, node: nil)
       @budget = budget
-      @oracle = oracle || OracleClient.default
+      @oracle = oracle || Config.oracle_client
       @node = node || NodeClient.default
     end
 

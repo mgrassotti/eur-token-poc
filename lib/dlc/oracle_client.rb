@@ -85,7 +85,9 @@ module Dlc
     end
 
     # Maturity: ask the oracle to attest the observed numeric outcome.
-    def attest_numeric(event_id:, outcome:)
+    # `maturity_epoch` is accepted for interface parity with PythiaOracleClient
+    # (Kormir identifies the event by id alone) and otherwise ignored.
+    def attest_numeric(event_id:, outcome:, maturity_epoch: nil)
       raw = post("/sign-numeric-event", {
         event_id: event_id,
         outcome: Integer(outcome)

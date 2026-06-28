@@ -108,3 +108,46 @@ services:
     ports:
       - "3005:3001"
       - "9739:9735"
+
+  # --- DLC stack (profile dlc) -----------------------------------------
+  # Real DLC oracle (Pythia, fork of sibyls) + Postgres. Debug mode enables
+  # POST /v1/force to attest an arbitrary (maturity, price) on regtest.
+  pythia-db:
+    profiles: [dlc]
+    image: postgres:16.6-alpine
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_DB: pythia
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  pythia:
+    profiles: [dlc]
+    build:
+      context: ./vendor/pythia
+      dockerfile: packages/pythia/Dockerfile
+    image: eur-token-pythia:local
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_DB: pythia
+      POSTGRES_HOST: pythia-db
+      POSTGRES_PORT: 5432
+      PYTHIA_SECRET_KEY: d0a26c65de0b4b853432c3931ee280f67b9c52de33e1b3aecb04edc1ec40ef4a
+      RUST_LOG: info
+    command: >
+      pythia
+      --debug-mode true
+      --pair '{"pricefeed":"lnmarkets","assetPair":"btc_usd","eventDescriptor":{"base":2,"isSigned":false,"unit":"usd/btc","precision":0,"nbDigits":20}}'
+      --schedule '0 */1 * * * * *'
+      --offset '2min'
+    ports:
+      - "8000:8000"
+    depends_on:
+      pythia-db:
+        condition: service_healthy

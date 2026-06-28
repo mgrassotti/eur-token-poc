@@ -19,7 +19,11 @@ module Rgb
       ).apply_transfer!
     end
 
-    def initialize(budget:, from_user: nil, to_user: nil, amount_cents: nil, rgb_result:)
+    def self.apply_redeem!(budget:, holder:)
+      new(budget:, from_user: holder).apply_redeem!
+    end
+
+    def initialize(budget:, from_user: nil, to_user: nil, amount_cents: nil, rgb_result: nil)
       @budget = budget
       @from_user = from_user
       @to_user = to_user
@@ -77,6 +81,19 @@ module Rgb
         append_recovery_history!
 
         transfer
+      end
+    end
+
+    # Cache-only: dopo la redemption RGB on-chain azzera la proiezione DB del holder
+    # (token account + rgb_assignment) per allinearla alla verità RGB del sidecar.
+    def apply_redeem!
+      ActiveRecord::Base.transaction do
+        budget.token_accounts.lock.where(user: from_user).find_each do |account|
+          account.update!(balance_cents: 0)
+        end
+        budget.rgb_assignments.lock.where(user: from_user).find_each do |assignment|
+          assignment.update!(notional_share_cents: 0)
+        end
       end
     end
 

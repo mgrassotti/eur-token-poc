@@ -17,7 +17,7 @@ RSpec.describe Rgb::TransferService do
 
   before do
     allow(Rgb::TransferService).to receive(:call).and_call_original
-    allow(Rgb::Config).to receive(:ensure_sidecar!)
+    allow(Rgb::Config).to receive(:ensure_node!)
     allow(Rgb::LibTransferService).to receive(:call).and_return(rgb_result)
   end
 

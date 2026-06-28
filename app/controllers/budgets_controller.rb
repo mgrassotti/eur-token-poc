@@ -67,7 +67,7 @@ class BudgetsController < ApplicationController
     end
     redirect_to budget, notice: notice
   rescue Budgets::ActivateService::Error, L1::ProvisionEscrowService::Error,
-         Rgb::SidecarClient::Error, Rgb::WalletSetupService::Error,
+         Rgb::LightningClient::Error, Rgb::Nodes::Error, Rgb::WalletSetupService::Error,
          Rgb::LibIssueService::Error, Rgb::IssueService::Error => e
     redirect_to @budget, alert: e.message
   end

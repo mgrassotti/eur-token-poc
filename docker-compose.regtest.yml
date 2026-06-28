@@ -1,6 +1,26 @@
 # Bitcoin Core regtest for M1 multisig integration tests.
 # Usage: docker compose -f docker-compose.regtest.yml up -d
-# RGB stack (electrs + proxy + sidecar): always started by ./bin/regtest up
+# RGB stack (electrs + proxy): always started by ./bin/regtest up
+# RGB Lightning Nodes (one per demo user + issuer): profile rgb, ports 3001-3005
+
+# Shared config for every RGB Lightning Node container. Each node uses the same
+# internal ports (daemon 3001, peer 9735) and the shared regtest services; host
+# port mapping disambiguates them. Built once from the vendored submodule.
+x-rln-common: &rln-common
+  profiles: [rgb]
+  build:
+    context: .
+    dockerfile: docker/rln.Dockerfile
+  image: eur-token-rln:local
+  restart: unless-stopped
+  depends_on:
+    bitcoind:
+      condition: service_healthy
+    electrs:
+      condition: service_started
+    rgb-proxy:
+      condition: service_started
+
 services:
   bitcoind:
     image: bitcoin/bitcoin:28.0
@@ -73,6 +93,41 @@ services:
       - "3030:3030"
     volumes:
       - rgb_wallet_data:/data/wallets
+
+  rln-alice:
+    <<: *rln-common
+    command: ["/data", "--daemon-listening-port", "3001", "--ldk-peer-listening-port", "9735", "--network", "regtest", "--disable-authentication"]
+    ports:
+      - "3001:3001"
+      - "9735:9735"
+
+  rln-bob:
+    <<: *rln-common
+    command: ["/data", "--daemon-listening-port", "3001", "--ldk-peer-listening-port", "9735", "--network", "regtest", "--disable-authentication"]
+    ports:
+      - "3002:3001"
+      - "9736:9735"
+
+  rln-claude:
+    <<: *rln-common
+    command: ["/data", "--daemon-listening-port", "3001", "--ldk-peer-listening-port", "9735", "--network", "regtest", "--disable-authentication"]
+    ports:
+      - "3003:3001"
+      - "9737:9735"
+
+  rln-david:
+    <<: *rln-common
+    command: ["/data", "--daemon-listening-port", "3001", "--ldk-peer-listening-port", "9735", "--network", "regtest", "--disable-authentication"]
+    ports:
+      - "3004:3001"
+      - "9738:9735"
+
+  rln-issuer:
+    <<: *rln-common
+    command: ["/data", "--daemon-listening-port", "3001", "--ldk-peer-listening-port", "9735", "--network", "regtest", "--disable-authentication"]
+    ports:
+      - "3005:3001"
+      - "9739:9735"
 
 volumes:
   rgb_wallet_data:

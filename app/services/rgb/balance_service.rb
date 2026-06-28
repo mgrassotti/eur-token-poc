@@ -1,7 +1,8 @@
 # frozen_string_literal: true
 
 module Rgb
-  # Saldo RGB settled per utente/deal — fonte primaria: sidecar; fallback proiezione DB.
+  # Settled RGB balance per user/deal. Primary source: the user's RLN node;
+  # fallback: the DB projection (rgb_assignments) when the node is unavailable.
   class BalanceService
     def self.settled(user:, budget:)
       new(user:, budget:).settled
@@ -13,10 +14,10 @@ module Rgb
     end
 
     def settled
-      return projection_balance unless sidecar_balanceable?
+      return projection_balance unless node_balanceable?
 
-      read_from_sidecar
-    rescue SidecarClient::Error
+      read_from_node
+    rescue LightningClient::Error, Nodes::Error
       projection_balance
     end
 
@@ -24,16 +25,13 @@ module Rgb
 
     attr_reader :user, :budget
 
-    def sidecar_balanceable?
-      budget.rgb_asset_id.present? && user.btc_account&.rgb_wallet_id.present? &&
-        SidecarClient.instance.available?
+    def node_balanceable?
+      budget.rgb_asset_id.present? && Nodes.available_for?(user)
     end
 
-    def read_from_sidecar
-      wallet_id = user.btc_account.rgb_wallet_id
-      assets = SidecarClient.instance.list_assets(wallet_id).fetch("nia", [])
-      entry = assets.find { |asset| asset["asset_id"] == budget.rgb_asset_id }
-      entry&.dig("balance", "settled").to_i
+    def read_from_node
+      balance = Nodes.for_user(user).asset_balance(asset_id: budget.rgb_asset_id)
+      balance["settled"].to_i
     end
 
     def projection_balance

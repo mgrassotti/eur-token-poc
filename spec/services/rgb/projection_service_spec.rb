@@ -68,4 +68,11 @@ RSpec.describe Rgb::ProjectionService do
     expect(alice.rgb_assignments.find_by!(budget: budget).notional_share_cents).to eq(75_000)
     expect(claude.rgb_assignments.find_by!(budget: budget).notional_share_cents).to eq(25_000)
   end
+
+  it "zeroes the holder DB cache on redeem" do
+    described_class.apply_redeem!(budget: budget, holder: alice)
+
+    expect(alice.token_accounts.find_by!(budget: budget).balance_cents).to eq(0)
+    expect(alice.rgb_assignments.find_by!(budget: budget).notional_share_cents).to eq(0)
+  end
 end

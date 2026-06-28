@@ -37,7 +37,7 @@ module Tokens
         rgb_result: rgb_result
       )
     rescue Rgb::TransferService::Error, Rgb::LibTransferService::Error,
-           Rgb::SidecarClient::Error, Rgb::ProjectionService::Error => e
+           Rgb::LightningClient::Error, Rgb::Nodes::Error, Rgb::ProjectionService::Error => e
       raise Error, e.message
     end
 
@@ -56,7 +56,7 @@ module Tokens
       raise Error, "RGB asset missing on deal" if budget.rgb_asset_id.blank?
       raise Error, "RGB genesis missing" unless budget.rgb_assignments.exists?
 
-      Rgb::Config.ensure_sidecar!
+      Rgb::Config.ensure_node!(from_user)
     end
   end
 end

@@ -17,7 +17,7 @@ class DashboardController < ApplicationController
     @savings_eur = savings_eur_value(@savings_sats, @market_rate)
     @margin_call_budgets = Budgets::MarginCall.budgets_for(current_user, market_rate: @market_rate)
     @rgb_assets = rgb_assets_for(current_user)
-    @rgb_sidecar_error = @rgb_assets.nil?
+    @rgb_node_error = @rgb_assets.nil?
 
     unless admin?
       @my_fund_accounts = Tokens::Spendable.fund_positions_for(current_user)
@@ -38,14 +38,11 @@ class DashboardController < ApplicationController
   end
 
   def rgb_assets_for(user)
-    wallet_id = user.btc_account&.rgb_wallet_id
-    return [] if wallet_id.blank?
     return [] unless user.rgb_assignments.exists?
+    return [] unless Rgb::Nodes.available_for?(user)
 
-    Rgb::SidecarClient.instance
-      .list_assets(wallet_id, read_timeout: Rgb::SidecarClient::DASHBOARD_READ_TIMEOUT)
-      .fetch("nia", [])
-  rescue Rgb::SidecarClient::Error
+    Rgb::Nodes.for_user(user).list_assets.fetch("nia", [])
+  rescue Rgb::LightningClient::Error, Rgb::Nodes::Error
     nil
   end
 end

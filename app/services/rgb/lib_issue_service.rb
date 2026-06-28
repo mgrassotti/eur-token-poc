@@ -1,7 +1,9 @@
 # frozen_string_literal: true
 
 module Rgb
-  # Issue RGB20 NIA per deal e alloca al borrower via rgb-lib (solo on-chain).
+  # Issue an RGB20 NIA asset for a deal on the borrower's own RLN node. In the
+  # RLN model the borrower's node is the issuer and holds the full genesis
+  # supply, so no separate issuer->borrower transfer is needed (on-chain RGB).
   class LibIssueService
     class Error < StandardError; end
 
@@ -16,43 +18,27 @@ module Rgb
     def call
       validate!
 
-      ensure_issuer_wallet!
-
-      issuer_id = Config::ISSUER_WALLET_ID
-      borrower_id = WalletSetupService.ensure_for!(budget.borrower)
+      client = WalletSetupService.ensure_for!(budget.borrower)
 
       ticker = "E#{budget.id}"[0, 8]
       name = "FloorEUR deal #{budget.id}"
 
-      issued = client.issue(
-        wallet_id: issuer_id,
+      issued = client.issue_asset_nia(
         ticker: ticker,
         name: name,
         precision: 0,
         amounts: [budget.amount_eur_cents]
       )
 
-      asset_id = issued.fetch("asset_id")
-      receive = client.blind_receive(
-        wallet_id: borrower_id,
-        asset_id: asset_id,
-        amount: budget.amount_eur_cents
-      )
-
-      transfer = client.send_asset(
-        sender_wallet_id: issuer_id,
-        recipient_wallet_id: borrower_id,
-        asset_id: asset_id,
-        recipient_id: receive.fetch("recipient_id"),
-        amount: budget.amount_eur_cents
-      )
+      asset = issued["asset"] || issued
+      asset_id = asset.fetch("asset_id")
 
       IssueResult.new(
         asset_id: asset_id,
         ticker: ticker,
         name: name,
-        recipient_id: receive.fetch("recipient_id"),
-        issue_txid: transfer.fetch("txid"),
+        recipient_id: nil,
+        issue_txid: asset["issue_txid"],
         amount_cents: budget.amount_eur_cents
       )
     end
@@ -64,15 +50,6 @@ module Rgb
     def validate!
       raise Error, "Budget non attivo" unless budget.active?
       raise Error, "Escrow non provisionato" unless budget.l1_multisig_provisioned?
-    end
-
-    def client
-      SidecarClient.instance
-    end
-
-    def ensure_issuer_wallet!
-      client.create_wallet(wallet_id: Config::ISSUER_WALLET_ID)
-      client.setup_wallet(Config::ISSUER_WALLET_ID)
     end
   end
 end

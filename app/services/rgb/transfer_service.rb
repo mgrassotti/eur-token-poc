@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module Rgb
-  # Transfer parziale RGB20 on-chain (rgb-lib via sidecar) — nessuna scrittura DB.
+  # Transfer parziale RGB20 on-chain via RLN — nessuna scrittura DB.
   class TransferService
     class Error < StandardError; end
 
@@ -17,7 +17,7 @@ module Rgb
     end
 
     def call
-      Config.ensure_sidecar!
+      Config.ensure_node!(from_user)
       LibTransferService.call(
         budget: budget,
         from_user: from_user,

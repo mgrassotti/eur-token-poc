@@ -103,8 +103,9 @@ Il settlement **FloorEUR**:
 1. Calcola liability € (notional + interessi)
 2. Converte in sats al **spot** di chiusura
 3. Cap: `total_holder = min(gross, escrow − mining_fee)` (fee default 5_000 sats)
-4. **PSBT maturity async:** `L1::SettlementPsbtService` costruisce la PSBT (`L1::SettlementTxBuilder`), persiste la versione **unsigned** nel recovery package, poi firma in sequenza bot + investitore e broadcast
-5. Sync saldi riserva; brucia i token
+4. **Redemption RGB:** ogni holder restituisce il saldo EURT al wallet **issuer/treasury** (`Rgb::RedeemService`) — rgb-lib 0.3 non ha un burn nativo, quindi la redemption all'issuer ritira i token dalla circolazione. La proiezione DB (`TokenAccount`/`RgbAssignment`) viene azzerata come cache (`Rgb::ProjectionService.apply_redeem!`)
+5. **PSBT maturity async:** `L1::SettlementPsbtService` costruisce la PSBT (`L1::SettlementTxBuilder`), persiste la versione **unsigned** nel recovery package, poi firma in sequenza bot + investitore e broadcast
+6. Sync saldi riserva
 
 ### Esempio numerico — 1000 €, peg 50k, 1 mese @ 1%, spot 50k
 
@@ -143,26 +144,35 @@ bundle exec rspec
 
 `bin/system-spec` replica lo stesso flusso nell'UI (login, switch utente dev, depositi, attivazione deal, transfer, settlement admin). Utile per debuggare errori sidecar su **Accetta rischio e attiva** con screenshot in `tmp/capybara/` al fallimento. Esempio rapido: `./bin/system-spec --example "attiva un deal"`.
 
-### RGB (M3) — rgb-lib via sidecar (obbligatorio)
+### RGB — RGB Lightning Node (RLN), un nodo per utente
 
-`./bin/regtest up` avvia sempre **bitcoind**, **electrs**, **rgb-proxy** e **rgb-sidecar** (rgb-lib 0.3 in Docker, porta **3030**).
+`./bin/regtest up` avvia **bitcoind**, **electrs**, **rgb-proxy** e **N nodi RGB Lightning** (uno per utente demo + issuer), costruiti dal submodule `vendor/rgb-lightning-node` (build Rust al primo avvio). Il legacy **rgb-sidecar** resta nel compose finché le spec `:rgb_lib` non sono migrate su RLN.
+
+| Nodo | Porta API host | Utente |
+|------|----------------|--------|
+| `rln-alice` | `3001` | alice@example.com |
+| `rln-bob` | `3002` | bob@example.com |
+| `rln-claude` | `3003` | claude@example.com |
+| `rln-david` | `3004` | david@example.com |
+| `rln-issuer` | `3005` | issuer/treasury (redemption) |
 
 ```bash
-./bin/regtest up
-bundle exec rspec spec/integration/rgb_lib_transfer_spec.rb
+./bin/regtest up        # build immagine RLN + avvio stack, attende i nodi su 3001-3005
 ```
 
-Variabili:
+Variabili principali (`lib/rgb/config.rb`):
 
 | Variabile | Default | Ruolo |
 |-----------|---------|--------|
-| `RGB_SIDECAR_URL` | `http://127.0.0.1:3030` | URL HTTP del sidecar |
+| `RLN_PASSWORD` | `regtestpassword` | password init/unlock nodi |
+| `RLN_ISSUER_URL` | `http://127.0.0.1:3005` | nodo issuer/treasury |
+| `RLN_TOKEN` | _(vuoto)_ | Biscuit bearer opzionale (nodi con `--disable-authentication`) |
 
-`Rgb::IssueService` / `Rgb::TransferService` richiedono il sidecar (`Rgb::Config.ensure_sidecar!`); la dashboard mostra sempre la card **RGB (rgb-lib)** con saldi NIA.
+Il mapping utente→nodo (`BtcAccount#rln_node_url`) è impostato da `DemoData::ResetService`. `Rgb::IssueService` / `Rgb::TransferService` / `Rgb::RedeemService` operano sul nodo dell'utente (`Rgb::Config.ensure_node!`); la dashboard mostra la card **RGB (RLN)** con i saldi NIA letti da `/assetbalance`.
 
-Senza sidecar attivo, activate/transfer falliscono e `bundle exec rspec` salta le spec `:rgb_lib`.
+Per un reset RGB pulito riavviare i container (`./bin/regtest reset`): i nodi RLN non espongono un "reset wallet", lo stato si azzera ricreando i container.
 
-Le spec `:rgb_lib` resettano i wallet sidecar (`POST /wallets/reset-all`) prima di ogni esempio per evitare stati corrotti sul volume Docker.
+Legacy: `RGB_SIDECAR_URL` (`http://127.0.0.1:3030`) resta usato solo dalle spec `:rgb_lib` non ancora migrate.
 
 **Nota Docker:** se `docker pull` / `docker compose build` restano bloccati senza output, il credential helper Desktop può essere in stallo. Workaround: `mkdir -p /tmp/docker-nocreds && echo '{"auths":{}}' > /tmp/docker-nocreds/config.json` poi `DOCKER_CONFIG=/tmp/docker-nocreds docker pull …`.
 

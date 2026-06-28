@@ -7,9 +7,32 @@ if [[ "${1:-}" == "--rgb" ]]; then
   shift
 fi
 
+RLN_PORTS=(3001 3002 3003 3004 3005)
+
+wait_for_rln() {
+  echo "Waiting for RGB Lightning Nodes on :${RLN_PORTS[*]}..."
+  for port in "${RLN_PORTS[@]}"; do
+    ready=""
+    for _ in $(seq 1 120); do
+      # /nodeinfo answers (any HTTP status) once the daemon is listening.
+      if curl -s -o /dev/null "http://127.0.0.1:${port}/nodeinfo" 2>/dev/null; then
+        ready="yes"
+        break
+      fi
+      sleep 2
+    done
+    if [[ -z "$ready" ]]; then
+      echo "RLN node on :${port} did not become ready in time" >&2
+      exit 1
+    fi
+    echo "RLN node on :${port} ready"
+  done
+}
+
 case "${1:-up}" in
   up)
-    docker compose -f docker-compose.regtest.yml "${PROFILE_ARGS[@]}" up -d
+    # --build compiles the RLN image from vendor/rgb-lightning-node (first run is slow).
+    docker compose -f docker-compose.regtest.yml "${PROFILE_ARGS[@]}" up -d --build
     echo "Waiting for bitcoind regtest on :18443..."
     for _ in $(seq 1 60); do
       if curl -sf --user regtest:regtest \
@@ -17,14 +40,7 @@ case "${1:-up}" in
         -H "content-type: application/json" \
         http://127.0.0.1:18443/ >/dev/null 2>&1; then
         echo "bitcoind regtest ready"
-        echo "Waiting for RGB sidecar on :3030..."
-        for _ in $(seq 1 90); do
-          if curl -sf http://127.0.0.1:3030/health >/dev/null 2>&1; then
-            echo "RGB sidecar ready"
-            break
-          fi
-          sleep 2
-        done
+        wait_for_rln
         exit 0
       fi
       sleep 1

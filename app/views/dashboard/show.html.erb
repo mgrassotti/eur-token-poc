@@ -217,18 +217,18 @@
     </div>
   </div>
 </div>
-<% if @rgb_sidecar_error %>
+<% if @rgb_node_error %>
   <div class="card mb-4 border-danger">
-    <div class="card-header bg-danger-subtle">RGB (rgb-lib)</div>
+    <div class="card-header bg-danger-subtle">RGB (RLN)</div>
     <div class="card-body">
-      <p class="mb-0 text-danger">Sidecar RGB non raggiungibile. Avvia lo stack con <code>./bin/regtest up</code>.</p>
+      <p class="mb-0 text-danger">Nodo RGB Lightning non raggiungibile. Avvia lo stack con <code>./bin/regtest up</code>.</p>
     </div>
   </div>
 <% else %>
   <div class="card mb-4 border-primary">
-    <div class="card-header bg-primary-subtle">RGB (rgb-lib)</div>
+    <div class="card-header bg-primary-subtle">RGB (RLN)</div>
     <div class="card-body">
-      <p class="text-muted small mb-3">Saldo asset RGB20 on-chain via sidecar regtest. I transfer «Invia Denaro» aggiornano anche il wallet RGB.</p>
+      <p class="text-muted small mb-3">Saldo asset RGB20 on-chain via RGB Lightning Node regtest. I transfer «Invia Denaro» aggiornano anche il nodo RGB.</p>
       <% if @rgb_assets.present? %>
         <ul class="list-group">
           <% @rgb_assets.each do |asset| %>

@@ -120,9 +120,11 @@ module Settlements
       holder_payouts = []
       payouts = token_accounts.each_with_index.map do |token_account, index|
         allocation = payoff.holder_allocations[index]
-        holder_payouts << { user: token_account.user, btc_sats: allocation.btc_sats }
+        holder = token_account.user
+        holder_payouts << { user: holder, btc_sats: allocation.btc_sats }
         payout_for(token_account, allocation, payoff).tap do
-          token_account.update!(balance_cents: 0)
+          redeem_rgb!(holder)
+          Rgb::ProjectionService.apply_redeem!(budget: budget, holder: holder)
         end
       end
 
@@ -145,6 +147,12 @@ module Settlements
       users_to_sync.uniq.each { |user| L1::SyncReserveBalanceService.call(user: user) }
 
       payouts
+    end
+
+    def redeem_rgb!(holder)
+      Rgb::RedeemService.call(budget: budget, holder: holder)
+    rescue Rgb::RedeemService::Error, Rgb::LightningClient::Error, Rgb::Nodes::Error => e
+      raise Error, "Redemption RGB fallita per #{holder.name}: #{e.message}"
     end
 
     def persist_settlement_txid!(txid)

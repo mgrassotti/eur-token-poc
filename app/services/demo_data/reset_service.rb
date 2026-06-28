@@ -13,6 +13,16 @@ module DemoData
     DEMO_PASSWORD = "password"
     DEFAULT_BTC_EUR_PER_BTC = 50_000
 
+    # Maps each demo user to its dedicated RGB Lightning Node (host ports defined
+    # in docker-compose.regtest.yml). Admin has no node (does not transact RGB);
+    # the issuer/treasury node lives at Rgb::Config.rln_issuer_url (3005).
+    RLN_NODE_URLS = {
+      "alice@example.com" => "http://127.0.0.1:3001",
+      "bob@example.com" => "http://127.0.0.1:3002",
+      "claude@example.com" => "http://127.0.0.1:3003",
+      "david@example.com" => "http://127.0.0.1:3004"
+    }.freeze
+
     def self.call
       new.call
     end
@@ -27,7 +37,6 @@ module DemoData
       end
 
       L1::RegtestResetService.call
-      reset_rgb_wallets!
     end
 
     private
@@ -70,7 +79,9 @@ module DemoData
           escrow_identity_wif: nil,
           escrow_identity_pubkey: nil,
           rgb_wallet_id: nil,
-          rgb_mnemonic: nil
+          rgb_mnemonic: nil,
+          node_pubkey: nil,
+          rln_node_url: RLN_NODE_URLS[account.user.email]
         )
       end
     end
@@ -91,14 +102,6 @@ module DemoData
       @demo_users ||= DEMO_USERS.to_h do |attrs|
         [attrs[:email], User.find_by!(email: attrs[:email])]
       end
-    end
-
-    def reset_rgb_wallets!
-      return unless Rgb::SidecarClient.instance.available?
-
-      Rgb::SidecarClient.instance.reset_all_wallets!
-    rescue Rgb::SidecarClient::Error => e
-      Rails.logger.warn("RGB wallet reset skipped after demo reset: #{e.message}")
     end
   end
 end

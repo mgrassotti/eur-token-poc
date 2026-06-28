@@ -63,6 +63,8 @@ module L1UnitStubs
   end
 
   def stub_rgb_mirror!
+    allow(Rgb::Config).to receive(:ensure_node!)
+
     allow(Rgb::IssueService).to receive(:call) do |budget:|
       budget.update!(rgb_asset_id: "rgb_stub_#{budget.id}") if budget.rgb_asset_id.blank?
       rgb_result = Rgb::IssueResult.new(

@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module Rgb
-  # Genesis RGB20 per il borrower dopo provision escrow (rgb-lib via sidecar).
+  # Genesis RGB20 per il borrower dopo provision escrow (RLN, nodo del borrower).
   class IssueService
     class Error < StandardError; end
 
@@ -14,7 +14,7 @@ module Rgb
     end
 
     def call
-      Config.ensure_sidecar!
+      Config.ensure_node!(budget.borrower)
 
       existing = budget.rgb_assignments.find_by(user: budget.borrower)
       return existing if budget.rgb_asset_id.present? && existing

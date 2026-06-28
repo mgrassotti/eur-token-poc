@@ -110,7 +110,7 @@ graph TB
 - [x] A.2 riscrittura `app/services/rgb/*` su RLN (issue/cessione/saldo/redeem/wallet) + migration `btc_accounts` (rln_node_url/rln_token/node_pubkey) + dashboard/reset/rescue
 - [x] A.2 unit spec aggiornati (`redeem_service`, `transfer_service`, `l1_unit_stubs` mirror) — suite unit verde
 - [x] A.2 (regtest) riscrittura spec `:rgb_lib` su nodi RLN reali (`spec/integration/rgb_lib_transfer_spec.rb` con `:regtest`, saldi letti dai nodi) + provisioning/funding nodi in `WalletSetupService` + conferma on-chain transfer/redeem via `Rgb::NodeConfirm` (mining+refresh su regtest) + `indexer_url` `tcp://electrs:50001`. Rimozione completa `rgb-sidecar/` + `Rgb::SidecarClient` + `Config.{sidecar_url,ensure_sidecar!,wallet_id_for}` + servizio compose `rgb-sidecar`/volume + script (`bin/dev`/`bin/demo-spec`/`bin/system-spec` ora sondano `:3001/nodeinfo`)
-- [ ] B.1 `lib/dlc/oracle_client.rb` (announce/attest numeric per-digit) + spec
+- [x] B.1 `lib/dlc/oracle_client.rb` (announce/attest numeric per-digit, REST Kormir) + `lib/dlc/numeric.rb` (decomposizione base-2 per-digit) + `lib/dlc/config.rb` (gate `DLC_ENABLED`, parametri FloorEUR) + spec (HTTP stub)
 - [ ] B.1/B.2 `lib/dlc/node_client.rb` (ddk: funding 2-of-2, CET, adaptor, execute, refund)
 - [ ] B.2 migration + modelli `DlcContract` / `DlcSettlement`
 - [ ] B.2 `Dlc::ContractSetupService` + hook in `L1::ProvisionEscrowService`

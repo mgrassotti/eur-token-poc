@@ -85,7 +85,7 @@ module Rgb
     end
 
     # Cache-only: dopo la redemption RGB on-chain azzera la proiezione DB del holder
-    # (token account + rgb_assignment) per allinearla alla verità RGB del sidecar.
+    # (token account + rgb_assignment) per allinearla alla verità RGB del nodo.
     def apply_redeem!
       ActiveRecord::Base.transaction do
         budget.token_accounts.lock.where(user: from_user).find_each do |account|

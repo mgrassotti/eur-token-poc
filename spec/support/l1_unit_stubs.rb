@@ -16,15 +16,19 @@ module L1UnitStubs
     example.metadata[:rgb_lib] == true
   end
 
-  def regtest_stack_spec?(example)
-    example.metadata[:regtest] == true && (
-      l1_integration_spec?(example) ||
-      rgb_lib_spec?(example) ||
+  # Specs that drive the real L1 stack (integration/regtest/system/demo): they
+  # must NOT receive L1 unit stubs, otherwise stubbed services swallow the
+  # behaviour under test. RGB may still be mirrored (see real_rgb_spec?).
+  def real_l1_spec?(example)
+    l1_integration_spec?(example) ||
+      example.metadata[:regtest] == true ||
       example.metadata[:demo_flow] == true ||
       example.metadata[:type] == :system
-    )
   end
 
+  # Specs that assert on the real RGB stack (RLN nodes): only these skip the RGB
+  # mirror. L1-focused regtest specs keep the RGB mirror so budget activation can
+  # issue a mock asset without requiring a configured/funded RLN node per user.
   def real_rgb_spec?(example)
     rgb_lib_spec?(example) || example.metadata[:demo_flow] == true
   end
@@ -129,11 +133,11 @@ RSpec.configure do |config|
   config.include L1UnitStubs
 
   config.before do |example|
-    stub_rgb_mirror! unless regtest_stack_spec?(example)
+    stub_rgb_mirror! unless real_rgb_spec?(example)
   end
 
   config.before do |example|
-    next if regtest_stack_spec?(example)
+    next if real_l1_spec?(example)
 
     stub_l1_unit_operations!
   end

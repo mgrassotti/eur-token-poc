@@ -13,6 +13,11 @@ RSpec.describe Rgb::RedeemService do
     allow(issuer_node).to receive(:init)
     allow(issuer_node).to receive(:unlock)
     allow(issuer_node).to receive(:create_utxos)
+    allow(issuer_node).to receive(:refresh_transfers)
+    # Keep the unit spec offline: no regtest funding/mining.
+    allow(Rgb::NodeConfirm).to receive(:regtest?).and_return(false)
+    allow(Rgb::NodeConfirm).to receive(:mine!)
+    allow(Rgb::NodeConfirm).to receive(:settle_clients!)
   end
 
   it "skips when the deal has no RGB asset" do
@@ -53,7 +58,7 @@ RSpec.describe Rgb::RedeemService do
     result = described_class.call(budget: budget, holder: holder)
 
     expect(result).to have_attributes(status: :redeemed, amount_cents: 40_000, txid: "redeem_txid")
-    expect(issuer_node).to have_received(:rgb_invoice).with(asset_id: "rgb_stub", amount: 40_000)
+    expect(issuer_node).to have_received(:rgb_invoice).with(amount: 40_000)
     expect(holder_node).to have_received(:send_asset).with(
       hash_including(asset_id: "rgb_stub", amount: 40_000, recipient_id: "rcp_issuer")
     )

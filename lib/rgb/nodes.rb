@@ -2,8 +2,8 @@
 
 module Rgb
   # Resolves the RGB Lightning Node (RLN) instance backing a given user, plus the
-  # shared issuer/treasury node. Replaces the single Rgb::SidecarClient.instance:
-  # in the RLN model each user owns a node, addressed by BtcAccount#rln_node_url.
+  # shared issuer/treasury node. In the RLN model each user owns a node, addressed
+  # by BtcAccount#rln_node_url.
   module Nodes
     class Error < StandardError; end
 
@@ -25,9 +25,17 @@ module Rgb
       LightningClient.new(base_url: Config.rln_issuer_url, token: Config.rln_token)
     end
 
-    # True when the user's node is reachable (used to choose RLN vs DB fallback).
+    # True when the user's node is up AND unlocked (read paths: balances/assets).
     def available_for?(user)
       for_user?(user) && for_user(user).available?
+    rescue Error, LightningClient::Error
+      false
+    end
+
+    # True when the user's node daemon answers (even if locked): write paths
+    # init/unlock it themselves, so reachability is the precondition to guard.
+    def reachable_for?(user)
+      for_user?(user) && for_user(user).reachable?
     rescue Error, LightningClient::Error
       false
     end

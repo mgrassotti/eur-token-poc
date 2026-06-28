@@ -9,12 +9,12 @@ bitcoind_up() {
     http://127.0.0.1:18443/ >/dev/null 2>&1
 }
 
-sidecar_up() {
-  curl -sf http://127.0.0.1:3030/health >/dev/null 2>&1
+rln_up() {
+  curl -s -o /dev/null http://127.0.0.1:3001/nodeinfo >/dev/null 2>&1
 }
 
-if ! bitcoind_up || ! sidecar_up; then
-  echo "→ Avvio regtest + RGB sidecar…"
+if ! bitcoind_up || ! rln_up; then
+  echo "→ Avvio regtest + RGB Lightning Nodes…"
   ./bin/regtest up
 fi
 

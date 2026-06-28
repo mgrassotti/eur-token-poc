@@ -71,28 +71,8 @@ services:
   rgb-proxy:
     profiles: [rgb]
     image: ghcr.io/rgb-tools/rgb-proxy-server:0.3.0
-    # No host port: sidecar reaches rgb-proxy:3000 on the compose network only.
+    # No host port: RLN nodes reach rgb-proxy:3000 on the compose network only.
     # Exposing 3000 here conflicted with Rails (bin/dev).
-
-  rgb-sidecar:
-    profiles: [rgb]
-    build: ./rgb-sidecar
-    depends_on:
-      bitcoind:
-        condition: service_healthy
-      electrs:
-        condition: service_started
-      rgb-proxy:
-        condition: service_started
-    environment:
-      ELECTRUM_URL: tcp://electrs:50001
-      RGB_PROXY_URL: rpc://rgb-proxy:3000/json-rpc
-      BITCOIND_RPC_URL: http://regtest:regtest@bitcoind:18443
-      DATA_ROOT: /data/wallets
-    ports:
-      - "3030:3030"
-    volumes:
-      - rgb_wallet_data:/data/wallets
 
   rln-alice:
     <<: *rln-common
@@ -128,6 +108,3 @@ services:
     ports:
       - "3005:3001"
       - "9739:9735"
-
-volumes:
-  rgb_wallet_data:

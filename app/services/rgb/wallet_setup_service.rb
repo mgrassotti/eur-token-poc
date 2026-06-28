@@ -1,11 +1,19 @@
 # frozen_string_literal: true
 
 module Rgb
-  # Ensures a user's RGB Lightning Node is ready: initialized, unlocked, with
-  # colorable UTXOs and a known pubkey. Returns the node client. Replaces the
-  # legacy sidecar wallet bootstrap (one shared process, many wallet_ids).
+  # Ensures a user's RGB Lightning Node is ready to transact RGB: initialized,
+  # unlocked, with a known pubkey and colorable UTXOs available. On regtest it
+  # also funds the node from the shared miner wallet so /createutxos can run.
+  # Returns the node client.
   class WalletSetupService
     class Error < StandardError; end
+
+    # 1 BTC funded to a fresh node covers colorable UTXOs + on-chain fees.
+    FUND_SATS = 100_000_000
+    MIN_VANILLA_SATS = 50_000
+    COLORABLE_UTXOS = 5
+    COLORABLE_UTXO_SIZE = 32_500
+    FEE_RATE = 5
 
     def self.call(user:)
       new(user:).call
@@ -28,7 +36,7 @@ module Rgb
       init!(client)
       unlock!(client)
       persist_pubkey!(client, account)
-      ensure_utxos!(client)
+      ensure_colorable_utxos!(client)
 
       client
     end
@@ -64,10 +72,34 @@ module Rgb
       nil
     end
 
-    def ensure_utxos!(client)
-      client.create_utxos(num: 4, size: 32_500, fee_rate: 5)
+    # Tops the node up to COLORABLE_UTXOS spendable colorable UTXOs, funding the
+    # node with regtest BTC first when needed. Non-fatal: a real issuance/transfer
+    # will surface a precise error if the node ends up unfunded.
+    def ensure_colorable_utxos!(client)
+      fund_node_btc!(client)
+      client.create_utxos(up_to: true, num: COLORABLE_UTXOS, size: COLORABLE_UTXO_SIZE, fee_rate: FEE_RATE)
+      NodeConfirm.mine! # confirm the new colorable UTXOs (regtest)
+      client.refresh_transfers
     rescue LightningClient::Error => e
-      Rails.logger.warn("RLN createutxos skipped for user #{user.id}: #{e.message}")
+      Rails.logger.warn("RLN createutxos per utente #{user.id} saltato: #{e.message}")
+    end
+
+    def fund_node_btc!(client)
+      return unless regtest_bitcoind_available?
+      return if client.btc_balance.dig("vanilla", "spendable").to_i >= MIN_VANILLA_SATS
+
+      address = client.address.fetch("address")
+      harness = L1::RegtestHarness.new(wallet_name: L1::SHARED_REGTEST_WALLET)
+      harness.ensure_chain_ready!
+      harness.fund_address!(address, sats: FUND_SATS)
+    rescue LightningClient::Error => e
+      Rails.logger.warn("RLN funding per utente #{user.id} saltato: #{e.message}")
+    end
+
+    def regtest_bitcoind_available?
+      L1::Bitcoind::Client.new.available?
+    rescue StandardError
+      false
     end
   end
 end

@@ -60,7 +60,7 @@ OBIETTIVO (RGB-first)
 
 ```ruby
 # Tokens::TransferService (nuovo)
-1. Config.ensure_sidecar!
+1. Config.ensure_node!(from_user)
 2. balance = Rgb::BalanceService.settled(user:, budget:)
 3. raise se balance < amount_cents
 4. Rgb::TransferService.call(...)   # on-chain
@@ -158,7 +158,7 @@ Settlement L1 (PSBT) **resta invariato** — legge solo le quote holder, non il 
 |----------|----------|
 | RGB transfer OK, proiezione DB fallisce | **Rollback critico** — log alert; non esporre successo UI; job di riconciliazione |
 | RGB transfer fallisce | nessuna modifica DB (oggi il DB può aggiornarsi prima — da invertire) |
-| Sidecar giù | operazioni token bloccate (`ensure_sidecar!`); dashboard mostra ultima cache |
+| Nodo RGB giù | operazioni token bloccate (`ensure_node!`); dashboard mostra ultima cache |
 | Drift DB vs RGB | `Rgb::ReconcileService` (admin): confronta `list_assets` vs `rgb_assignments` |
 
 **Transazione ideale (Fase A):** non esiste 2PC tra sidecar e Postgres. Pattern **outbox**:

@@ -1,39 +1,46 @@
 # frozen_string_literal: true
 
+# Helpers for integration specs that exercise the real RGB stack on RGB
+# Lightning Nodes (tags :rgb_lib / :demo_flow). Requires ./bin/regtest up.
 module RgbLibHelpers
-  COMPOSE_FILE = Rails.root.join("docker-compose.regtest.yml").to_s
+  # Host API ports for the per-user RLN nodes (see docker-compose.regtest.yml).
+  NODE_URLS = [
+    "http://127.0.0.1:3001",
+    "http://127.0.0.1:3002",
+    "http://127.0.0.1:3003",
+    "http://127.0.0.1:3004"
+  ].freeze
 
   module_function
 
-  def reset_rgb_wallet_data!
-    reset_via_sidecar!
-  rescue Rgb::SidecarClient::Error
-    reset_via_docker_exec!
+  # Assigns RLN nodes to the given users (in order) so Rgb::Nodes can resolve them.
+  def assign_rln_nodes!(*users)
+    users.each_with_index do |user, index|
+      url = NODE_URLS.fetch(index)
+      account = user.btc_account || user.create_btc_account!
+      account.update!(rln_node_url: url)
+    end
   end
 
-  def reset_via_sidecar!
-    Rgb::SidecarClient.instance.reset_all_wallets!
+  def rln_settled(user, asset_id)
+    Rgb::Nodes.for_user(user).asset_balance(asset_id: asset_id)["settled"].to_i
   end
 
-  def reset_via_docker_exec!
-    success = system(
-      "docker", "compose", "-f", COMPOSE_FILE,
-      "exec", "-T", "rgb-sidecar",
-      "sh", "-c", "rm -rf /data/wallets/*",
-      out: File::NULL, err: File::NULL
-    )
-    raise "RGB wallet reset failed (rebuild sidecar or run ./bin/regtest up)" unless success
+  def rln_available?
+    Rgb::LightningClient.new(base_url: NODE_URLS.first).reachable? &&
+      L1::Bitcoind::Client.new.available?
+  rescue StandardError
+    false
   end
 end
 
 RSpec.configure do |config|
+  config.include RgbLibHelpers, rgb_lib: true
+  config.include RgbLibHelpers, demo_flow: true
+
   config.before do |example|
     next unless example.metadata[:rgb_lib] || example.metadata[:demo_flow]
 
-    unless Rgb::SidecarClient.instance.available?
-      skip "./bin/regtest up required (RGB sidecar unreachable)"
-    end
-
-    RgbLibHelpers.reset_rgb_wallet_data!
+    skip "./bin/regtest up required (RGB Lightning Nodes unreachable)" unless RgbLibHelpers.rln_available?
   end
 end

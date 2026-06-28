@@ -13,7 +13,7 @@ bin/rails db:setup
 bin/dev
 ```
 
-`bin/dev` avvia **regtest + stack RGB** (`./bin/regtest up`: bitcoind, electrs, rgb-proxy, sidecar) e **Rails**. Il PoC **richiede** regtest e sidecar RGB per depositi, escrow, transfer token e settlement.
+`bin/dev` avvia **regtest + stack RGB** (`./bin/regtest up`: bitcoind, electrs, rgb-proxy, nodi RGB Lightning) e **Rails**. Il PoC **richiede** regtest e i nodi RGB Lightning per depositi, escrow, transfer token e settlement.
 
 Apri http://localhost:3000 e accedi con:
 
@@ -128,9 +128,9 @@ Con **transfer parziale** il payout holder segue le quote correnti — vedi `spe
 ## Test
 
 ```bash
-bundle exec rspec          # unit + integration (RGB lib se sidecar attivo)
+bundle exec rspec          # unit + integration (spec :rgb_lib reali se i nodi RLN sono attivi)
 ./bin/demo-spec            # flusso demo end-to-end su regtest
-./bin/system-spec          # stesso flusso via browser (Capybara + sidecar reale)
+./bin/system-spec          # stesso flusso via browser (Capybara + nodi RLN reali)
 ```
 
 Per suite pulite senza dati seed che alterano i conteggi:
@@ -140,13 +140,13 @@ bin/rails db:schema:load RAILS_ENV=test
 bundle exec rspec
 ```
 
-`bin/demo-spec` richiede regtest + sidecar RGB (`./bin/regtest up`). Eseguilo dopo modifiche a payoff, settlement L1, RGB o saldi dashboard.
+`bin/demo-spec` richiede regtest + nodi RGB Lightning (`./bin/regtest up`). Eseguilo dopo modifiche a payoff, settlement L1, RGB o saldi dashboard.
 
-`bin/system-spec` replica lo stesso flusso nell'UI (login, switch utente dev, depositi, attivazione deal, transfer, settlement admin). Utile per debuggare errori sidecar su **Accetta rischio e attiva** con screenshot in `tmp/capybara/` al fallimento. Esempio rapido: `./bin/system-spec --example "attiva un deal"`.
+`bin/system-spec` replica lo stesso flusso nell'UI (login, switch utente dev, depositi, attivazione deal, transfer, settlement admin). Utile per debuggare errori RGB su **Accetta rischio e attiva** con screenshot in `tmp/capybara/` al fallimento. Esempio rapido: `./bin/system-spec --example "attiva un deal"`.
 
 ### RGB — RGB Lightning Node (RLN), un nodo per utente
 
-`./bin/regtest up` avvia **bitcoind**, **electrs**, **rgb-proxy** e **N nodi RGB Lightning** (uno per utente demo + issuer), costruiti dal submodule `vendor/rgb-lightning-node` (build Rust al primo avvio). Il legacy **rgb-sidecar** resta nel compose finché le spec `:rgb_lib` non sono migrate su RLN.
+`./bin/regtest up` avvia **bitcoind**, **electrs**, **rgb-proxy** e **N nodi RGB Lightning** (uno per utente demo + issuer), costruiti dal submodule `vendor/rgb-lightning-node` (build Rust al primo avvio). Il legacy `rgb-sidecar` è stato rimosso: l'intero stack RGB gira sui nodi RLN.
 
 | Nodo | Porta API host | Utente |
 |------|----------------|--------|
@@ -170,9 +170,7 @@ Variabili principali (`lib/rgb/config.rb`):
 
 Il mapping utente→nodo (`BtcAccount#rln_node_url`) è impostato da `DemoData::ResetService`. `Rgb::IssueService` / `Rgb::TransferService` / `Rgb::RedeemService` operano sul nodo dell'utente (`Rgb::Config.ensure_node!`); la dashboard mostra la card **RGB (RLN)** con i saldi NIA letti da `/assetbalance`.
 
-Per un reset RGB pulito riavviare i container (`./bin/regtest reset`): i nodi RLN non espongono un "reset wallet", lo stato si azzera ricreando i container.
-
-Legacy: `RGB_SIDECAR_URL` (`http://127.0.0.1:3030`) resta usato solo dalle spec `:rgb_lib` non ancora migrate.
+Per un reset RGB pulito riavviare i container (`./bin/regtest reset`): i nodi RLN non espongono un "reset wallet", lo stato si azzera ricreando i container. Le spec `:rgb_lib` (`spec/integration/rgb_lib_transfer_spec.rb`) girano sui nodi RLN reali quando lo stack è attivo, altrimenti vengono saltate.
 
 **Nota Docker:** se `docker pull` / `docker compose build` restano bloccati senza output, il credential helper Desktop può essere in stallo. Workaround: `mkdir -p /tmp/docker-nocreds && echo '{"auths":{}}' > /tmp/docker-nocreds/config.json` poi `DOCKER_CONFIG=/tmp/docker-nocreds docker pull …`.
 
@@ -186,7 +184,7 @@ Legacy: `RGB_SIDECAR_URL` (`http://127.0.0.1:3030`) resta usato solo dalle spec 
   - `Tokens::WalletTransferService`
   - `Payoffs::FloorEurCalculator`, `Settlements::ExecuteService`
 - **Gap verso M2+:** oracle firmato, Path B CLTV in produzione, margin annex on-chain — vedi [`docs/rgb-design/`](docs/rgb-design/)
-- **RGB (M3):** rgb-lib via sidecar Docker (obbligatorio con `./bin/regtest up`)
+- **RGB (M3):** RGB Lightning Node per utente (obbligatorio con `./bin/regtest up`)
 
 ## Stato roadmap (`main`)
 
@@ -195,7 +193,7 @@ Legacy: `RGB_SIDECAR_URL` (`http://127.0.0.1:3030`) resta usato solo dalle spec 
 | **M0** | Fatto — payoff FloorEUR, LTV, spec §11 |
 | **M1** | **Fatto** — regtest multisig 2-of-3, funding PSBT §3.2, settlement on-chain FloorEUR via `SettlementPsbtService`, recovery package con `psbt_maturity` unsigned, `bin/demo-spec`, 92 spec |
 | **M6** | Fatto — budget-as-deal, settlement per budget, L1 wiring (merged in `main`) |
-| **M3** | **In corso** — RGB20 NIA via rgb-lib sidecar (`./bin/regtest up`), issue su activate, transfer parziale, card dashboard |
+| **M3** | **In corso** — RGB20 NIA via RGB Lightning Node per utente (`./bin/regtest up`), issue su activate, transfer parziale on-chain, redemption a settlement, card dashboard |
 | **M2+** | Bot facilitatore / oracle firmato, Path B CLTV in prodotto, margin annex on-chain |
 
 ## L1 — multisig regtest

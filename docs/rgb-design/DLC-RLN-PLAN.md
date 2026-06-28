@@ -109,7 +109,7 @@ graph TB
 - [x] A.1 infra nodi RLN: submodule `vendor/rgb-lightning-node` + `docker/rln.Dockerfile` (build debug) + 5 nodi in `docker-compose.regtest.yml` (3001-3005) + `bin/regtest` (build/attesa) + mapping utente->nodo in `DemoData::ResetService`. Validato end-to-end su nodo reale (unlock/fund/createutxos/issueassetnia/assetbalance) e client allineato all'API vendored (`/sendrgb` recipient_map, `rgbinvoice` con `witness`, `unlock` con `announce_addresses`, `refreshtransfers` con `filter`)
 - [x] A.2 riscrittura `app/services/rgb/*` su RLN (issue/cessione/saldo/redeem/wallet) + migration `btc_accounts` (rln_node_url/rln_token/node_pubkey) + dashboard/reset/rescue
 - [x] A.2 unit spec aggiornati (`redeem_service`, `transfer_service`, `l1_unit_stubs` mirror) — suite unit verde
-- [ ] A.2 (regtest) riscrittura spec `:rgb_lib` su nodi RLN reali + rimozione `rgb-sidecar`/`Rgb::SidecarClient` (legacy mantenuto fino ad allora)
+- [x] A.2 (regtest) riscrittura spec `:rgb_lib` su nodi RLN reali (`spec/integration/rgb_lib_transfer_spec.rb` con `:regtest`, saldi letti dai nodi) + provisioning/funding nodi in `WalletSetupService` + conferma on-chain transfer/redeem via `Rgb::NodeConfirm` (mining+refresh su regtest) + `indexer_url` `tcp://electrs:50001`. Rimozione completa `rgb-sidecar/` + `Rgb::SidecarClient` + `Config.{sidecar_url,ensure_sidecar!,wallet_id_for}` + servizio compose `rgb-sidecar`/volume + script (`bin/dev`/`bin/demo-spec`/`bin/system-spec` ora sondano `:3001/nodeinfo`)
 - [ ] B.1 `lib/dlc/oracle_client.rb` (announce/attest numeric per-digit) + spec
 - [ ] B.1/B.2 `lib/dlc/node_client.rb` (ddk: funding 2-of-2, CET, adaptor, execute, refund)
 - [ ] B.2 migration + modelli `DlcContract` / `DlcSettlement`

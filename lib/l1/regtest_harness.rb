@@ -164,6 +164,16 @@ module L1
       client.call("generatetoaddress", count, address)
     end
 
+    # Sends regtest BTC from the shared wallet to an arbitrary address (e.g. an
+    # RGB Lightning Node vanilla address) and confirms it. Used to fund RLN nodes
+    # so they can create colorable UTXOs for RGB issuance/transfers.
+    def fund_address!(address, sats:)
+      ensure_spendable_balance!(sats + ESTIMATED_TX_FEE_SATS)
+      txid = client.call("sendtoaddress", address, btc(sats))
+      mine_blocks(1)
+      txid
+    end
+
     def current_height
       @global_client.call("getblockchaininfo").fetch("blocks")
     end

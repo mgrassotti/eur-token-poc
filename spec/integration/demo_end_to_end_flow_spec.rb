@@ -2,7 +2,7 @@
 
 require "rails_helper"
 
-# Flusso demo (regtest + RGB sidecar reale): eseguire con bin/demo-spec
+# Flusso demo (regtest + RGB Lightning Nodes reali): eseguire con bin/demo-spec
 RSpec.describe "Demo end-to-end flow", :regtest, :demo_flow do
   def bitcoind_available?
     L1::Bitcoind::Client.new.available?

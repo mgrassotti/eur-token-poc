@@ -2,25 +2,6 @@
 
 module Rgb
   module Config
-    ISSUER_WALLET_ID = "rgb_issuer"
-
-    # --- Legacy sidecar (deprecated, kept until A.2 removes it) -----------
-
-    def self.sidecar_url
-      ENV.fetch("RGB_SIDECAR_URL", "http://127.0.0.1:3030")
-    end
-
-    def self.ensure_sidecar!
-      return if SidecarClient.instance.available?
-
-      raise SidecarClient::Error,
-            "RGB sidecar required at #{sidecar_url} — run ./bin/regtest up"
-    end
-
-    def self.wallet_id_for(user)
-      "user_#{user.id}"
-    end
-
     # --- RGB Lightning Node (RLN) ----------------------------------------
 
     # Password used to init/unlock demo nodes. Real deployments override per node.
@@ -42,7 +23,7 @@ module Rgb
         bitcoind_rpc_password: ENV.fetch("RLN_BITCOIND_PASS", "regtest"),
         bitcoind_rpc_host: ENV.fetch("RLN_BITCOIND_HOST", "bitcoind"),
         bitcoind_rpc_port: Integer(ENV.fetch("RLN_BITCOIND_PORT", "18443")),
-        indexer_url: ENV.fetch("RLN_INDEXER_URL", "electrs:50001"),
+        indexer_url: ENV.fetch("RLN_INDEXER_URL", "tcp://electrs:50001"),
         proxy_endpoint: ENV.fetch("RLN_PROXY_ENDPOINT", "rpc://rgb-proxy:3000/json-rpc")
       }
     end
@@ -52,10 +33,10 @@ module Rgb
       ENV["RLN_TOKEN"].presence
     end
 
-    # Raises unless the user's RLN node is reachable. RLN counterpart of
-    # ensure_sidecar! for the write paths (issue/transfer/redeem).
+    # Raises unless the user's RLN node daemon answers. Guards the RGB write
+    # paths (issue/transfer/redeem); the services unlock the node themselves.
     def self.ensure_node!(user)
-      return if Nodes.available_for?(user)
+      return if Nodes.reachable_for?(user)
 
       raise LightningClient::Error,
             "RGB node richiesto per utente #{user.id} — esegui ./bin/regtest up"

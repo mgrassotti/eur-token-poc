@@ -37,7 +37,7 @@ module SystemTestHelpers
   end
 
   def expect_no_error_flash!
-    expect(page).not_to have_css(".alert-danger", text: /RGB sidecar|Internal Server Error|Escrow L1 non provisionato/i)
+    expect(page).not_to have_css(".alert-danger", text: /Nodo RGB|Internal Server Error|Escrow L1 non provisionato/i)
   end
 
   def deposit_reserve!(sats:)
@@ -103,9 +103,9 @@ module SystemTestHelpers
   end
 
   def expect_rgb_card_visible!
-    visit root_path unless page.has_css?(".card-header", text: "RGB (rgb-lib)", wait: 0)
-    expect(page).to have_css(".card", text: "RGB (rgb-lib)")
-    expect(page).not_to have_css(".border-danger", text: "Sidecar RGB non raggiungibile")
+    visit root_path unless page.has_css?(".card-header", text: "RGB (RLN)", wait: 0)
+    expect(page).to have_css(".card", text: "RGB (RLN)")
+    expect(page).not_to have_css(".border-danger", text: "Nodo RGB Lightning non raggiungibile")
   end
 end
 

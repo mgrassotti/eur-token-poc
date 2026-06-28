@@ -2,7 +2,7 @@
 
 module Rgb
   # On-chain RGB20 partial transfer between two RLN nodes: the recipient node
-  # issues a blinded rgb invoice, the sender node pays it via /sendasset routed
+  # issues a blinded rgb invoice, the sender node pays it via /sendrgb routed
   # through the shared RGB proxy. No DB writes (ProjectionService mirrors).
   class LibTransferService
     class Error < StandardError; end
@@ -27,7 +27,9 @@ module Rgb
       sender = WalletSetupService.ensure_for!(from_user)
       recipient = WalletSetupService.ensure_for!(to_user)
 
-      invoice = recipient.rgb_invoice(asset_id: asset_id, amount: amount_cents)
+      # Blind invoice (no asset_id): the recipient may not know the contract yet;
+      # the consignment delivered via the proxy carries it.
+      invoice = recipient.rgb_invoice(amount: amount_cents)
       recipient_id = invoice.fetch("recipient_id")
 
       transfer = sender.send_asset(
@@ -36,6 +38,9 @@ module Rgb
         recipient_id: recipient_id,
         transport_endpoints: [Config.rln_unlock_params[:proxy_endpoint]]
       )
+
+      # Confirm the transfer so both nodes reach settled balances (regtest no-op otherwise).
+      NodeConfirm.settle_users!(from_user, to_user)
 
       TransferResult.new(
         txid: transfer.fetch("txid"),

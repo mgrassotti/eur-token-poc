@@ -2,7 +2,7 @@
 
 require "rails_helper"
 
-# Flusso demo via browser (regtest + RGB sidecar reale): bin/system-spec
+# Flusso demo via browser (regtest + RGB Lightning Nodes reali): bin/system-spec
 RSpec.describe "Demo end-to-end flow (system)", type: :system, regtest: true, demo_flow: true,
                use_transactional_fixtures: false do
   def bitcoind_available?
@@ -75,7 +75,7 @@ RSpec.describe "Demo end-to-end flow (system)", type: :system, regtest: true, de
     activate_budget!(second_budget)
   end
 
-  it "attiva un deal via UI (debug sidecar RGB su activate)" do
+  it "attiva un deal via UI (debug RGB Lightning Node su activate)" do
     period_start = Date.new(2026, 1, 1)
     period_end = Date.new(2026, 2, 1)
 

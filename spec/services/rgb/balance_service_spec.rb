@@ -6,8 +6,8 @@ RSpec.describe Rgb::BalanceService do
   let(:alice) { create(:user) }
   let(:budget) { create(:budget, borrower: alice, amount_eur_cents: 100_000) }
 
-  it "reads from rgb_assignments when sidecar is unavailable" do
-    allow(Rgb::SidecarClient.instance).to receive(:available?).and_return(false)
+  it "reads from rgb_assignments when the RGB node is unavailable" do
+    allow(Rgb::Nodes).to receive(:available_for?).with(alice).and_return(false)
     RgbAssignment.create!(
       budget: budget,
       user: alice,

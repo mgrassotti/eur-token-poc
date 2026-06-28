@@ -6,10 +6,10 @@ require "json"
 module Rgb
   # REST client for a single RGB Lightning Node (RLN) instance.
   #
-  # One instance targets one node (one URL per user/role). Unlike the legacy
-  # Rgb::SidecarClient there is no wallet_id: the node *is* the wallet. Auth is
-  # optional (nodes started with --disable-authentication need no token); a
-  # Biscuit bearer token may be supplied for hardened deployments.
+  # One instance targets one node (one URL per user/role). There is no wallet_id:
+  # the node *is* the wallet. Auth is optional (nodes started with
+  # --disable-authentication need no token); a Biscuit bearer token may be
+  # supplied for hardened deployments.
   #
   # Endpoint shapes follow the RGB Lightning Node OpenAPI (master). RGB fungible
   # quantities are expressed via an Assignment object: {type: "Fungible", value: N}.
@@ -32,6 +32,7 @@ module Rgb
 
     # --- Node lifecycle ---------------------------------------------------
 
+    # True only when the node is up AND unlocked (can serve reads like balances).
     def available?
       return @available if @last_check_at && Time.current - @last_check_at < 5.seconds
 
@@ -40,6 +41,15 @@ module Rgb
       @available = true
     rescue Error
       @available = false
+    end
+
+    # True when the daemon answers at all, even if locked/uninitialized. Used by
+    # write paths that will init/unlock the node themselves (WalletSetupService).
+    def reachable?
+      node_info(read_timeout: DASHBOARD_READ_TIMEOUT)
+      true
+    rescue Error => e
+      !e.message.match?(/unreachable|timeout/i)
     end
 
     # Returns the BIP39 mnemonic. Idempotency is the caller's concern: a node
@@ -108,8 +118,9 @@ module Rgb
       })
     end
 
-    def list_assets
-      post("/listassets")
+    # filter_asset_schemas: [] returns every schema (NIA/CFA/UDA).
+    def list_assets(filter_asset_schemas: [])
+      post("/listassets", { filter_asset_schemas: Array(filter_asset_schemas) })
     end
 
     def asset_balance(asset_id:, read_timeout: DEFAULT_READ_TIMEOUT)
@@ -117,13 +128,14 @@ module Rgb
     end
 
     # Recipient side: produce a blinded invoice for an incoming transfer.
-    def rgb_invoice(asset_id:, amount:, min_confirmations: 1, witness: false)
-      post("/rgbinvoice", {
-        asset_id: asset_id,
-        assignment: fungible(amount),
-        min_confirmations: min_confirmations,
-        witness: witness
-      })
+    # Blinded RGB invoice. asset_id/amount are optional: omit them when the
+    # recipient does not yet know the contract (first receive) — the incoming
+    # consignment carries the contract and the sender pins asset/amount.
+    def rgb_invoice(asset_id: nil, amount: nil, min_confirmations: 1, witness: false)
+      body = { min_confirmations: min_confirmations, witness: witness }
+      body[:asset_id] = asset_id if asset_id
+      body[:assignment] = fungible(amount) if amount
+      post("/rgbinvoice", body)
     end
 
     def decode_rgb_invoice(invoice:)

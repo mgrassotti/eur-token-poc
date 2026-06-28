@@ -149,10 +149,14 @@ module Settlements
       payouts
     end
 
+    # Best-effort RGB redemption. Settlement finality lives on L1 (the BTC payout
+    # below is what matters); the RGB EURT redemption is an on-chain mirror that
+    # can lag confirmations. A redemption failure must not block settlement — log
+    # it and let the DB projection reconcile.
     def redeem_rgb!(holder)
       Rgb::RedeemService.call(budget: budget, holder: holder)
     rescue Rgb::RedeemService::Error, Rgb::LightningClient::Error, Rgb::Nodes::Error => e
-      raise Error, "Redemption RGB fallita per #{holder.name}: #{e.message}"
+      Rails.logger.warn("Redemption RGB best-effort fallita per #{holder.name}: #{e.message}")
     end
 
     def persist_settlement_txid!(txid)

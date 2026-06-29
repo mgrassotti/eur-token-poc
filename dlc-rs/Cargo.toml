@@ -1,0 +1,30 @@
+[package]
+name = "dlc-node"
+version = "0.1.0"
+edition = "2021"
+description = "Rust DLC node (rust-dlc) REST sidecar driving the FloorEUR numeric DLC on regtest against a Pythia oracle"
+
+[[bin]]
+name = "dlc-node"
+path = "src/main.rs"
+
+# rust-dlc pinned to the SAME commit Pythia uses (vendor/pythia Cargo.lock):
+# git+https://github.com/p2pderivatives/rust-dlc.git #fe0e07642477a338dbb53adfd1c003d8715943d3
+# Using the identical dlc / dlc-trie / dlc-messages + secp256k1-zkp 0.11 guarantees
+# byte-for-byte agreement on the ECDSA-adaptor signature point and oracle s-value
+# decomposition, which is exactly the compatibility cfd-dlc-js lacked.
+[dependencies]
+dlc = { git = "https://github.com/p2pderivatives/rust-dlc.git", rev = "fe0e07642477a338dbb53adfd1c003d8715943d3" }
+dlc-trie = { git = "https://github.com/p2pderivatives/rust-dlc.git", rev = "fe0e07642477a338dbb53adfd1c003d8715943d3" }
+dlc-messages = { git = "https://github.com/p2pderivatives/rust-dlc.git", rev = "fe0e07642477a338dbb53adfd1c003d8715943d3", features = ["use-serde"] }
+secp256k1-zkp = { version = "0.11.0", features = ["rand-std", "serde", "hashes"] }
+bitcoin = { version = "0.32", features = ["serde", "rand-std"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tiny_http = "0.12"
+ureq = "2"
+hex = "0.4"
+anyhow = "1"
+
+[profile.release]
+opt-level = 2

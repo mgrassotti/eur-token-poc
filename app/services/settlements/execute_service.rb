@@ -117,6 +117,10 @@ module Settlements
     def settle!(token_accounts, payoff)
       raise Error, "Escrow L1 non provisionato" unless budget.l1_multisig_provisioned?
 
+      # Snapshot holder allocations before redemption zeroes the token balances;
+      # the DLC peg_pot distribution fans out on these maturity shares.
+      dlc_shares = token_accounts.map { |ta| { user: ta.user, cents: ta.balance_cents } }
+
       holder_payouts = []
       payouts = token_accounts.each_with_index.map do |token_account, index|
         allocation = payoff.holder_allocations[index]
@@ -130,7 +134,7 @@ module Settlements
 
       settlement_txid =
         if dlc_active?
-          settle_via_dlc!
+          settle_via_dlc!(dlc_shares)
         else
           settle_via_escrow!(payoff, holder_payouts)
         end
@@ -150,9 +154,9 @@ module Settlements
       Dlc::Config.enabled? && budget.dlc_contract&.funded?
     end
 
-    def settle_via_dlc!
+    def settle_via_dlc!(shares)
       result = Dlc::SettlementService.call(budget: budget, end_btc_eur_rate: end_btc_eur_rate)
-      Dlc::Distribution.call(budget: budget, peg_pot_sats: result.peg_pot_sats)
+      Dlc::Distribution.call(budget: budget, peg_pot_sats: result.peg_pot_sats, shares: shares)
       persist_dlc_recovery!
       result.cet_txid
     end

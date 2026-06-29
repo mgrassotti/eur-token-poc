@@ -120,3 +120,56 @@ graph TB
 - [~] B.3 integration `:dlc_integration`/`:regtest` end-to-end (`spec/integration/dlc/dlc_settlement_spec.rb`) — scaffold pronto, **skippa** finché Kormir + ddk non sono nello stack compose (infra residua). Doc aggiornati (`RGB-FIRST`/`MULTISIG-SPEC`/`P2P-OPTIONS`)
 
 > **Infra residua (B.3)**: aggiungere oracle Kormir e nodo ddk (shim REST sugli endpoint `/contracts*`) a `docker-compose.regtest.yml`; sostituire la `PayoutCurve` campionata con la payout-function nativa di rust-dlc; sostituire la `RedeemService` best-effort con la distribuzione DLC come meccanismo autorevole (vedi §"Best-effort redemption").
+
+---
+
+## Aggiornamento (giugno 2026): nodo DLC reale su `rust-dlc` — **Variante B implementata**
+
+> Stato: **funzionante end-to-end su regtest** — CREATE / EXECUTE / REFUND / DISTRIBUTE tutti verdi contro l'oracle Pythia. Lo storico blocker `NULLFAIL` su EXECUTE è risolto.
+
+### Contesto e scelta dell'oracle
+
+La fase B è stata realizzata con **oracle Pythia** (`dlc-markets/pythia`, fork di sibyls) anziché Kormir, perché Pythia espone `POST /v1/force {maturation, price}` per **forzare l'attestazione** di un (maturity, price) arbitrario — indispensabile per un regtest deterministico — ed è REST + Postgres (nessun gRPC/Rust applicativo da scrivere lato oracle). Kormir resta valido ma le sue route non combaciavano col nostro `OracleClient` e non offre un force-attest comodo.
+
+### Il blocker EXECUTE e la sua causa
+
+Il **primo** nodo DLC fu uno shim Node.js (`dlc-shim/`) che avvolgeva `@atomicfinance` + **`cfd-dlc-js`**. Funzionava per funding/refund/distribute ma la CET di EXECUTE veniva **rifiutata da bitcoind con `NULLFAIL`** ("Signature must be zero for failed CHECKMULTISIG"). Diagnosi conclusiva: tutti i pezzi verificavano isolatamente (adaptor valido, indice CET corretto, `s_i·G == ComputeSigPoint`), ma la firma CET decifrata restava invalida → **incompatibilità del calcolo del punto della firma ECDSA-adaptor tra `cfd-dlc-js` (atomicfinance) e l'attestation `rust-dlc` di Pythia**.
+
+### Soluzione: sidecar Rust `dlc-rs/` su `rust-dlc`
+
+Il nodo DLC è stato riscritto come **sidecar Rust** (`dlc-rs/`, servizio compose `dlc-node`) costruito su **`rust-dlc`** (`dlc` + `dlc-trie` + `dlc-messages`), **pinnato allo stesso commit che usa Pythia** (`p2pderivatives/rust-dlc` @ `fe0e0764`) e `secp256k1-zkp 0.11`. Poiché oracle e nodo condividono lo stesso codice crittografico, il punto della firma adaptor e la decomposizione dei valori-s dell'oracle (`signatures_to_secret`) coincidono **byte-per-byte** → EXECUTE valido.
+
+Punti chiave dell'implementazione:
+
+- **Stesso contratto REST** dello shim precedente (`/info`, `POST /contracts`, `GET /contracts/:id`, `POST /contracts/:id/{execute,refund,distribute}`): **zero modifiche** a `Dlc::NodeClient` lato Ruby.
+- **Deserializzazione diretta** dell'announcement Pythia negli struct `dlc_messages::oracle_msgs::OracleAnnouncement` (serde) — nessun parsing manuale.
+- **Numeric/digit-decomposition** via `MultiOracleTrie`; messaggio per-cifra `sha256(digit)` + `schnorrsig_compute_sig_point` (identico a Pythia).
+- **Curva FloorEUR**: `peg = K/price` campionata sui punti del deal, arrotondata (bucket configurabili `DLC_ROUNDING_BUCKETS`) e coalizzata in `RangePayout` (un CET per intervallo).
+- **PoC in-process**: il sidecar tiene entrambe le chiavi (peg=offerer, investor=acceptor), finanzia il 2-of-2 da un wallet bitcoind regtest, firma gli input P2WPKH, fa broadcast e — a maturity — decifra l'adaptor accept-side con l'attestation e co-firma con la chiave peg (`dlc::sign_cet`).
+- **Build**: Dockerfile multi-stage (layer di sole dipendenze per cache), `platform: linux/amd64`.
+
+### Compose
+
+`docker-compose.regtest.yml` (profilo `dlc`): `bitcoind` + `pythia-db` + `pythia` + `dlc-node` (build da `./dlc-rs`). Lo shim Node.js legacy resta in `./dlc-shim` solo come riferimento storico.
+
+### Variante A (alternativa futura): `ddk-node` completo
+
+Se in futuro serve un **vero nodo DLC peer-to-peer** anziché il sidecar in-process:
+
+- **`ddk-node`** (dlcdevkit, v1.1.x): nodo DLC pronto con **gRPC** + CLI, basato su `ddk`/`rust-dlc`.
+- Richiede: bitcoin node + **esplora** (electrs con API Esplora) + **oracle server** (Kormir, HTTP/Nostr).
+- **Transport Nostr** (default) o gossip LN → modello a due nodi (peg + investor) con relay; **wallet BDK** proprio (funding separato da bitcoind).
+- Pro: nodo "vero", spec-compliant, mantenuto. Contro: rifà M1 (Pythia→Kormir) + M2 su uno stack più pesante (2 nodi + relay + esplora + client gRPC).
+- Compatibilità crittografica garantita comunque (ddk+Kormir sono entrambi `rust-dlc`).
+
+Poiché lo stesso motore `rust-dlc` è già in casa nel sidecar (`dlc-rs/`), un'eventuale migrazione a `ddk-node` riuserebbe gli stessi concetti (announcement/attestation, trie numerica, payout iperbolica).
+
+### Wiring lato Ruby — **completato e verde end-to-end**
+
+> Stato: il percorso DLC è cablato nei servizi Rails e il test di integrazione `spec/integration/dlc/dlc_settlement_spec.rb` passa contro lo stack reale (Pythia + sidecar `dlc-rs` + RLN), con CET e distribuzione realmente trasmessi on-chain.
+
+- **Oracle provider**: `Dlc::Config.oracle_provider = "pythia"` (default). `oracle_client` istanzia `PythiaOracleClient`. Le route Pythia (announcement GET, attestation `POST /v1/force`) sono già coperte dal client; gli `event_id` applicativi (`deal-<budget.id>`) restano lato nostro mentre Pythia deriva il proprio da `(asset_pair, maturity)` — irrilevante perché attestazione e announcement sono legati alla **stessa maturity**.
+- **Maturity dell'evento oracle**: Pythia è un price-feed che pre-pianifica gli announcement a pochi minuti dal presente, quindi non ha un announcement per la maturity-calendario (lontana) del deal. `Dlc::Config.oracle_maturity_epoch` allinea perciò l'evento DLC a uno **slot near-future** schedulato (override deterministico via `DLC_ORACLE_MATURITY_EPOCH`); la maturity economica del budget continua a governare il timelock di refund e la business logic. `ContractSetupService` memoizza l'epoch così che venga **annunciato, persistito e poi attestato** lo stesso slot.
+- **Distribuzione del `peg_pot`**: in settlement il redeem RGB azzera i `token_account`, quindi `Settlements::ExecuteService` cattura uno **snapshot pre-redeem** delle quote holder e lo passa a `Dlc::Distribution(shares:)` (fallback ai saldi DB quando assente). Il resolver di default degli indirizzi usa `Rgb::WalletSetupService.ensure_for!` per **inizializzare/sbloccare** il nodo RLN dell'holder prima di richiedere l'indirizzo on-chain.
+- **Sidecar**: `handle_create` ora invoca `chain.ensure()` (crea/finanzia i wallet bitcoind) così sopravvive a un reset della chain regtest tra una run e l'altra.
+- **Test**: `DLC_ENABLED=true bundle exec rspec spec/integration/dlc/dlc_settlement_spec.rb` → CREATE (funded) / EXECUTE (CET broadcast) / DISTRIBUTE (peg_pot fan-out) tutti verdi; le unit (`spec/services/dlc/*`, `execute_service_dlc_spec`) restano verdi.

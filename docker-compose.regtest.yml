@@ -151,3 +151,29 @@ services:
     depends_on:
       pythia-db:
         condition: service_healthy
+
+  # DLC node: a Rust REST sidecar built on rust-dlc (dlc + dlc-trie), pinned to
+  # the SAME rust-dlc commit Pythia uses, so the ECDSA-adaptor signature point and
+  # the oracle s-value decomposition agree byte-for-byte (the cfd-dlc-js engine
+  # did not, causing NULLFAIL on EXECUTE). It builds, funds, executes and refunds
+  # the FloorEUR 2-of-2 numeric DLC on regtest, owning its bitcoind wallets via RPC.
+  # (Legacy node-dlc/cfd-dlc-js shim kept under ./dlc-shim for reference.)
+  dlc-node:
+    profiles: [dlc]
+    # rust-dlc pulls libsecp256k1 prebuilt-free; amd64 keeps parity with the rest
+    # of the regtest stack and avoids arch-specific surprises under emulation.
+    platform: linux/amd64
+    build:
+      context: ./dlc-rs
+    image: eur-token-dlc-node:local
+    restart: unless-stopped
+    environment:
+      PORT: 8090
+      BITCOIND_RPC_URL: http://bitcoind:18443
+      BITCOIND_RPC_USER: regtest
+      BITCOIND_RPC_PASSWORD: regtest
+    ports:
+      - "8090:8090"
+    depends_on:
+      bitcoind:
+        condition: service_healthy

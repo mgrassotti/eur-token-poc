@@ -63,10 +63,12 @@ module Dlc
       "deal-#{budget.id}"
     end
 
-    # Maturity timestamp the oracle commits to. On regtest the period_end date
-    # stands in for the block-height maturity used by the escrow path.
+    # Maturity timestamp the oracle commits to. For Pythia (price-feed oracle)
+    # this is a near-future scheduled slot (see Config.oracle_maturity_epoch);
+    # otherwise the budget calendar maturity (period_end) is used. Memoized so the
+    # same epoch is announced, persisted and later attested.
     def maturity_epoch
-      budget.period_end.to_time.to_i
+      @maturity_epoch ||= Config.oracle_maturity_epoch || budget.period_end.to_time.to_i
     end
   end
 end

@@ -15,17 +15,26 @@ module Dlc
 
     Payout = Data.define(:user, :sats, :address, :txid)
 
-    DEFAULT_ADDRESS_RESOLVER = ->(user) { Rgb::Nodes.for_user(user).address.fetch("address") }
-
-    def self.call(budget:, peg_pot_sats:, node: nil, address_resolver: DEFAULT_ADDRESS_RESOLVER)
-      new(budget:, peg_pot_sats:, node:, address_resolver:).call
+    # Resolve a holder's on-chain BTC payout address from their RLN node,
+    # initializing/unlocking it first (like the other RGB write paths) so a
+    # locked node doesn't abort settlement.
+    DEFAULT_ADDRESS_RESOLVER = lambda do |user|
+      Rgb::WalletSetupService.ensure_for!(user).address.fetch("address")
     end
 
-    def initialize(budget:, peg_pot_sats:, node: nil, address_resolver: DEFAULT_ADDRESS_RESOLVER)
+    def self.call(budget:, peg_pot_sats:, node: nil, address_resolver: DEFAULT_ADDRESS_RESOLVER, shares: nil)
+      new(budget:, peg_pot_sats:, node:, address_resolver:, shares:).call
+    end
+
+    def initialize(budget:, peg_pot_sats:, node: nil, address_resolver: DEFAULT_ADDRESS_RESOLVER, shares: nil)
       @budget = budget
       @peg_pot_sats = Integer(peg_pot_sats)
       @node = node || NodeClient.default
       @address_resolver = address_resolver
+      # Optional pre-redemption snapshot [{user:, cents:}]. Settlement zeroes the
+      # token balances during redemption, so the caller passes the maturity
+      # allocation here; otherwise we read the live balances from the DB.
+      @shares_snapshot = shares
     end
 
     def call
@@ -54,23 +63,37 @@ module Dlc
     # Largest-remainder-free split: each holder floors their pro-rata share and
     # the last holder absorbs the rounding remainder, so the sum equals peg_pot.
     def compute_shares
-      accounts = budget.token_accounts.where("balance_cents > 0").order(:id).to_a
-      return [] if accounts.empty?
+      allocations = holder_allocations
+      return [] if allocations.empty?
 
-      total_cents = accounts.sum(&:balance_cents)
+      total_cents = allocations.sum { |a| a[:cents] }
       raise Error, "Allocazione holder vuota" if total_cents.zero?
 
       shares = []
       assigned = 0
-      accounts[0..-2].each do |account|
-        sats = (peg_pot_sats * account.balance_cents) / total_cents
-        shares << { user: account.user, sats: sats }
+      allocations[0..-2].each do |allocation|
+        sats = (peg_pot_sats * allocation[:cents]) / total_cents
+        shares << { user: allocation[:user], sats: sats }
         assigned += sats
       end
 
-      last = accounts.last
-      shares << { user: last.user, sats: peg_pot_sats - assigned }
+      last = allocations.last
+      shares << { user: last[:user], sats: peg_pot_sats - assigned }
       shares
+    end
+
+    # Holder cents at maturity: the explicit pre-redemption snapshot when given,
+    # otherwise the live token balances.
+    def holder_allocations
+      if @shares_snapshot
+        @shares_snapshot.filter_map do |s|
+          cents = Integer(s[:cents])
+          { user: s[:user], cents: cents } if cents.positive?
+        end
+      else
+        budget.token_accounts.where("balance_cents > 0").order(:id).to_a
+          .map { |a| { user: a.user, cents: a.balance_cents } }
+      end
     end
 
     def persist!(txid, shares, outputs)

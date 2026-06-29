@@ -48,7 +48,8 @@ RSpec.describe Settlements::ExecuteService, "DLC settlement path" do
     described_class.call(budget: budget, end_btc_eur_rate: peg)
 
     expect(Dlc::SettlementService).to have_received(:call).with(budget: budget, end_btc_eur_rate: peg)
-    expect(Dlc::Distribution).to have_received(:call).with(budget: budget, peg_pot_sats: 10_600_000)
+    expect(Dlc::Distribution).to have_received(:call)
+      .with(budget: budget, peg_pot_sats: 10_600_000, shares: kind_of(Array))
     expect(L1::SettlementPsbtService).not_to have_received(:broadcast!)
     expect(budget.reload).to be_settled
     expect(budget.recovery_package["settlement_txid"]).to eq(cet_txid)

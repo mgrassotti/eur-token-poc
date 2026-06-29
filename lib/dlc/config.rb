@@ -40,6 +40,23 @@ module Dlc
       end
     end
 
+    # Oracle event maturity (unix epoch) for the DLC numeric event.
+    #
+    # Pythia is a price-feed oracle: it pre-schedules numeric announcements a few
+    # minutes ahead on a cron, so it has no announcement for a deal's far-future
+    # calendar maturity. On regtest we therefore align the DLC event to a
+    # near-future scheduled slot (the budget's economic maturity still governs the
+    # refund timelock and business logic). Returns nil for other providers so the
+    # caller falls back to the budget calendar maturity. Override with
+    # DLC_ORACLE_MATURITY_EPOCH for fully deterministic runs.
+    def self.oracle_maturity_epoch(now: Time.now)
+      override = ENV["DLC_ORACLE_MATURITY_EPOCH"].presence
+      return Integer(override) if override
+      return nil unless oracle_provider == "pythia"
+
+      ((now.to_i / 60) + 2) * 60
+    end
+
     # Master switch for the DLC settlement path. While false, settlement uses
     # the legacy 2-of-3 escrow and RGB redemption.
     def self.enabled?

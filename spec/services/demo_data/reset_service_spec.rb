@@ -48,6 +48,8 @@ RSpec.describe DemoData::ResetService do
 
   it "creates demo users when they are missing" do
     Settlement.delete_all
+    DlcSettlement.delete_all
+    DlcContract.delete_all
     TokenTransfer.delete_all
     RgbAssignment.delete_all
     TokenAccount.delete_all

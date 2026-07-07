@@ -1,6 +1,6 @@
 # FloorEUR PoC (Rails)
 
-Proof-of-concept Rails per **deal P2P bilaterali** (un `Budget` = un deal): token EUR nominale spendibili, collateral BTC in escrow **multisig on-chain (regtest)**, settlement **FloorEUR** a scadenza.
+Proof-of-concept Rails per **deal P2P bilaterali** (un `Budget` = un deal): token EUR nominale spendibili, collateral BTC in **lock 2-of-2 on-chain (regtest)**, settlement **FloorEUR** via **DLC** (oracle-attested CET) a scadenza.
 
 Specifiche di design: [`docs/rgb-design/`](docs/rgb-design/) (`PAYOFF-SPEC`, `P2P-OPTIONS`, `MULTISIG-SPEC`, `MARGIN-SPEC`).
 
@@ -35,11 +35,11 @@ Ogni **ricarica** (`Budget`) è un deal autonomo:
 
 | Concetto | Implementazione PoC |
 |----------|---------------------|
-| Escrow | UTXO **2-of-3 P2WSH** on-chain (`escrow_txid`/`vout`) + `CollateralLock` (tracking importi) |
+| Collateral lock | UTXO **2-of-2 P2WSH** {peg, investor} on-chain (`escrow_txid`/`vout`) + `CollateralLock` (tracking importi) |
 | Strike | `Budget#peg_eur_per_btc` — fissato **all’attivazione** dal `MarketRate` corrente |
 | Maturity | `Budget#maturity_block_height` (da `genesis_block_height` + durata in blocchi) |
 | Token | `TokenAccount` — proiezione DB; saldi spendibili da `Rgb::BalanceService` |
-| Settlement | `Payoffs::FloorEurCalculator` → `Settlements::ExecuteService` → `L1::SettlementPsbtService` |
+| Settlement | `Payoffs::FloorEurCalculator` → `Settlements::ExecuteService` → `Dlc::SettlementService` (CET oracle-attested) + `Dlc::Distribution` (peg_pot) |
 | Transfer | `Tokens::WalletTransferService` — spend da più deal se serve |
 | Riserva BTC | Wallet regtest per utente; saldo **spendibile on-chain** (`L1::UserWallet`) |
 | Oracle / catena | `MarketRate` + `ChainState` (admin); auto-settle al maturity block |
@@ -81,7 +81,7 @@ Ogni deposito trasferisce dal **Wallet esterno** (`l1_external_wallet`) e avanza
 Il sistema:
 
 - Verifica saldo spendibile on-chain (peg + investor + fee funding)
-- Provisiona escrow **2-of-3** (`L1::ProvisionEscrowService`)
+- Provisiona il **lock collaterale 2-of-2** + il **contratto DLC 2-of-2** (`L1::ProvisionEscrowService` → `Dlc::ContractSetupService`)
 - Fissa `peg_eur_per_btc` e mint **1_000 €** nominali ad Alice sul **conto spesa / risparmio**
 
 ### 4. Spesa token (Alice → Claude → David)
@@ -104,7 +104,7 @@ Il settlement **FloorEUR**:
 2. Converte in sats al **spot** di chiusura
 3. Cap: `total_holder = min(gross, escrow − mining_fee)` (fee default 5_000 sats)
 4. **Redemption RGB:** ogni holder restituisce il saldo EURT al wallet **issuer/treasury** (`Rgb::RedeemService`) — rgb-lib 0.3 non ha un burn nativo, quindi la redemption all'issuer ritira i token dalla circolazione. La proiezione DB (`TokenAccount`/`RgbAssignment`) viene azzerata come cache (`Rgb::ProjectionService.apply_redeem!`)
-5. **PSBT maturity async:** `L1::SettlementPsbtService` costruisce la PSBT (`L1::SettlementTxBuilder`), persiste la versione **unsigned** nel recovery package, poi firma in sequenza bot + investitore e broadcast
+5. **DLC settlement:** l'oracle (Pythia) firma l'outcome numerico, `Dlc::SettlementService` esegue la **CET** (che rilascia il `peg_pot`) e `Dlc::Distribution` lo distribuisce pro-rata agli holder sulla riserva L1
 6. Sync saldi riserva
 
 ### Esempio numerico — 1000 €, peg 50k, 1 mese @ 1%, spot 50k
@@ -198,7 +198,7 @@ Per un reset RGB pulito riavviare i container (`./bin/regtest reset`): i nodi RL
 
 ## L1 — multisig regtest
 
-Modulo `lib/l1/` per escrow **2-of-3 P2WSH** su Bitcoin Core regtest (JSON-RPC).
+Modulo `lib/l1/` per il **lock collaterale 2-of-2 P2WSH** {peg, investor} su Bitcoin Core regtest (JSON-RPC). Il settlement è gestito dal DLC (CET oracle-attested); il lock 2-of-2 vincola solo il collaterale on-chain, recuperabile via refund timelock (Path B).
 
 | Componente | Ruolo |
 |------------|--------|
@@ -208,16 +208,15 @@ Modulo `lib/l1/` per escrow **2-of-3 P2WSH** su Bitcoin Core regtest (JSON-RPC).
 | `L1::SyncReserveBalanceService` | Allinea `BtcAccount#balance_sats` al saldo spendibile on-chain |
 | `L1::WalletInventoryService` | Riepilogo admin wallet caricati + equivalente € |
 | `L1::RegtestResetService` | Ricrea bitcoind al reset demo (`./bin/regtest reset`) |
-| `L1::FundingPsbtService` | §3.2 PSBT: peg + investor → escrow 2-of-3 |
-| `L1::ProvisionEscrowService` | Chiamato da `ActivateService` dopo l’attivazione |
-| `L1::SettlementPsbtService` | Settlement maturity async: build PSBT → persist unsigned → firma bot+investor → broadcast |
-| `L1::SettlementTxBuilder` | Costruzione tx/PSBT settlement (output holder + investor) |
-| `L1::SettlementSpendService` | Wrapper compat sottile su `SettlementPsbtService`; sync saldi |
-| `L1::SettlementPsbtTemplateService` | PSBT maturity unsigned + output nel recovery package (`psbt_maturity`) |
+| `L1::FundingPsbtService` | §3.2 PSBT: peg + investor → lock 2-of-2 |
+| `L1::ProvisionEscrowService` | Chiamato da `ActivateService`: lock 2-of-2 + funding DLC |
+| `L1::RefundPsbtBuilder` | Path B: refund timelock peg + investor (2-of-2) |
 | `L1::RecoveryPackage` + `RecordEscrowService` | Export JSON §6 |
 | `GET /budgets/:id/recovery_package` | Download JSON (richiedente, investitore, admin) |
 
-Campi DB su `Budget`: `peg_party_pubkey`, `investor_pubkey`, `bot_pubkey`, `escrow_txid`, `escrow_vout`, `refund_delay_blocks` (default 1008), `recovery_package`.
+> Le classi di settlement escrow legacy (`L1::SettlementPsbtService`, `SettlementTxBuilder`, `SettlementSpendService`, `SettlementPsbtTemplateService`, `SignatureMatrix`, `BotKey`) restano nel repo come codice non più cablato: il settlement passa esclusivamente dal DLC.
+
+Campi DB su `Budget`: `peg_party_pubkey`, `investor_pubkey`, `escrow_txid`, `escrow_vout`, `refund_delay_blocks` (default 1008), `recovery_package` (`bot_pubkey` resta come colonna legacy inutilizzata).
 
 ## Console walkthrough
 

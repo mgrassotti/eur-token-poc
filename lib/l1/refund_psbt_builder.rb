@@ -1,18 +1,17 @@
 # frozen_string_literal: true
 
 module L1
-  # Path B refund PSBT — peg + investor 2-of-3, nLockTime a maturity + delay.
+  # Path B refund PSBT — peg + investor 2-of-2, nLockTime a maturity + delay.
   class RefundPsbtBuilder
-    def self.call(funding:, escrow:, peg_party:, investor:, bot:, budget:, signers:)
-      new(funding:, escrow:, peg_party:, investor:, bot:, budget:, signers:).call
+    def self.call(funding:, escrow:, peg_party:, investor:, budget:, signers:)
+      new(funding:, escrow:, peg_party:, investor:, budget:, signers:).call
     end
 
-    def initialize(funding:, escrow:, peg_party:, investor:, bot:, budget:, signers:)
+    def initialize(funding:, escrow:, peg_party:, investor:, budget:, signers:)
       @funding = funding
       @escrow = escrow
       @peg_party = peg_party
       @investor = investor
-      @bot = bot
       @budget = budget
       @signers = signers
     end
@@ -49,7 +48,7 @@ module L1
 
     private
 
-    attr_reader :funding, :escrow, :peg_party, :investor, :bot, :budget, :signers
+    attr_reader :funding, :escrow, :peg_party, :investor, :budget, :signers
 
     def global_client
       @global_client ||= Bitcoind::Client.new

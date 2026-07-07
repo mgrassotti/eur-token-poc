@@ -6,8 +6,8 @@ module Dlc
   #
   # The DLC CET pays the whole peg_pot to the peg/distributor side; this service
   # fans it out to each holder. Baseline is a single on-chain payout via the ddk
-  # node (addresses resolved from each holder's RLN node). The atomic LN variant
-  # would bind each receipt to the oracle secret (HODL invoice) so EURT
+  # node (addresses resolved from each holder's L1 reserve wallet). The atomic LN
+  # variant would bind each receipt to the oracle secret (HODL invoice) so EURT
   # redemption and BTC receipt settle atomically — unavailable on the vendored
   # RLN, hence the on-chain baseline (see DLC-RLN-PLAN.md caveats).
   class Distribution
@@ -15,11 +15,11 @@ module Dlc
 
     Payout = Data.define(:user, :sats, :address, :txid)
 
-    # Resolve a holder's on-chain BTC payout address from their RLN node,
-    # initializing/unlocking it first (like the other RGB write paths) so a
-    # locked node doesn't abort settlement.
+    # Resolve a holder's payout address from their L1 reserve wallet so the
+    # FloorEUR payout lands in the same balance the dashboard/reserve show (as
+    # with the legacy escrow settlement). Settlement then syncs the reserve.
     DEFAULT_ADDRESS_RESOLVER = lambda do |user|
-      Rgb::WalletSetupService.ensure_for!(user).address.fetch("address")
+      L1::UserWallet.for(user).receive_address(label: "dlc_payout")
     end
 
     def self.call(budget:, peg_pot_sats:, node: nil, address_resolver: DEFAULT_ADDRESS_RESOLVER, shares: nil)

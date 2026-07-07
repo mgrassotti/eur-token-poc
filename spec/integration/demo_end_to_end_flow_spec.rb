@@ -79,28 +79,24 @@ RSpec.describe "Demo end-to-end flow", :regtest, :demo_flow do
 
     budget.reload
     expect(budget).to be_settled
+    expect(budget.dlc_settlement).to be_executed
 
-    # Holder: conto riserva in € @ 55k ≈ liability FloorEUR (505 / 404 / 101 €)
-    expect_reserve_eur!(alice, 505.0, rate: DemoFlowHelpers::SETTLEMENT_EUR_PER_BTC)
-    expect_reserve_eur!(claude, 404.0, rate: DemoFlowHelpers::SETTLEMENT_EUR_PER_BTC)
-    expect_reserve_eur!(david, 101.0, rate: DemoFlowHelpers::SETTLEMENT_EUR_PER_BTC)
-
-    holder_payouts = {
-      alice => payoff.holder_allocations[0].btc_sats,
-      claude => payoff.holder_allocations[1].btc_sats,
-      david => payoff.holder_allocations[2].btc_sats
-    }
-    holder_payouts.each do |user, expected_sats|
-      expect(reserve_sats(user)).to eq(expected_sats)
+    # Settlement DLC: la CET rilascia il peg_pot, distribuito pro-rata agli holder
+    # sulla loro riserva L1 (Dlc::Distribution). Gli importi seguono la curva DLC
+    # (≈ liability FloorEUR ma non identici), quindi si verificano sulla
+    # distribuzione effettivamente registrata + conservazione del peg_pot.
+    distribution = dlc_distribution_payouts_sats(budget)
+    [alice, claude, david].each do |user|
+      expect(reserve_sats(user)).to eq(distribution.fetch(user.id))
     end
+    expect(distribution.values.sum).to eq(dlc_peg_pot_sats(budget))
+    expect(reserve_eur(alice, DemoFlowHelpers::SETTLEMENT_EUR_PER_BTC)).to be > 0
 
-    # Bob: change post-funding + residuo investitore on-chain (meno fee settlement dall'escrow)
-    expect_reserve_sats!(bob, bob_reserve_before_settlement + payoff.investor_remainder_sats)
+    # Investitore: il lock viene rilasciato (deal chiuso). Nel PoC la CET paga
+    # l'output investitore su un indirizzo del sidecar (il DLC non è ancora
+    # finanziato dalle riserve → Fase 1), quindi la riserva L1 di Bob non cambia.
+    expect_reserve_sats!(bob, bob_reserve_before_settlement)
     expect(investment_sats(bob)).to eq(0)
-
-    # Conservazione sats nell'escrow
-    total_out = payoff.total_holder_sats + payoff.investor_remainder_sats + payoff.mining_fee_sats
-    expect(total_out).to eq(budget.collateral_lock.amount_sats)
 
     # Alice riusa la riserva post-settlement per una nuova ricarica da 500 € (@ 55k)
     alice_reserve_sats = reserve_sats(alice)

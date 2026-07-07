@@ -59,22 +59,45 @@
         <dd class="col-sm-9"><%= budget_ltv_badge(@budget, @market_rate.btc_eur_per_btc) %></dd>
       <% end %>
       <% if @budget.l1_multisig_provisioned? %>
-        <dt class="col-sm-3">Escrow L1</dt>
+        <dt class="col-sm-3">Collateral lock L1</dt>
         <dd class="col-sm-9">
           <code><%= @budget.escrow_outpoint %></code>
           <% if @budget.recovery_package.dig("escrow", "address") %>
             <span class="text-muted small d-block"><%= @budget.recovery_package.dig("escrow", "address") %></span>
           <% end %>
         </dd>
-        <dt class="col-sm-3">Pubkeys (2-of-3)</dt>
+        <dt class="col-sm-3">Pubkeys (2-of-2)</dt>
         <dd class="col-sm-9">
           <span class="text-muted small d-block">peg: <code><%= truncate_hex(@budget.peg_party_pubkey) %></code></span>
           <span class="text-muted small d-block">investor: <code><%= truncate_hex(@budget.investor_pubkey) %></code></span>
-          <span class="text-muted small d-block">bot: <code><%= truncate_hex(@budget.bot_pubkey) %></code></span>
         </dd>
       <% elsif @budget.active? %>
         <dt class="col-sm-3">Escrow L1</dt>
         <dd class="col-sm-9"><span class="text-warning">Non provisionato</span></dd>
+      <% end %>
+      <% if @budget.dlc_contract.present? %>
+        <% dlc = @budget.dlc_contract %>
+        <dt class="col-sm-3">Contratto DLC (2-of-2)</dt>
+        <dd class="col-sm-9">
+          <span class="text-muted small d-block">funding {peg, investor}: <code><%= dlc.funding_outpoint %></code></span>
+          <span class="text-muted small d-block">stato: <code><%= dlc.status %></code></span>
+          <span class="text-muted small d-block">oracle event: <code><%= dlc.oracle_event_id %></code> (<%= dlc.num_digits %> digit, <%= dlc.unit %>)</span>
+        </dd>
+        <% if @budget.dlc_settlement&.executed? %>
+          <% st = @budget.dlc_settlement %>
+          <dt class="col-sm-3">Settlement DLC</dt>
+          <dd class="col-sm-9">
+            <span class="text-muted small d-block">CET txid: <code><%= truncate_hex(st.cet_txid) %></code></span>
+            <span class="text-muted small d-block">
+              outcome: <%= number_with_delimiter(st.outcome) %> €/BTC ·
+              peg_pot: <%= format_sats(st.peg_pot_sats) %> ·
+              investor: <%= format_sats(st.investor_sats) %>
+            </span>
+            <% if @budget.recovery_package.dig("dlc_distribution", "txid") %>
+              <span class="text-muted small d-block">distribuzione: <code><%= truncate_hex(@budget.recovery_package.dig("dlc_distribution", "txid")) %></code></span>
+            <% end %>
+          </dd>
+        <% end %>
       <% end %>
     </dl>
     <% if @budget.recovery_package.present? && (admin? || @budget.borrower_id == current_user.id || @budget.investor_id == current_user.id) %>
@@ -105,7 +128,8 @@
         Disponibili sul conto: <strong><%= format_sats(investor_available_sats) %></strong>.
       </p>
       <p class="text-muted small mb-3">
-        All'attivazione verrà creato un escrow multisig 2-of-3 su regtest
+        All'attivazione verrà creato un contratto DLC 2-of-2 {peg, investor}
+        con settlement vincolato all'oracle su regtest
         (richiede <code>./bin/regtest up</code>).
       </p>
       <%= button_to "Accetta rischio e attiva la richiesta", activate_budget_path(@budget), method: :post, class: "btn btn-warning" %>

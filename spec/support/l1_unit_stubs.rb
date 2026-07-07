@@ -5,7 +5,7 @@ module L1UnitStubs
     spec/integration/l1/|
     spec/integration/rgb_lib_transfer_spec\.rb|
     spec/integration/demo_end_to_end_flow_spec\.rb|
-    spec/services/l1/(deposit_reserve|settlement_spend)_service_spec\.rb
+    spec/services/l1/deposit_reserve_service_spec\.rb
   }x
 
   def l1_integration_spec?(example)
@@ -37,12 +37,30 @@ module L1UnitStubs
     budget.update!(
       peg_party_pubkey: "02#{"a" * 64}",
       investor_pubkey: "02#{"b" * 64}",
-      bot_pubkey: "02#{"c" * 64}",
       escrow_txid: "deadbeef" * 8,
       escrow_vout: 0,
       recovery_package: { "version" => 1, "escrow" => { "address" => "bcrt1stub" } }
     )
     seed_rgb_genesis!(budget)
+    seed_dlc_contract!(budget)
+  end
+
+  # DLC is the settlement mechanism: activation funds a 2-of-2 DLC. Unit specs
+  # seed a funded contract so Settlements::ExecuteService can run offline (the
+  # oracle attestation + CET broadcast are stubbed by stub_dlc_settlement!).
+  def seed_dlc_contract!(budget)
+    return if budget.dlc_contract.present?
+
+    DlcContract.create!(
+      budget: budget,
+      oracle_event_id: "deal-#{budget.id}",
+      oracle_announcement: "stub",
+      ddk_contract_id: "c-#{budget.id}",
+      funding_txid: "ab" * 32,
+      funding_vout: 0,
+      num_digits: 20,
+      status: :funded
+    )
   end
 
   def seed_rgb_genesis!(budget)
@@ -97,24 +115,6 @@ module L1UnitStubs
       budget.tap { |b| stub_l1_provisioned!(b) if b.persisted? && !b.l1_multisig_provisioned? }
     end
 
-    allow(L1::SettlementSpendService).to receive(:call)
-    allow(L1::SettlementPsbtService).to receive(:build) do |budget:, payoff:, holder_payouts:, co_signer: L1::SettlementPsbtService::DEFAULT_CO_SIGNER|
-      L1::SettlementPsbtService::SettlementPsbt.new(
-        budget: budget,
-        payoff: payoff,
-        holder_payouts: [],
-        raw_hex: "00",
-        psbt: "cHNidP8B",
-        hex: nil,
-        complete: false,
-        signatures_applied: [],
-        co_signer: co_signer
-      )
-    end
-    allow(L1::SettlementPsbtService).to receive(:sign!) { |draft, _role| draft }
-    allow(L1::SettlementPsbtService).to receive(:broadcast!) { "deadbeef" * 8 }
-    allow(L1::SettlementPsbtTemplateService).to receive(:call) { |budget:, **| budget }
-
     allow(L1::UserWallet).to receive(:for) do |user|
       wallet = instance_double(L1::UserWallet, wallet_name: "user_#{user.id}")
       account = user.btc_account
@@ -126,6 +126,28 @@ module L1UnitStubs
     end
 
     allow(L1::SyncReserveBalanceService).to receive(:call) { |user:| user.btc_account.reload }
+  end
+
+  # Specs that exercise the real DLC services (oracle/node clients + Ruby
+  # services) must keep the real Dlc::SettlementService / Dlc::Distribution.
+  def dlc_unit_spec?(example)
+    example.file_path.match?(%r{spec/(services|lib|integration)/dlc/})
+  end
+
+  # Offline stub for the DLC settlement path used by Settlements::ExecuteService.
+  # The peg_pot math is asserted elsewhere; here we only keep settlement running
+  # without hitting the oracle/node.
+  def stub_dlc_settlement!
+    allow(Dlc::SettlementService).to receive(:call) do |budget:, **|
+      Dlc::SettlementService::Result.new(
+        dlc_settlement: nil,
+        cet_txid: "cet#{"0" * 61}",
+        outcome: 0,
+        peg_pot_sats: 0,
+        investor_sats: 0
+      )
+    end
+    allow(Dlc::Distribution).to receive(:call).and_return([])
   end
 end
 
@@ -140,5 +162,6 @@ RSpec.configure do |config|
     next if real_l1_spec?(example)
 
     stub_l1_unit_operations!
+    stub_dlc_settlement! unless dlc_unit_spec?(example)
   end
 end

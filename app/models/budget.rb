@@ -177,7 +177,7 @@ class Budget < ApplicationRecord
   end
 
   def l1_multisig_provisioned?
-    peg_party_pubkey.present? && investor_pubkey.present? && bot_pubkey.present? && escrow_outpoint.present?
+    peg_party_pubkey.present? && investor_pubkey.present? && escrow_outpoint.present?
   end
 
   def refund_locktime_height

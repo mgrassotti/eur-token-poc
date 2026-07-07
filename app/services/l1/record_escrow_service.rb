@@ -2,17 +2,16 @@
 
 module L1
   class RecordEscrowService
-    def self.call(budget:, funding:, escrow:, peg_party:, investor:, bot:)
-      new(budget:, funding:, escrow:, peg_party:, investor:, bot:).call
+    def self.call(budget:, funding:, escrow:, peg_party:, investor:)
+      new(budget:, funding:, escrow:, peg_party:, investor:).call
     end
 
-    def initialize(budget:, funding:, escrow:, peg_party:, investor:, bot:)
+    def initialize(budget:, funding:, escrow:, peg_party:, investor:)
       @budget = budget
       @funding = funding
       @escrow = escrow
       @peg_party = peg_party
       @investor = investor
-      @bot = bot
     end
 
     def call
@@ -24,14 +23,12 @@ module L1
         escrow: escrow,
         peg_party: peg_party,
         investor: investor,
-        bot: bot,
         refund_psbt: refund_psbt
       )
 
       budget.update!(
         peg_party_pubkey: pubkey_hex(peg_party),
         investor_pubkey: pubkey_hex(investor),
-        bot_pubkey: pubkey_hex(bot),
         escrow_txid: funding.txid,
         escrow_vout: funding.vout,
         refund_delay_blocks: Budget::REFUND_DELAY_BLOCKS,
@@ -43,7 +40,7 @@ module L1
 
     private
 
-    attr_reader :budget, :funding, :escrow, :peg_party, :investor, :bot
+    attr_reader :budget, :funding, :escrow, :peg_party, :investor
 
     def build_refund_psbt
       return unsigned_refund_metadata unless refund_signable?
@@ -53,7 +50,6 @@ module L1
         escrow: escrow,
         peg_party: peg_party,
         investor: investor,
-        bot: bot,
         budget: budget,
         signers: [peg_party, investor]
       )

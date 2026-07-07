@@ -68,6 +68,18 @@ module DemoFlowHelpers
     DemoFlowHelpers::BOB_DEPOSIT_SATS - investor_locked - L1::FundingPsbtService::ESTIMATED_FEE_SATS
   end
 
+  # Actual per-holder peg_pot payout recorded by Dlc::Distribution (sats), keyed
+  # by the holder user. Under DLC the FloorEUR liability is paid pro-rata from the
+  # peg_pot the CET released, so exact amounts follow the DLC payout curve.
+  def dlc_distribution_payouts_sats(budget)
+    payouts = budget.reload.recovery_package&.dig("dlc_distribution", "payouts") || []
+    payouts.each_with_object({}) { |p, acc| acc[p["user_id"]] = p["sats"] }
+  end
+
+  def dlc_peg_pot_sats(budget)
+    budget.reload.recovery_package&.dig("dlc_distribution", "peg_pot_sats").to_i
+  end
+
   def expected_settlement_payoff(budget, end_rate: DemoFlowHelpers::SETTLEMENT_EUR_PER_BTC)
     token_accounts = budget.token_accounts.where("balance_cents > 0").order(:id).to_a
     Payoffs::FloorEurCalculator.call(

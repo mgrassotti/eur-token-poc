@@ -15,7 +15,6 @@ module L1
     def initialize(budget:)
       @budget = budget
       @global_client = Bitcoind::Client.new
-      @bot = BotKey.generate
     end
 
     def call
@@ -29,7 +28,6 @@ module L1
       escrow = Escrow.from_keys(
         peg_party: peg_party,
         investor: investor_party,
-        bot: @bot,
         client: @global_client
       )
 
@@ -59,7 +57,6 @@ module L1
         investor_sats: investor_sats,
         peg_party: peg_party,
         investor: investor_party,
-        bot: @bot,
         escrow: escrow,
         funding_psbt: signed_tx.fetch(:psbt)
       )

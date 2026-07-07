@@ -4,17 +4,16 @@ module L1
   class RecoveryPackage
     VERSION = 1
 
-    def self.build(budget:, funding:, escrow:, peg_party:, investor:, bot:, refund_psbt: nil)
-      new(budget:, funding:, escrow:, peg_party:, investor:, bot:, refund_psbt:).to_h
+    def self.build(budget:, funding:, escrow:, peg_party:, investor:, refund_psbt: nil)
+      new(budget:, funding:, escrow:, peg_party:, investor:, refund_psbt:).to_h
     end
 
-    def initialize(budget:, funding:, escrow:, peg_party:, investor:, bot:, refund_psbt: nil)
+    def initialize(budget:, funding:, escrow:, peg_party:, investor:, refund_psbt: nil)
       @budget = budget
       @funding = funding
       @escrow = escrow
       @peg_party = peg_party
       @investor = investor
-      @bot = bot
       @refund_psbt = refund_psbt
     end
 
@@ -24,8 +23,7 @@ module L1
         deal_params: deal_params,
         pubkeys: {
           peg_party: pubkey(@peg_party),
-          investor: pubkey(@investor),
-          bot: pubkey(@bot)
+          investor: pubkey(@investor)
         },
         escrow: {
           address: @escrow.address,
@@ -34,9 +32,7 @@ module L1
           amount_sats: @funding.escrow_sats
         },
         psbt_funding: funding_psbt_section,
-        psbt_maturity_template: { note: "Build at maturity with Payoffs::FloorEurCalculator outputs" },
         psbt_refund_timelock: refund_psbt_section,
-        bot_signing: { wif: bot_wif, public_key_hex: pubkey(@bot) },
         party_signing: {
           peg_party: party_signing_entry(@peg_party),
           investor: party_signing_entry(@investor)
@@ -62,7 +58,7 @@ module L1
     def refund_psbt_section
       base = {
         locktime_height: refund_locktime_height,
-        note: "Path B — peg + investor 2-of-3 dopo refund_delay_blocks"
+        note: "Path B — peg + investor 2-of-2 dopo refund_delay_blocks"
       }
       return base.merge(hex: nil, complete: false) unless @refund_psbt
 
@@ -93,12 +89,6 @@ module L1
 
     def pubkey(party)
       party.respond_to?(:public_key_hex) ? party.public_key_hex : party[:public_key_hex]
-    end
-
-    def bot_wif
-      return @bot.wif if @bot.respond_to?(:wif)
-
-      nil
     end
 
     def party_signing_entry(party)

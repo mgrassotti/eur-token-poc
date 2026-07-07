@@ -28,13 +28,12 @@ module L1
         funding: funding,
         escrow: funding.escrow,
         peg_party: funding.peg_party,
-        investor: funding.investor,
-        bot: funding.bot
+        investor: funding.investor
       )
 
       Rgb::IssueService.call(budget: budget.reload)
 
-      setup_dlc!(budget.reload) if Dlc::Config.enabled?
+      setup_dlc!(budget.reload)
 
       budget.reload
     rescue Bitcoind::Error => e
@@ -45,9 +44,9 @@ module L1
 
     attr_reader :budget
 
-    # When the DLC path is enabled, fund the 2-of-2 contract alongside the
-    # legacy escrow (kept as fallback). Setup failures abort activation so the
-    # misconfiguration is visible rather than silently degrading to legacy.
+    # Fund the 2-of-2 numeric DLC (oracle announcement + funding tx) that is the
+    # settlement mechanism. Setup failures abort activation so the
+    # misconfiguration is visible rather than silently leaving the deal unsettled.
     def setup_dlc!(budget)
       Dlc::ContractSetupService.call(budget: budget)
     end

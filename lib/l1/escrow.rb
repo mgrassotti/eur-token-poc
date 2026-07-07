@@ -1,15 +1,17 @@
 # frozen_string_literal: true
 
 module L1
-  # 2-of-3 P2WSH escrow (BIP67 pubkey sort) — MULTISIG-SPEC §2, §4.
+  # 2-of-2 P2WSH collateral lock (BIP67 pubkey sort) between peg + investor.
+  # Settlement is handled by the DLC (oracle-attested CET); this UTXO only locks
+  # the reserve collateral on-chain (recoverable via the timelocked refund path).
   class Escrow
     REQUIRED_SIGNATURES = 2
-    TOTAL_KEYS = 3
+    TOTAL_KEYS = 2
 
     Result = Data.define(:address, :redeem_script_hex, :witness_script_hex, :pubkeys_hex)
 
-    def self.from_keys(peg_party:, investor:, bot:, client: Bitcoind::Client.new)
-      pubkeys = [peg_party.public_key_hex, investor.public_key_hex, bot.public_key_hex].sort
+    def self.from_keys(peg_party:, investor:, client: Bitcoind::Client.new)
+      pubkeys = [peg_party.public_key_hex, investor.public_key_hex].sort
       response = client.call(
         "createmultisig",
         REQUIRED_SIGNATURES,

@@ -11,46 +11,13 @@ RSpec.describe "L1 regtest multisig", :regtest do
     skip "Start regtest: docker compose -f docker-compose.regtest.yml up -d" unless bitcoind_available?
   end
 
-  it "funds a 2-of-3 P2WSH escrow (Alice 1M + Bob 1M)" do
+  it "funds a 2-of-2 P2WSH escrow (Alice 1M + Bob 1M)" do
     L1::RegtestHarness.with_available_bitcoind do |harness|
       funding = harness.fund_escrow!(peg_sats: 1_000_000, investor_sats: 1_000_000)
 
       expect(funding.escrow_sats).to eq(2_000_000)
       expect(funding.txid).to be_present
       expect(harness.escrow.address).to start_with("bcrt1")
-    end
-  end
-
-  it "settles with peg_party + investor without bot (FloorEUR-style split)" do
-    L1::RegtestHarness.with_available_bitcoind do |harness|
-      funding = harness.fund_escrow!(peg_sats: 1_000_000, investor_sats: 1_000_000)
-      escrow_sats = funding.escrow_sats
-      fee = Budget::ESTIMATED_SETTLEMENT_FEE_SATS
-      distributable = escrow_sats - fee
-      holder_sats = 1_060_000
-      holder_sats = distributable if holder_sats > distributable
-      investor_sats = distributable - holder_sats
-
-      result = harness.spend_escrow!(
-        funding: funding,
-        holder_sats: holder_sats,
-        investor_sats: investor_sats,
-        signers: [harness.peg_party, harness.investor]
-      )
-
-      expect(result.txid).to be_present
-      expect(L1::SignatureMatrix.valid_pair?(:peg_party, :investor)).to be(true)
-    end
-  end
-
-  it "rejects bot-only spend (1-of-3 insufficient)" do
-    L1::RegtestHarness.with_available_bitcoind do |harness|
-      funding = harness.fund_escrow!(peg_sats: 500_000, investor_sats: 500_000)
-
-      signed = harness.incomplete_escrow_sign(funding: funding, signers: [harness.bot])
-
-      expect(signed.fetch("complete")).to be(false)
-      expect(L1::SignatureMatrix.bot_only?([harness.bot])).to be(true)
     end
   end
 
@@ -113,8 +80,7 @@ RSpec.describe "L1 regtest multisig", :regtest do
         funding: funding,
         escrow: harness.escrow,
         peg_party: harness.peg_party,
-        investor: harness.investor,
-        bot: harness.bot
+        investor: harness.investor
       )
 
       expect(updated.l1_multisig_provisioned?).to be(true)

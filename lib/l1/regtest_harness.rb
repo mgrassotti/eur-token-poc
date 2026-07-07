@@ -11,18 +11,15 @@ module L1
       :investor_sats,
       :peg_party,
       :investor,
-      :bot,
       :escrow,
       :funding_psbt
     )
-
-    SettlementResult = Data.define(:txid, :holder_sats, :investor_sats)
 
     PartyKey = Data.define(:label, :address, :wif, :public_key_hex) do
       def wif_for_signing = wif
     end
 
-    attr_reader :global_client, :client, :peg_party, :investor, :bot, :escrow, :wallet_name
+    attr_reader :global_client, :client, :peg_party, :investor, :escrow, :wallet_name
 
     COINBASE_MATURITY_BLOCKS = 101
 
@@ -33,8 +30,7 @@ module L1
       @client = @global_client.with_wallet(wallet_name)
       @peg_party = load_party_key("peg_party")
       @investor = load_party_key("investor")
-      @bot = load_party_key("bot")
-      @escrow = Escrow.from_keys(peg_party: @peg_party, investor: @investor, bot: @bot, client: @global_client)
+      @escrow = Escrow.from_keys(peg_party: @peg_party, investor: @investor, client: @global_client)
     end
 
     def self.with_available_bitcoind
@@ -97,7 +93,6 @@ module L1
         investor_sats: investor_sats,
         peg_party: peg_party,
         investor: investor,
-        bot: bot,
         escrow: escrow,
         funding_psbt: nil
       )
@@ -108,38 +103,6 @@ module L1
       raise Bitcoind::Error, "Refund before locktime" if current_height < locktime_height
 
       @global_client.call("sendrawtransaction", signed_hex)
-    end
-
-    def spend_escrow!(funding:, holder_sats:, investor_sats:, signers:)
-      holder_address = new_address("holder")
-      investor_address = new_address("investor_payout")
-
-      outputs = []
-      outputs << { holder_address => btc(holder_sats) } if holder_sats.positive?
-      outputs << { investor_address => btc(investor_sats) } if investor_sats.positive?
-
-      raw = @global_client.call(
-        "createrawtransaction",
-        [{ txid: funding.txid, vout: funding.vout }],
-        outputs
-      )
-
-      signed = sign_escrow_spend(raw, funding: funding, signers: signers)
-      raise Bitcoind::Error, "Expected complete 2-of-3 signatures" unless signed.fetch("complete")
-
-      txid = @global_client.call("sendrawtransaction", signed.fetch("hex"))
-      SettlementResult.new(txid: txid, holder_sats: holder_sats, investor_sats: investor_sats)
-    end
-
-    def incomplete_escrow_sign(funding:, signers:)
-      holder_address = new_address("holder_probe")
-      raw = @global_client.call(
-        "createrawtransaction",
-        [{ txid: funding.txid, vout: funding.vout }],
-        [{ holder_address => btc(funding.escrow_sats - 10_000) }]
-      )
-
-      sign_escrow_spend(raw, funding: funding, signers: signers)
     end
 
     def build_refund_tx(funding:, peg_sats:, investor_sats:, locktime_height:)

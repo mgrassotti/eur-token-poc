@@ -1,11 +1,11 @@
 # frozen_string_literal: true
 
 module Dlc
-  # Central configuration for the DLC workstream (oracle + ddk node).
+  # Central configuration for the DLC workstream (oracle + node).
   #
-  # Defaults target a local Kormir oracle on regtest. The whole DLC path is
-  # gated behind `enabled?` so the legacy 2-of-3 escrow remains the default
-  # until Workstream B is wired end-to-end.
+  # DLC is the only settlement mechanism: activation funds a 2-of-2 {peg,
+  # investor} numeric DLC on the node and maturity executes the oracle-attested
+  # CET + peg_pot distribution. Defaults target a local Pythia oracle on regtest.
   module Config
     # --- Oracle (Pythia by default; Kormir/Mycelia supported) ------------
 
@@ -55,12 +55,6 @@ module Dlc
       return nil unless oracle_provider == "pythia"
 
       ((now.to_i / 60) + 2) * 60
-    end
-
-    # Master switch for the DLC settlement path. While false, settlement uses
-    # the legacy 2-of-3 escrow and RGB redemption.
-    def self.enabled?
-      ENV.fetch("DLC_ENABLED", "false") == "true"
     end
 
     # --- DLC node (dlcdevkit / ddk shim, REST) ---------------------------

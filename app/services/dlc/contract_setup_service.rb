@@ -5,8 +5,8 @@ module Dlc
   # the 2-of-2 DLC contract on the ddk node, persisting the result as a
   # DlcContract. Idempotent — returns the existing contract if already set up.
   #
-  # Gated by Dlc::Config.enabled? at the call site (L1::ProvisionEscrowService);
-  # while disabled the legacy 2-of-3 escrow remains the settlement mechanism.
+  # Called unconditionally from L1::ProvisionEscrowService after the collateral
+  # lock; funds the 2-of-2 DLC that is the sole settlement mechanism.
   class ContractSetupService
     class Error < StandardError; end
 

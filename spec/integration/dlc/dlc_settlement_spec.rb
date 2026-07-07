@@ -9,9 +9,9 @@ require "rails_helper"
 #   docker compose -f docker-compose.regtest.yml --profile dlc up -d
 # The spec self-skips if any component is unreachable.
 #
-# With DLC enabled, ActivateService funds a 2-of-2 numeric DLC on the node
-# (alongside the legacy escrow) and settlement runs the oracle-attested CET +
-# peg_pot distribution instead of the escrow payout.
+# ActivateService funds a 2-of-2 numeric DLC on the node (the 2-of-2 collateral
+# lock is provisioned alongside it) and settlement runs the oracle-attested CET +
+# peg_pot distribution.
 RSpec.describe "DLC settlement (regtest)", :regtest, :dlc_integration do
   def bitcoind_available?
     L1::Bitcoind::Client.new.available?
@@ -22,7 +22,6 @@ RSpec.describe "DLC settlement (regtest)", :regtest, :dlc_integration do
     skip "Oracle DLC non raggiungibile (#{Dlc::Config.oracle_url})" unless Dlc::Config.oracle_client.available?
     skip "Nodo DLC non raggiungibile (#{Dlc::Config.node_url})" unless Dlc::NodeClient.default.available?
     reset_demo_with_regtest!
-    allow(Dlc::Config).to receive(:enabled?).and_return(true)
   end
 
   it "announces, funds, executes the CET and distributes the peg_pot" do

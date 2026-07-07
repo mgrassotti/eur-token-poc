@@ -115,7 +115,7 @@ module Settlements
     end
 
     def settle!(token_accounts, payoff)
-      raise Error, "Escrow L1 non provisionato" unless budget.l1_multisig_provisioned?
+      raise Error, "Contratto DLC non finanziato" unless budget.dlc_contract&.funded?
 
       # Snapshot holder allocations before redemption zeroes the token balances;
       # the DLC peg_pot distribution fans out on these maturity shares.
@@ -132,12 +132,7 @@ module Settlements
         end
       end
 
-      settlement_txid =
-        if dlc_active?
-          settle_via_dlc!(dlc_shares)
-        else
-          settle_via_escrow!(payoff, holder_payouts)
-        end
+      settlement_txid = settle_via_dlc!(dlc_shares)
       persist_settlement_txid!(settlement_txid)
 
       users_to_sync = holder_payouts.map { |p| p[:user] }.uniq
@@ -147,13 +142,8 @@ module Settlements
       payouts
     end
 
-    # Authoritative path when DLC is enabled and funded: the oracle attestation
-    # executes the CET that pays peg_pot + investor. The legacy 2-of-3 escrow
-    # remains as fallback. Holder-level distribution of peg_pot is Workstream B.3.
-    def dlc_active?
-      Dlc::Config.enabled? && budget.dlc_contract&.funded?
-    end
-
+    # Settlement path: the oracle attestation executes the CET that pays
+    # peg_pot + investor; peg_pot is then distributed pro-rata to the holders.
     def settle_via_dlc!(shares)
       result = Dlc::SettlementService.call(budget: budget, end_btc_eur_rate: end_btc_eur_rate)
       Dlc::Distribution.call(budget: budget, peg_pot_sats: result.peg_pot_sats, shares: shares)
@@ -165,21 +155,6 @@ module Settlements
       package = budget.reload.recovery_package&.deep_dup || {}
       package["dlc"] = Dlc::RecoveryPackage.build(budget: budget)
       budget.update!(recovery_package: package)
-    end
-
-    def settle_via_escrow!(payoff, holder_payouts)
-      draft = L1::SettlementPsbtService.build(budget: budget, payoff: payoff, holder_payouts: holder_payouts)
-      L1::SettlementPsbtTemplateService.call(
-        budget: budget,
-        payoff: payoff,
-        holder_payouts: holder_payouts,
-        draft: draft,
-        end_btc_eur_rate: end_btc_eur_rate
-      )
-
-      signed = L1::SettlementPsbtService.sign!(draft, :bot)
-      signed = L1::SettlementPsbtService.sign!(signed, draft.co_signer)
-      L1::SettlementPsbtService.broadcast!(signed)
     end
 
     # Best-effort RGB redemption. Settlement finality lives on L1 (the BTC payout

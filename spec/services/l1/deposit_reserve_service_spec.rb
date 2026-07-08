@@ -29,7 +29,7 @@ RSpec.describe L1::DepositReserveService do
   end
 
   it "returns demo defaults per user" do
-    expect(described_class.default_btc_amount_for(user)).to eq(0.1)
+    expect(described_class.default_btc_amount_for(user)).to eq(0.02)
     expect(described_class.default_btc_amount_for(create(:user, email: "bob@example.com"))).to eq(0.2)
   end
 end

@@ -6,7 +6,7 @@ module L1
     BLOCKS_PER_DEPOSIT = 6
 
     DEMO_DEFAULT_BTC = {
-      "alice@example.com" => 0.1,
+      "alice@example.com" => 0.02,
       "bob@example.com" => 0.2
     }.freeze
     FALLBACK_DEFAULT_BTC = 0.1

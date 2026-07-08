@@ -15,7 +15,7 @@ RSpec.describe ReserveDepositsController, type: :request do
     get new_reserve_deposit_path
 
     expect(response).to have_http_status(:ok)
-    expect(response.body).to include("0.1")
+    expect(response.body).to include("0.02")
     expect(response.body).to include("Wallet esterno")
   end
 

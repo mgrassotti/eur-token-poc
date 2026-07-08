@@ -208,13 +208,12 @@ Modulo `lib/l1/` per il **lock collaterale 2-of-2 P2WSH** {peg, investor} su Bit
 | `L1::SyncReserveBalanceService` | Allinea `BtcAccount#balance_sats` al saldo spendibile on-chain |
 | `L1::WalletInventoryService` | Riepilogo admin wallet caricati + equivalente € |
 | `L1::RegtestResetService` | Ricrea bitcoind al reset demo (`./bin/regtest reset`) |
-| `L1::FundingPsbtService` | §3.2 PSBT: peg + investor → lock 2-of-2 |
-| `L1::ProvisionEscrowService` | Chiamato da `ActivateService`: lock 2-of-2 + funding DLC |
+| `L1::ProvisionEscrowService` | Chiamato da `ActivateService`: funding DLC da riserve (lock nel funding 2-of-2) + RGB issue |
 | `L1::RefundPsbtBuilder` | Path B: refund timelock peg + investor (2-of-2) |
-| `L1::RecoveryPackage` + `RecordEscrowService` | Export JSON §6 |
+| `L1::RecoveryPackage` | Export JSON §6 |
 | `GET /budgets/:id/recovery_package` | Download JSON (richiedente, investitore, admin) |
 
-> Le classi di settlement escrow legacy (`L1::SettlementPsbtService`, `SettlementTxBuilder`, `SettlementSpendService`, `SettlementPsbtTemplateService`, `SignatureMatrix`, `BotKey`) restano nel repo come codice non più cablato: il settlement passa esclusivamente dal DLC.
+> Il settlement passa esclusivamente dal DLC; il vecchio ramo escrow-settlement è stato rimosso.
 
 Campi DB su `Budget`: `peg_party_pubkey`, `investor_pubkey`, `escrow_txid`, `escrow_vout`, `refund_delay_blocks` (default 1008), `recovery_package` (`bot_pubkey` resta come colonna legacy inutilizzata).
 

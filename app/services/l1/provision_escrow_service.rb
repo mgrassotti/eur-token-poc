@@ -19,21 +19,15 @@ module L1
 
       ensure_chain_ready!
 
-      funding = FundingPsbtService.call(budget: budget)
-
-      sync_wallet_balances!
-
-      RecordEscrowService.call(
-        budget: budget,
-        funding: funding,
-        escrow: funding.escrow,
-        peg_party: funding.peg_party,
-        investor: funding.investor
-      )
+      # Fase 1: no separate 2-of-2 escrow. Fund the DLC straight from the peg +
+      # investor L1 reserves first — that single 2-of-2 funding tx IS the
+      # collateral lock and records the provisioning flags (peg/investor pubkeys +
+      # escrow outpoint) that RGB issuance gates on. Then issue RGB.
+      setup_dlc!(budget.reload)
 
       Rgb::IssueService.call(budget: budget.reload)
 
-      setup_dlc!(budget.reload)
+      sync_wallet_balances!
 
       budget.reload
     rescue Bitcoind::Error => e
@@ -44,8 +38,9 @@ module L1
 
     attr_reader :budget
 
-    # Fund the 2-of-2 numeric DLC (oracle announcement + funding tx) that is the
-    # settlement mechanism. Setup failures abort activation so the
+    # Fund the 2-of-2 numeric DLC from the users' reserves (oracle announcement +
+    # funding tx). This also records the collateral lock (funding outpoint +
+    # party pubkeys) on the budget. Setup failures abort activation so the
     # misconfiguration is visible rather than silently leaving the deal unsettled.
     def setup_dlc!(budget)
       Dlc::ContractSetupService.call(budget: budget)

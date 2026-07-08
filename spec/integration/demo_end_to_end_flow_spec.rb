@@ -51,8 +51,9 @@ RSpec.describe "Demo end-to-end flow", :regtest, :demo_flow do
     expect(budget).to be_active
     expect(budget.l1_multisig_provisioned?).to be(true)
 
-    bob_reserve_after_funding = expected_bob_reserve_after_funding
-    expect_reserve_sats!(bob, bob_reserve_after_funding)
+    # Fase 1: the DLC funding tx spends Bob's reserve; his change returns minus his
+    # share of the rust-dlc funding fee (a few hundred sats at the default rate).
+    expect(reserve_sats(bob)).to be_within(5_000).of(expected_bob_reserve_after_funding)
     expect_investment_eur!(bob, 1_000.0, rate: DemoFlowHelpers::PEG_EUR_PER_BTC)
 
     expect_spending_eur!(alice, 1_000.0)
@@ -73,7 +74,10 @@ RSpec.describe "Demo end-to-end flow", :regtest, :demo_flow do
     payoff = expected_settlement_payoff(budget)
     expect(payoff.liability_eur_cents).to eq(101_000) # 1_000 € + 10 € interessi (1 mese @ 1%)
 
-    bob_reserve_before_settlement = reserve_sats(bob)
+    # Riserve pre-settlement: gli holder (alice ha il resto del funding, claude e
+    # david non hanno depositato) e l'investitore. In Fase 1 il settlement AGGIUNGE
+    # alla riserva (collateral restituito), quindi si verifica il delta.
+    reserve_before = [alice, claude, david, bob].to_h { |u| [u.id, reserve_sats(u)] }
 
     ChainState.update_block_height!(budget.maturity_block_height, auto_settle: true)
 
@@ -81,21 +85,21 @@ RSpec.describe "Demo end-to-end flow", :regtest, :demo_flow do
     expect(budget).to be_settled
     expect(budget.dlc_settlement).to be_executed
 
-    # Settlement DLC: la CET rilascia il peg_pot, distribuito pro-rata agli holder
-    # sulla loro riserva L1 (Dlc::Distribution). Gli importi seguono la curva DLC
-    # (≈ liability FloorEUR ma non identici), quindi si verificano sulla
-    # distribuzione effettivamente registrata + conservazione del peg_pot.
+    # Settlement DLC (Fase 1): la CET rilascia il peg_pot (reale) sul lato peg,
+    # distribuito pro-rata agli holder sulle loro riserve L1 (Dlc::Distribution).
+    # Ogni riserva holder cresce esattamente della distribuzione registrata.
     distribution = dlc_distribution_payouts_sats(budget)
     [alice, claude, david].each do |user|
-      expect(reserve_sats(user)).to eq(distribution.fetch(user.id))
+      expect(reserve_sats(user)).to eq(reserve_before.fetch(user.id) + distribution.fetch(user.id))
     end
     expect(distribution.values.sum).to eq(dlc_peg_pot_sats(budget))
     expect(reserve_eur(alice, DemoFlowHelpers::SETTLEMENT_EUR_PER_BTC)).to be > 0
 
-    # Investitore: il lock viene rilasciato (deal chiuso). Nel PoC la CET paga
-    # l'output investitore su un indirizzo del sidecar (il DLC non è ancora
-    # finanziato dalle riserve → Fase 1), quindi la riserva L1 di Bob non cambia.
-    expect_reserve_sats!(bob, bob_reserve_before_settlement)
+    # Investitore (Fase 1): la CET restituisce il collateral investitore
+    # DIRETTAMENTE sulla riserva L1 di Bob (output accept della CET). Il lock è
+    # rilasciato e la riserva cresce dell'output investitore della CET.
+    expect(dlc_investor_return_sats(budget)).to be > 0
+    expect(reserve_sats(bob)).to eq(reserve_before.fetch(bob.id) + dlc_investor_return_sats(budget))
     expect(investment_sats(bob)).to eq(0)
 
     # Alice riusa la riserva post-settlement per una nuova ricarica da 500 € (@ 55k)

@@ -9,7 +9,10 @@ module DemoFlowHelpers
     admin: "admin@example.com"
   }.freeze
 
-  ALICE_DEPOSIT_SATS = 2_000_000   # 0.02 BTC
+  # Alice deposits slightly more than the 0.02 BTC collateral so the DLC funding
+  # tx (funded from her reserve in Fase 1) has headroom for her share of the
+  # on-chain funding fee; the remainder returns to her reserve as change.
+  ALICE_DEPOSIT_SATS = 2_100_000   # 0.021 BTC (0.02 collateral + fee headroom)
   BOB_DEPOSIT_SATS = 10_000_000    # 0.1 BTC
   BUDGET_EUR_CENTS = 100_000       # 1_000 €
   PEG_EUR_PER_BTC = 50_000
@@ -63,9 +66,18 @@ module DemoFlowHelpers
     expect(spending_cents(user) / 100.0).to be_within(tolerance).of(expected_eur)
   end
 
+  # Fase 1: the investor collateral is locked by spending Bob's reserve UTXOs into
+  # the DLC funding tx; the remainder (minus his share of the on-chain funding
+  # fee) returns to his reserve as change. The exact fee is computed by rust-dlc,
+  # so callers assert within a small tolerance of this fee-free upper bound.
   def expected_bob_reserve_after_funding
     investor_locked = BtcConversion.eur_cents_to_sats(DemoFlowHelpers::BUDGET_EUR_CENTS, DemoFlowHelpers::PEG_EUR_PER_BTC)
-    DemoFlowHelpers::BOB_DEPOSIT_SATS - investor_locked - L1::FundingPsbtService::ESTIMATED_FEE_SATS
+    DemoFlowHelpers::BOB_DEPOSIT_SATS - investor_locked
+  end
+
+  # Investor collateral returned to reserve by the CET (accept-side output).
+  def dlc_investor_return_sats(budget)
+    budget.reload.dlc_settlement&.investor_sats.to_i
   end
 
   # Actual per-holder peg_pot payout recorded by Dlc::Distribution (sats), keyed

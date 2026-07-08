@@ -24,9 +24,14 @@ use std::collections::HashMap;
 use std::str::FromStr;
 
 use anyhow::{anyhow, bail, Context, Result};
+use bitcoin::absolute::LockTime;
 use bitcoin::hashes::{sha256, Hash};
 use bitcoin::sighash::EcdsaSighashType;
-use bitcoin::{Amount, KnownHrp, OutPoint, ScriptBuf, Transaction, Txid};
+use bitcoin::transaction::Version;
+use bitcoin::{
+    Amount, KnownHrp, Network, OutPoint, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Txid,
+    Witness,
+};
 
 use dlc::{create_dlc_transactions, DlcTransactions, Payout, PartyParams, TxInputInfo};
 use dlc_messages::oracle_msgs::{EventDescriptor, OracleAnnouncement};
@@ -43,8 +48,6 @@ use secp256k1_zkp::{
 use serde_json::{json, Value};
 use tiny_http::{Method, Response, Server};
 
-const COIN: u64 = 100_000_000;
-const FUND_BUFFER_SATS: u64 = 2_000_000; // extra per party to cover on-chain fees
 const MAX_WITNESS_LEN: usize = 107; // P2WPKH low-R
 
 // ---------------------------------------------------------------------------
@@ -256,50 +259,6 @@ impl<'a> Chain<'a> {
             .ok_or_else(|| anyhow!("getblockcount"))?)
     }
 
-    fn watch_address(&self, address: &str) -> Result<()> {
-        let di = self
-            .rpc
-            .call("getdescriptorinfo", json!([format!("addr({})", address)]), None)?;
-        let desc = di["descriptor"].as_str().ok_or_else(|| anyhow!("descriptor"))?;
-        self.rpc.call(
-            "importdescriptors",
-            json!([[{ "desc": desc, "timestamp": "now", "internal": false }]]),
-            Some(&self.watch),
-        )?;
-        Ok(())
-    }
-
-    /// Fund `address` with `sats` and return the resulting (outpoint, value_sats).
-    fn fund(&self, address: &str, sats: u64) -> Result<(OutPoint, u64)> {
-        self.watch_address(address)?;
-        let amount = sats as f64 / COIN as f64;
-        self.rpc
-            .call("sendtoaddress", json!([address, amount]), Some(&self.miner))?;
-        self.mine(1)?;
-        let utxos = self.rpc.call(
-            "listunspent",
-            json!([1, 9999999, [address]]),
-            Some(&self.watch),
-        )?;
-        // The address may carry stale change UTXOs from previous contracts (keys
-        // are reused in the PoC); pick the largest, which is the funding we just
-        // sent (collateral + buffer).
-        let u = utxos
-            .as_array()
-            .and_then(|a| {
-                a.iter().max_by(|x, y| {
-                    let xv = x["amount"].as_f64().unwrap_or(0.0);
-                    let yv = y["amount"].as_f64().unwrap_or(0.0);
-                    xv.partial_cmp(&yv).unwrap_or(std::cmp::Ordering::Equal)
-                })
-            })
-            .ok_or_else(|| anyhow!("no utxo for {}", address))?;
-        let txid = Txid::from_str(u["txid"].as_str().ok_or_else(|| anyhow!("txid"))?)?;
-        let vout = u["vout"].as_u64().ok_or_else(|| anyhow!("vout"))? as u32;
-        let value = (u["amount"].as_f64().ok_or_else(|| anyhow!("amount"))? * COIN as f64).round() as u64;
-        Ok((OutPoint { txid, vout }, value))
-    }
-
     fn broadcast(&self, tx: &Transaction) -> Result<String> {
         let hex = bitcoin::consensus::encode::serialize_hex(tx);
         let txid = self
@@ -438,6 +397,10 @@ struct Contract {
     funding_txid: String,
     refund_lock_time: u32,
     status: String,
+    // Recorded at execute: the peg-side CET output (P2WPKH, sidecar peg key)
+    // that `distribute` later spends to fan the peg_pot out to the holders.
+    peg_payout_outpoint: Option<OutPoint>,
+    peg_payout_value: Option<u64>,
 }
 
 struct App {
@@ -479,6 +442,50 @@ fn parse_points(v: &Value) -> Vec<(i64, i64)> {
         .unwrap_or_default()
 }
 
+fn parse_inputs(v: &Value) -> Result<Vec<(OutPoint, u64)>> {
+    let arr = v.as_array().ok_or_else(|| anyhow!("inputs must be an array"))?;
+    let mut out = Vec::with_capacity(arr.len());
+    for it in arr {
+        let txid = Txid::from_str(it["txid"].as_str().ok_or_else(|| anyhow!("input.txid"))?)?;
+        let vout = it["vout"].as_u64().ok_or_else(|| anyhow!("input.vout"))? as u32;
+        let amount = it["amount_sats"]
+            .as_u64()
+            .ok_or_else(|| anyhow!("input.amount_sats"))?;
+        out.push((OutPoint { txid, vout }, amount));
+    }
+    Ok(out)
+}
+
+fn parse_address(s: &str) -> Result<ScriptBuf> {
+    Ok(bitcoin::Address::from_str(s)
+        .with_context(|| format!("parse address {}", s))?
+        .require_network(Network::Regtest)
+        .with_context(|| format!("address {} not regtest", s))?
+        .script_pubkey())
+}
+
+fn party_inputs(inputs: &[(OutPoint, u64)]) -> (Vec<TxInputInfo>, u64) {
+    let infos = inputs
+        .iter()
+        .map(|(op, _)| TxInputInfo {
+            outpoint: *op,
+            max_witness_len: MAX_WITNESS_LEN,
+            redeem_script: ScriptBuf::new(),
+            serial_id: thread_rng().gen(),
+        })
+        .collect();
+    let amount = inputs.iter().map(|(_, a)| *a).sum();
+    (infos, amount)
+}
+
+// Fase 1: the DLC 2-of-2 funding tx is funded from the users' real L1 reserve
+// UTXOs (provided by Ruby), not from the sidecar miner wallet. We build the
+// unsigned funding tx + CET set + adaptor sigs here; Ruby signs the P2WPKH
+// funding inputs with the reserve wallets and broadcasts the SAME tx (segwit
+// txid is stable, so the CETs stay valid). The 2-of-2 FUND keys remain the
+// sidecar's (app.peg/app.investor), so adaptor sigs / sign_cet / refund are
+// unchanged. Only the funding inputs and the CET payout/change scriptpubkeys
+// point at real reserve addresses.
 fn handle_create(app: &mut App, body: &Value) -> Result<Value> {
     let rpc = app.rpc();
     let chain = Chain {
@@ -486,8 +493,9 @@ fn handle_create(app: &mut App, body: &Value) -> Result<Value> {
         miner: app.cfg.miner_wallet.clone(),
         watch: app.cfg.watch_wallet.clone(),
     };
-    // Wallets may be gone after a regtest chain reset; (re)create + (re)fund them
-    // before funding the DLC so the watch-only importdescriptors below succeeds.
+    // Wallets may be gone after a regtest chain reset; (re)create the miner/watch
+    // wallets so later mining (execute/distribute/refund) works. This no longer
+    // funds the DLC parties — the collateral comes from the reserve UTXOs.
     chain.ensure().context("ensure chain")?;
 
     let ann_str = match &body["oracle_announcement"] {
@@ -512,9 +520,29 @@ fn handle_create(app: &mut App, body: &Value) -> Result<Value> {
     let fee_rate = body["fee_rate_sats_vb"].as_u64().unwrap_or(5);
     let points = parse_points(&body["payouts"]);
 
-    eprintln!("[dlc-node] create: fund parties");
-    let (peg_outpoint, peg_value) = chain.fund(&app.peg.address, offer + FUND_BUFFER_SATS)?;
-    let (inv_outpoint, inv_value) = chain.fund(&app.investor.address, accept + FUND_BUFFER_SATS)?;
+    let peg_inputs = parse_inputs(&body["peg_inputs"]).context("peg_inputs")?;
+    let investor_inputs = parse_inputs(&body["investor_inputs"]).context("investor_inputs")?;
+    if peg_inputs.is_empty() || investor_inputs.is_empty() {
+        bail!("peg_inputs and investor_inputs are required and must be non-empty");
+    }
+    let peg_change_spk = parse_address(
+        body["peg_change_address"]
+            .as_str()
+            .ok_or_else(|| anyhow!("peg_change_address"))?,
+    )?;
+    let investor_change_spk = parse_address(
+        body["investor_change_address"]
+            .as_str()
+            .ok_or_else(|| anyhow!("investor_change_address"))?,
+    )?;
+    let investor_payout_spk = parse_address(
+        body["investor_payout_address"]
+            .as_str()
+            .ok_or_else(|| anyhow!("investor_payout_address"))?,
+    )?;
+
+    let (peg_input_infos, peg_input_amount) = party_inputs(&peg_inputs);
+    let (investor_input_infos, investor_input_amount) = party_inputs(&investor_inputs);
 
     let height = chain.block_count()? as u32;
     let cet_lock_time = height;
@@ -523,32 +551,25 @@ fn handle_create(app: &mut App, body: &Value) -> Result<Value> {
 
     let offer_params = PartyParams {
         fund_pubkey: app.peg.pk,
-        change_script_pubkey: app.peg.spk.clone(),
+        change_script_pubkey: peg_change_spk,
         change_serial_id: thread_rng().gen(),
+        // Peg payout stays the sidecar peg address; `distribute` fans it out to
+        // the individual holders' reserve addresses at settlement.
         payout_script_pubkey: app.peg.spk.clone(),
         payout_serial_id: thread_rng().gen(),
-        inputs: vec![TxInputInfo {
-            outpoint: peg_outpoint,
-            max_witness_len: MAX_WITNESS_LEN,
-            redeem_script: ScriptBuf::new(),
-            serial_id: thread_rng().gen(),
-        }],
-        input_amount: Amount::from_sat(peg_value),
+        inputs: peg_input_infos,
+        input_amount: Amount::from_sat(peg_input_amount),
         collateral: Amount::from_sat(offer),
     };
     let accept_params = PartyParams {
         fund_pubkey: app.investor.pk,
-        change_script_pubkey: app.investor.spk.clone(),
-        change_serial_id: thread_rng().gen(),
-        payout_script_pubkey: app.investor.spk.clone(),
+        change_script_pubkey: investor_change_spk,
+        // Investor collateral returns straight to the investor's L1 reserve.
+        payout_script_pubkey: investor_payout_spk,
         payout_serial_id: thread_rng().gen(),
-        inputs: vec![TxInputInfo {
-            outpoint: inv_outpoint,
-            max_witness_len: MAX_WITNESS_LEN,
-            redeem_script: ScriptBuf::new(),
-            serial_id: thread_rng().gen(),
-        }],
-        input_amount: Amount::from_sat(inv_value),
+        change_serial_id: thread_rng().gen(),
+        inputs: investor_input_infos,
+        input_amount: Amount::from_sat(investor_input_amount),
         collateral: Amount::from_sat(accept),
     };
 
@@ -561,7 +582,7 @@ fn handle_create(app: &mut App, body: &Value) -> Result<Value> {
         "[dlc-node] create: {} CETs, create_dlc_transactions",
         payouts.len()
     );
-    let mut dlc_txs = create_dlc_transactions(
+    let dlc_txs = create_dlc_transactions(
         &offer_params,
         &accept_params,
         &payouts,
@@ -596,17 +617,16 @@ fn handle_create(app: &mut App, body: &Value) -> Result<Value> {
         )
         .map_err(|e| anyhow!("generate_sign: {:?}", e))?;
 
-    eprintln!("[dlc-node] create: sign + broadcast funding");
-    sign_funding(
-        &app.secp,
-        &mut dlc_txs.fund,
-        &[
-            (peg_outpoint, &app.peg.sk, peg_value),
-            (inv_outpoint, &app.investor.sk, inv_value),
-        ],
-    )?;
-    let funding_txid = chain.broadcast(&dlc_txs.fund)?;
-    eprintln!("[dlc-node] create: funded {}", funding_txid);
+    // Do NOT sign or broadcast: Ruby signs the P2WPKH funding inputs with the
+    // reserve wallets and broadcasts. The segwit txid is stable pre-witness, so
+    // the CETs (which reference this outpoint) remain valid.
+    let funding_txid = dlc_txs.fund.compute_txid().to_string();
+    let funding_tx_hex = bitcoin::consensus::encode::serialize_hex(&dlc_txs.fund);
+    let fund_vout = dlc_txs.get_fund_output_index() as u64;
+    eprintln!(
+        "[dlc-node] create: unsigned funding {} (vout {}), awaiting reserve signing",
+        funding_txid, fund_vout
+    );
 
     let id = body["contract_id"]
         .as_str()
@@ -616,7 +636,6 @@ fn handle_create(app: &mut App, body: &Value) -> Result<Value> {
             format!("dlc-{}", app.seq)
         });
 
-    let fund_vout = dlc_txs.get_fund_output_index() as u64;
     app.contracts.insert(
         id.clone(),
         Contract {
@@ -630,7 +649,9 @@ fn handle_create(app: &mut App, body: &Value) -> Result<Value> {
             total: total as i64,
             funding_txid: funding_txid.clone(),
             refund_lock_time,
-            status: "funded".to_string(),
+            status: "pending_funding".to_string(),
+            peg_payout_outpoint: None,
+            peg_payout_value: None,
         },
     );
 
@@ -638,39 +659,9 @@ fn handle_create(app: &mut App, body: &Value) -> Result<Value> {
         "contract_id": id,
         "funding_txid": funding_txid,
         "funding_vout": fund_vout,
-        "funding_address": Value::Null,
-        "status": "funded",
+        "funding_tx_hex": funding_tx_hex,
+        "status": "pending_funding",
     }))
-}
-
-fn sign_funding(
-    secp: &Secp256k1<All>,
-    fund: &mut Transaction,
-    inputs: &[(OutPoint, &SecretKey, u64)],
-) -> Result<()> {
-    let plan: Vec<(usize, SecretKey, u64)> = fund
-        .input
-        .iter()
-        .enumerate()
-        .filter_map(|(i, txin)| {
-            inputs
-                .iter()
-                .find(|(op, _, _)| *op == txin.previous_output)
-                .map(|(_, sk, v)| (i, **sk, *v))
-        })
-        .collect();
-    for (i, sk, value) in plan {
-        dlc::util::sign_p2wpkh_input(
-            secp,
-            &sk,
-            fund,
-            i,
-            EcdsaSighashType::All,
-            Amount::from_sat(value),
-        )
-        .map_err(|e| anyhow!("sign_p2wpkh_input[{}]: {:?}", i, e))?;
-    }
-    Ok(())
 }
 
 fn handle_get(app: &App, id: &str) -> Result<Value> {
@@ -760,8 +751,30 @@ fn handle_execute(app: &mut App, id: &str, body: &Value) -> Result<Value> {
     let cet_txid = chain.broadcast(&cet)?;
 
     let outcome = digits_to_int(&digits, c.base);
-    let peg_sats = peg_payout_at(&c.points, outcome, c.total);
-    let investor_sats = c.total - peg_sats;
+
+    // Record the peg-side CET output (the one paying the sidecar peg address) so
+    // `distribute` can later spend it to fan the peg_pot out to the holders. We
+    // report the ACTUAL on-chain output values (bucketed by the CET set), which
+    // is what `distribute` can actually spend — not the raw curve value.
+    let cet_txid_parsed = Txid::from_str(&cet_txid)?;
+    let peg_output = cet
+        .output
+        .iter()
+        .enumerate()
+        .find(|(_, o)| o.script_pubkey == app.peg.spk);
+    let (peg_sats, investor_sats) = match peg_output {
+        Some((idx, txout)) => {
+            let value = txout.value.to_sat();
+            c.peg_payout_outpoint = Some(OutPoint {
+                txid: cet_txid_parsed,
+                vout: idx as u32,
+            });
+            c.peg_payout_value = Some(value);
+            (value as i64, c.total - value as i64)
+        }
+        // Peg output dust-discarded (peg received nothing): investor took it all.
+        None => (0, c.total),
+    };
 
     c.status = "executed".to_string();
 
@@ -819,6 +832,10 @@ fn handle_refund(app: &mut App, id: &str) -> Result<Value> {
     Ok(json!({ "refund_txid": refund_txid }))
 }
 
+// Fase 1: the peg_pot is real collateral sitting in the peg-side CET output
+// (P2WPKH, sidecar peg key). We spend THAT output to the holders' reserve
+// addresses (sum minus a network fee), signing with app.peg.sk. This replaces
+// the old `sendmany` from the miner wallet (fake coins).
 fn handle_distribute(app: &App, id: &str, body: &Value) -> Result<Value> {
     let rpc = app.rpc();
     let chain = Chain {
@@ -826,26 +843,96 @@ fn handle_distribute(app: &App, id: &str, body: &Value) -> Result<Value> {
         miner: app.cfg.miner_wallet.clone(),
         watch: app.cfg.watch_wallet.clone(),
     };
-    if !app.contracts.contains_key(id) {
-        bail!("unknown contract");
+    let c = app
+        .contracts
+        .get(id)
+        .ok_or_else(|| anyhow!("unknown contract"))?;
+    let (peg_outpoint, peg_value) = match (c.peg_payout_outpoint, c.peg_payout_value) {
+        (Some(op), Some(v)) => (op, v),
+        _ => bail!("peg CET output not recorded; execute the contract first"),
+    };
+
+    let fee_rate = body["fee_rate_sats_vb"].as_u64().unwrap_or(5);
+    let mut requested: Vec<(String, ScriptBuf, u64)> = Vec::new();
+    for p in body["payouts"].as_array().cloned().unwrap_or_default() {
+        let addr = p["address"]
+            .as_str()
+            .ok_or_else(|| anyhow!("distribute payout.address"))?
+            .to_string();
+        let sats = p["sats"]
+            .as_u64()
+            .ok_or_else(|| anyhow!("distribute payout.sats"))?;
+        let spk = parse_address(&addr)?;
+        requested.push((addr, spk, sats));
     }
-    let payouts = body["payouts"].as_array().cloned().unwrap_or_default();
-    let mut outputs = serde_json::Map::new();
-    for p in &payouts {
-        if let (Some(addr), Some(sats)) = (p["address"].as_str(), p["sats"].as_u64()) {
-            let btc = sats as f64 / COIN as f64;
-            let entry = outputs.entry(addr.to_string()).or_insert(json!(0.0));
-            *entry = json!(entry.as_f64().unwrap_or(0.0) + btc);
-        }
+    if requested.is_empty() {
+        bail!("distribute: no payouts");
     }
-    let mut txid = Value::Null;
-    if !outputs.is_empty() {
-        txid = chain
-            .rpc
-            .call("sendmany", json!(["", Value::Object(outputs)]), Some(&chain.miner))?;
-        chain.mine(1)?;
+    let total_requested: u64 = requested.iter().map(|(_, _, s)| *s).sum();
+    if total_requested == 0 {
+        bail!("distribute: total requested is zero");
     }
-    Ok(json!({ "txid": txid, "payouts": payouts }))
+
+    // Estimated vsize: 11 (overhead) + 68 (1 P2WPKH input) + 31 per P2WPKH output.
+    let est_vsize = 11 + 68 + 31 * requested.len() as u64;
+    let fee = est_vsize * fee_rate;
+    if peg_value <= fee {
+        bail!("peg CET output {} too small for fee {}", peg_value, fee);
+    }
+    let available = peg_value - fee;
+
+    // Scale each requested payout to the actually-spendable amount (peg output
+    // minus the fee), giving the remainder to the last holder so the sum is exact.
+    let mut amounts: Vec<u64> = requested
+        .iter()
+        .map(|(_, _, sats)| {
+            ((*sats as u128) * (available as u128) / (total_requested as u128)) as u64
+        })
+        .collect();
+    let assigned: u64 = amounts.iter().sum();
+    if let Some(last) = amounts.last_mut() {
+        *last += available - assigned;
+    }
+
+    let outputs: Vec<TxOut> = requested
+        .iter()
+        .zip(amounts.iter())
+        .map(|((_, spk, _), amt)| TxOut {
+            value: Amount::from_sat(*amt),
+            script_pubkey: spk.clone(),
+        })
+        .collect();
+
+    let mut tx = Transaction {
+        version: Version::TWO,
+        lock_time: LockTime::ZERO,
+        input: vec![TxIn {
+            previous_output: peg_outpoint,
+            script_sig: ScriptBuf::new(),
+            sequence: Sequence::MAX,
+            witness: Witness::new(),
+        }],
+        output: outputs,
+    };
+    dlc::util::sign_p2wpkh_input(
+        &app.secp,
+        &app.peg.sk,
+        &mut tx,
+        0,
+        EcdsaSighashType::All,
+        Amount::from_sat(peg_value),
+    )
+    .map_err(|e| anyhow!("distribute sign_p2wpkh_input: {:?}", e))?;
+
+    let txid = chain.broadcast(&tx)?;
+
+    let actual: Vec<Value> = requested
+        .iter()
+        .zip(amounts.iter())
+        .map(|((addr, _, _), amt)| json!({ "address": addr, "sats": *amt }))
+        .collect();
+
+    Ok(json!({ "txid": txid, "payouts": actual }))
 }
 
 // ---------------------------------------------------------------------------

@@ -22,7 +22,7 @@ module Dlc
   class NodeClient
     class Error < StandardError; end
 
-    Contract = Data.define(:contract_id, :funding_txid, :funding_vout, :funding_address, :status, :raw)
+    Contract = Data.define(:contract_id, :funding_txid, :funding_vout, :funding_address, :funding_tx_hex, :status, :raw)
     Execution = Data.define(:cet_txid, :outcome, :peg_sats, :investor_sats, :raw)
     Refund = Data.define(:refund_txid, :raw)
     DistributionResult = Data.define(:txid, :payouts, :raw)
@@ -53,19 +53,30 @@ module Dlc
       get("/info", read_timeout: INFO_READ_TIMEOUT)
     end
 
-    # Offer + accept + sign + broadcast funding in one shim call (PoC: the shim
-    # holds both 2-of-2 keys). `payouts` is the FloorEUR schedule as an array of
+    # Fase 1: build the DLC (offer + accept + adaptor sigs) and return the
+    # UNSIGNED 2-of-2 funding tx. The 2-of-2 FUND keys stay at the sidecar, but
+    # the funding INPUTS are the users' real L1 reserve UTXOs (signed by Ruby)
+    # and the CET payout/change scriptpubkeys point at real reserve/change
+    # addresses. `payouts` is the FloorEUR schedule as an array of
     # { outcome:, peg_sats:, investor_sats: } points over the numeric domain.
+    # `peg_inputs`/`investor_inputs` are [{ txid:, vout:, amount_sats: }].
     def create_contract(oracle_announcement:, payouts:, peg_collateral_sats:,
-                        investor_collateral_sats:, refund_locktime:, fee_rate: 5,
-                        contract_id: nil)
+                        investor_collateral_sats:, refund_locktime:,
+                        peg_inputs:, investor_inputs:, peg_change_address:,
+                        investor_change_address:, investor_payout_address:,
+                        fee_rate: 5, contract_id: nil)
       body = {
         oracle_announcement: oracle_announcement,
         payouts: Array(payouts).map { |p| normalize_payout(p) },
         offer_collateral_sats: Integer(peg_collateral_sats),
         accept_collateral_sats: Integer(investor_collateral_sats),
         refund_locktime: Integer(refund_locktime),
-        fee_rate_sats_vb: Integer(fee_rate)
+        fee_rate_sats_vb: Integer(fee_rate),
+        peg_inputs: Array(peg_inputs).map { |i| normalize_input(i) },
+        investor_inputs: Array(investor_inputs).map { |i| normalize_input(i) },
+        peg_change_address: peg_change_address,
+        investor_change_address: investor_change_address,
+        investor_payout_address: investor_payout_address
       }
       body[:contract_id] = contract_id if contract_id
       build_contract(post("/contracts", body))
@@ -106,6 +117,14 @@ module Dlc
 
     private
 
+    def normalize_input(input)
+      {
+        txid: input[:txid] || input["txid"],
+        vout: Integer(input[:vout] || input["vout"]),
+        amount_sats: Integer(input[:amount_sats] || input["amount_sats"])
+      }
+    end
+
     def normalize_payout(point)
       {
         outcome: Integer(point[:outcome] || point["outcome"]),
@@ -128,6 +147,7 @@ module Dlc
         funding_txid: h["funding_txid"],
         funding_vout: h["funding_vout"]&.to_i,
         funding_address: h["funding_address"],
+        funding_tx_hex: h["funding_tx_hex"],
         status: h["status"],
         raw: raw
       )

@@ -29,7 +29,7 @@ RSpec.describe Dlc::NodeClient do
     expect { described_class.new(base_url: "") }.to raise_error(described_class::Error)
   end
 
-  it "creates a 2-of-2 contract and returns the funding outpoint" do
+  it "builds an unsigned 2-of-2 funding tx from the reserve inputs" do
     allow(http).to receive(:post) do |path, body, _headers|
       expect(path).to eq("/contracts")
       payload = JSON.parse(body)
@@ -38,12 +38,17 @@ RSpec.describe Dlc::NodeClient do
       expect(payload["accept_collateral_sats"]).to eq(10_000_000)
       expect(payload["refund_locktime"]).to eq(2008)
       expect(payload["payouts"]).to eq([{ "outcome" => 50_000, "peg_sats" => 1, "investor_sats" => 2 }])
+      expect(payload["peg_inputs"]).to eq([{ "txid" => "aa" * 32, "vout" => 0, "amount_sats" => 10_100_000 }])
+      expect(payload["investor_inputs"]).to eq([{ "txid" => "bb" * 32, "vout" => 1, "amount_sats" => 10_100_000 }])
+      expect(payload["peg_change_address"]).to eq("bcrt1peg")
+      expect(payload["investor_change_address"]).to eq("bcrt1invchg")
+      expect(payload["investor_payout_address"]).to eq("bcrt1invpay")
       ok(
         "contract_id" => "c-1",
         "funding_txid" => "ab" * 32,
         "funding_vout" => 0,
-        "funding_address" => "bcrt1q",
-        "status" => "funded"
+        "funding_tx_hex" => "0200000000",
+        "status" => "pending_funding"
       )
     end
 
@@ -52,13 +57,19 @@ RSpec.describe Dlc::NodeClient do
       payouts: [{ outcome: 50_000, peg_sats: 1, investor_sats: 2 }],
       peg_collateral_sats: 10_000_000,
       investor_collateral_sats: 10_000_000,
-      refund_locktime: 2008
+      refund_locktime: 2008,
+      peg_inputs: [{ txid: "aa" * 32, vout: 0, amount_sats: 10_100_000 }],
+      investor_inputs: [{ txid: "bb" * 32, vout: 1, amount_sats: 10_100_000 }],
+      peg_change_address: "bcrt1peg",
+      investor_change_address: "bcrt1invchg",
+      investor_payout_address: "bcrt1invpay"
     )
 
     expect(contract).to be_a(described_class::Contract)
     expect(contract.contract_id).to eq("c-1")
     expect(contract.funding_vout).to eq(0)
-    expect(contract.status).to eq("funded")
+    expect(contract.funding_tx_hex).to eq("0200000000")
+    expect(contract.status).to eq("pending_funding")
   end
 
   it "executes the CET for a given attestation" do
@@ -126,7 +137,10 @@ RSpec.describe Dlc::NodeClient do
     expect do
       client.create_contract(
         oracle_announcement: "x", payouts: [], peg_collateral_sats: 1,
-        investor_collateral_sats: 1, refund_locktime: 1
+        investor_collateral_sats: 1, refund_locktime: 1,
+        peg_inputs: [{ txid: "aa" * 32, vout: 0, amount_sats: 2 }],
+        investor_inputs: [{ txid: "bb" * 32, vout: 0, amount_sats: 2 }],
+        peg_change_address: "a", investor_change_address: "b", investor_payout_address: "c"
       )
     end.to raise_error(described_class::Error, /insufficient funds/)
   end

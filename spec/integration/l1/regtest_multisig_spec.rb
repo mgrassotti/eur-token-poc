@@ -61,31 +61,4 @@ RSpec.describe "L1 regtest multisig", :regtest do
     end
   end
 
-  it "records recovery package on Budget" do
-    alice = create(:user, name: "Alice")
-    bob = create(:user, name: "Bob")
-
-    L1::RegtestHarness.with_available_bitcoind do |harness|
-      funding = harness.fund_escrow!(peg_sats: 1_000_000, investor_sats: 1_000_000)
-      budget = setup_active_budget!(
-        borrower: alice,
-        investor: bob,
-        amount_eur_cents: 100_000,
-        peg: 50_000,
-        block_height: 800_000
-      )
-
-      updated = L1::RecordEscrowService.call(
-        budget: budget,
-        funding: funding,
-        escrow: harness.escrow,
-        peg_party: harness.peg_party,
-        investor: harness.investor
-      )
-
-      expect(updated.l1_multisig_provisioned?).to be(true)
-      expect(updated.recovery_package["deal_params"]["deal_id"]).to eq(budget.id)
-      expect(updated.recovery_package["escrow"]["outpoint"]).to eq("#{funding.txid}:0")
-    end
-  end
 end

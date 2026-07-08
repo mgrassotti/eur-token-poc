@@ -2,18 +2,23 @@
 
 require "rails_helper"
 
-RSpec.describe "L1 PSBT user-wallet funding", :regtest do
+# Fase 1: activation funds the DLC 2-of-2 straight from the borrower and
+# investor L1 reserve wallets (no separate §3.2 PSBT escrow). Requires the live
+# DLC stack (profile `dlc`) in addition to bitcoind.
+RSpec.describe "L1 reserve-funded DLC collateral", :regtest, :dlc_integration do
   def bitcoind_available?
     L1::Bitcoind::Client.new.available?
   end
 
   before do
-    skip "Start regtest: docker compose -f docker-compose.regtest.yml up -d" unless bitcoind_available?
+    skip "Start regtest: ./bin/regtest up" unless bitcoind_available?
+    skip "Oracle DLC non raggiungibile (#{Dlc::Config.oracle_url})" unless Dlc::Config.oracle_client.available?
+    skip "Nodo DLC non raggiungibile (#{Dlc::Config.node_url})" unless Dlc::NodeClient.default.available?
   end
 
-  it "funds escrow via §3.2 PSBT from borrower and investor wallets" do
-    alice = create(:user, name: "Alice", email: "alice-psbt-#{SecureRandom.hex(4)}@example.com")
-    bob = create(:user, name: "Bob", email: "bob-psbt-#{SecureRandom.hex(4)}@example.com")
+  it "locks collateral via the DLC funding tx from borrower and investor reserves" do
+    alice = create(:user, name: "Alice", email: "alice-reserve-#{SecureRandom.hex(4)}@example.com")
+    bob = create(:user, name: "Bob", email: "bob-reserve-#{SecureRandom.hex(4)}@example.com")
 
     L1::DepositReserveService.call(user: alice, amount_sats: 10_000_000)
     L1::DepositReserveService.call(user: bob, amount_sats: 10_000_000)
@@ -27,8 +32,9 @@ RSpec.describe "L1 PSBT user-wallet funding", :regtest do
     )
 
     expect(budget.l1_multisig_provisioned?).to be(true)
-    expect(budget.recovery_package.dig("psbt_funding", "mode")).to eq("§3.2 async PSBT")
-    expect(budget.recovery_package.dig("psbt_funding", "psbt")).to be_present
-    expect(budget.escrow_txid).to be_present
+    expect(budget.dlc_contract).to be_funded
+    expect(budget.escrow_txid).to eq(budget.dlc_contract.funding_txid)
+    expect(budget.recovery_package.dig("escrow", "outpoint")).to eq(budget.escrow_outpoint)
+    expect(budget.recovery_package.dig("escrow", "note")).to include("Fase 1")
   end
 end

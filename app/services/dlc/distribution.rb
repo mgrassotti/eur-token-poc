@@ -47,10 +47,14 @@ module Dlc
       outputs = shares.map { |s| { address: address_resolver.call(s[:user]), sats: s[:sats] } }
       result = node.distribute(contract_id: contract.ddk_contract_id, payouts: outputs)
 
-      persist!(result.txid, shares, outputs)
+      # The node spends the real peg CET output and deducts a network fee, so the
+      # on-chain amounts can be slightly below the requested shares. Record the
+      # ACTUAL amounts the node paid so the reserves match the recovery package.
+      actual = actual_amounts(shares, result)
+      persist!(result.txid, shares, outputs, actual)
 
       shares.each_with_index.map do |s, i|
-        Payout.new(user: s[:user], sats: s[:sats], address: outputs[i][:address], txid: result.txid)
+        Payout.new(user: s[:user], sats: actual[i], address: outputs[i][:address], txid: result.txid)
       end
     rescue NodeClient::Error, Rgb::Nodes::Error, Rgb::LightningClient::Error => e
       raise Error, "Distribuzione DLC fallita: #{e.message}"
@@ -96,13 +100,25 @@ module Dlc
       end
     end
 
-    def persist!(txid, shares, outputs)
+    # Actual on-chain sats paid per share, from the node response (index-aligned
+    # with the requested outputs); falls back to the requested share when the node
+    # does not echo detailed amounts (e.g. unit specs with a stubbed node).
+    def actual_amounts(shares, result)
+      payouts = Array(result.payouts)
+      shares.each_with_index.map do |s, i|
+        entry = payouts[i]
+        value = entry && (entry["sats"] || entry[:sats])
+        value ? Integer(value) : s[:sats]
+      end
+    end
+
+    def persist!(txid, shares, outputs, actual)
       package = budget.recovery_package&.deep_dup || {}
       package["dlc_distribution"] = {
         "txid" => txid,
-        "peg_pot_sats" => peg_pot_sats,
+        "peg_pot_sats" => actual.sum,
         "payouts" => shares.each_with_index.map do |s, i|
-          { "user_id" => s[:user].id, "sats" => s[:sats], "address" => outputs[i][:address] }
+          { "user_id" => s[:user].id, "sats" => actual[i], "address" => outputs[i][:address] }
         end
       }
       budget.update!(recovery_package: package)

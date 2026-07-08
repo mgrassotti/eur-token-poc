@@ -54,19 +54,20 @@ RSpec.describe "Demo end-to-end flow (system)", type: :system, regtest: true, de
 
     switch_to(:admin)
     set_market_rate!(DemoFlowHelpers::SETTLEMENT_EUR_PER_BTC)
-    bob_reserve_before_settlement = reserve_sats(demo_user(:bob))
+    holders = [demo_user(:alice), demo_user(:claude), demo_user(:david)]
+    reserve_before = (holders + [demo_user(:bob)]).to_h { |u| [u.id, reserve_sats(u)] }
 
     advance_chain_to_maturity!(budget)
 
-    # Settlement DLC: il peg_pot rilasciato dalla CET è distribuito pro-rata agli
-    # holder sulla riserva L1 (importi dalla curva DLC). Bob (investitore) non
-    # riceve l'output CET in riserva nel PoC (Fase 1), solo il lock è rilasciato.
+    # Settlement DLC (Fase 1): la CET rilascia il peg_pot reale sul lato peg,
+    # distribuito pro-rata agli holder sulla riserva L1; l'output investitore della
+    # CET torna direttamente sulla riserva di Bob. Ogni riserva cresce del delta.
     budget.reload
     distribution = dlc_distribution_payouts_sats(budget)
-    [demo_user(:alice), demo_user(:claude), demo_user(:david)].each do |user|
-      expect(reserve_sats(user)).to eq(distribution.fetch(user.id))
+    holders.each do |user|
+      expect(reserve_sats(user)).to eq(reserve_before.fetch(user.id) + distribution.fetch(user.id))
     end
-    expect_reserve_sats!(demo_user(:bob), bob_reserve_before_settlement)
+    expect(reserve_sats(demo_user(:bob))).to eq(reserve_before.fetch(demo_user(:bob).id) + dlc_investor_return_sats(budget))
 
     switch_to(:alice)
     second_budget = create_spending_budget!(

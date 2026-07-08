@@ -1,10 +1,95 @@
-# FloorEUR PoC (Rails)
+# MAT PoC (Rails + DLC + RGB on regtest)
 
-Proof-of-concept Rails per **deal P2P bilaterali** (un `Budget` = un deal): token EUR nominale spendibili, collateral BTC in **lock 2-of-2 on-chain (regtest)**, settlement **FloorEUR** via **DLC** (oracle-attested CET) a scadenza.
+Proof-of-concept Rails per deal P2P bilaterali (`Budget`), con:
 
-Specifiche di design: [`docs/rgb-design/`](docs/rgb-design/) (`PAYOFF-SPEC`, `P2P-OPTIONS`, `MULTISIG-SPEC`, `MARGIN-SPEC`).
+- collateral BTC reale su regtest
+- token EUR nominali trasferibili tra utenti
+- settlement a scadenza via DLC (oracle-attested CET)
 
-## Setup
+## Stato attuale di implementazione
+
+- **Settlement unico:** DLC (Discreet Log Contract)
+- **I**l funding del DLC usa UTXO reali delle riserve utente.
+- **Single lock model:** il funding 2-of-2 del DLC e' il lock del collateral.
+- **RGB stack:** nodi RGB Lightning reali su regtest (uno per utente + issuer).
+- **Demo/test end-to-end:** integrazione e system test allineati al flusso reale.
+
+
+
+## Architettura funzionale
+
+Ogni `Budget` rappresenta un deal autonomo:
+
+- il borrower apre la richiesta (importo EUR nominale)
+- l'investitore attiva il deal
+- vengono emessi i token EUR nominali al borrower
+- i token possono essere trasferiti ad altri utenti
+- a maturity il DLC esegue la CET, poi il `peg_pot` viene distribuito pro-rata agli holder
+
+### Collateral e payout
+
+- collateral borrower + investor bloccato nel **funding output DLC 2-of-2**
+- output investor CET torna direttamente alla riserva dell'investitore
+- output peg CET viene distribuito agli holder via `Dlc::Distribution`
+
+
+
+## Architettura tecnica
+
+### Componenti principali
+
+- **Rails app:** orchestration, stato dominio, dashboard, demo flow
+- **bitcoind regtest:** catena e wallet on-chain
+- **Pythia oracle:** annuncio/attestazione dell'evento numerico DLC
+- `dlc-rs` **sidecar (Rust):**
+  - costruisce DLC tx set (funding/CET/refund)
+  - riceve input reali da Ruby
+  - restituisce funding tx unsigned
+  - esegue CET alla maturity
+  - distribuisce il `peg_pot` dagli output reali CET
+- **RGB Lightning Nodes:** uno per utente + issuer
+
+### Flusso di activation (stato corrente)
+
+`Budgets::ActivateService` -> `L1::ProvisionEscrowService`:
+
+1. annuncia evento oracle
+2. seleziona UTXO reserve borrower/investor
+3. chiama `Dlc::NodeClient#create_contract` con:
+  - `peg_inputs` / `investor_inputs`
+  - change addresses
+  - investor payout address
+4. firma funding tx con i wallet reserve in Ruby
+5. broadcast funding tx
+6. salva outpoint funding DLC su `Budget` (`escrow_txid` / `escrow_vout`)
+7. issue RGB
+
+### Flusso di settlement
+
+`Settlements::ExecuteService`:
+
+1. valida maturity + contratto funded
+2. redemption token RGB
+3. `Dlc::SettlementService` esegue CET con attestazione oracle
+4. `Dlc::Distribution` distribuisce il `peg_pot` agli holder
+5. sync riserve on-chain
+
+
+
+## Modello dati (essenziale)
+
+- `Budget`: ciclo vita deal + outpoint collateral lock (funding DLC)
+- `DlcContract`: metadati contratto DLC e funding outpoint
+- `DlcSettlement`: risultato CET (`cet_txid`, outcome, peg/investor sats)
+- `TokenAccount` / `TokenTransfer` / `RgbAssignment`: stato token e ownership
+- `CollateralLock`: tracking contabile lock collateral lato dominio
+- `BtcAccount`: saldo riserva spendibile utente
+
+Nota: alcune colonne legacy possono ancora esistere a DB per backward compatibility, ma il runtime segue il modello DLC-only sopra.
+
+
+
+## Setup rapido
 
 ```bash
 cd ~/dev/eur-token-poc
@@ -13,236 +98,177 @@ bin/rails db:setup
 bin/dev
 ```
 
-`bin/dev` avvia **regtest + stack RGB** (`./bin/regtest up`: bitcoind, electrs, rgb-proxy, nodi RGB Lightning) e **Rails**. Il PoC **richiede** regtest e i nodi RGB Lightning per depositi, escrow, transfer token e settlement.
+`bin/dev` avvia Rails e lo stack regtest richiesto.
 
-Apri http://localhost:3000 e accedi con:
+Login demo:
 
-| Utente | Email | Password | Ruolo |
-|--------|-------|----------|-------|
-| Admin | admin@example.com | password | Cambio BTC/€, altezza blocco, settlement |
-| Alice | alice@example.com | password | Richiedente (borrower) |
-| Bob | bob@example.com | password | Investitore |
-| Claude | claude@example.com | password | Destinatario token |
-| David | david@example.com | password | — |
+- `admin@example.com` / `password`
+- `alice@example.com` / `password`
+- `bob@example.com` / `password`
+- `claude@example.com` / `password`
+- `david@example.com` / `password`
 
-In development puoi usare il dropdown **Switch** nella navbar per cambiare utente rapidamente.
+## Stack regtest / RGB / DLC
 
-Dopo `db:setup` i **conti di riserva sono a zero**: deposita BTC dal Wallet esterno prima di creare ricariche.
-
-## Modello (per deal)
-
-Ogni **ricarica** (`Budget`) è un deal autonomo:
-
-| Concetto | Implementazione PoC |
-|----------|---------------------|
-| Collateral lock | UTXO **2-of-2 P2WSH** {peg, investor} on-chain (`escrow_txid`/`vout`) + `CollateralLock` (tracking importi) |
-| Strike | `Budget#peg_eur_per_btc` — fissato **all’attivazione** dal `MarketRate` corrente |
-| Maturity | `Budget#maturity_block_height` (da `genesis_block_height` + durata in blocchi) |
-| Token | `TokenAccount` — proiezione DB; saldi spendibili da `Rgb::BalanceService` |
-| Settlement | `Payoffs::FloorEurCalculator` → `Settlements::ExecuteService` → `Dlc::SettlementService` (CET oracle-attested) + `Dlc::Distribution` (peg_pot) |
-| Transfer | `Tokens::WalletTransferService` — spend da più deal se serve |
-| Riserva BTC | Wallet regtest per utente; saldo **spendibile on-chain** (`L1::UserWallet`) |
-| Oracle / catena | `MarketRate` + `ChainState` (admin); auto-settle al maturity block |
-
-**Collateral in apertura:** richiedente **1×** + investitore **1×** l’importo nominale → escrow **2×**, LTV iniziale **50%**.
-
-**Monitoraggio LTV** (ledger PoC, annex margin on-chain M2+): margin call investitore ≥ **70%**, liquidazione automatica ≥ **90%** (`Budgets::AutoLiquidationService`).
-
-## Scenario demo
-
-Flusso allineato a `bin/demo-spec` (integrazione regtest).
-
-### Stato iniziale (`db:setup` / reset demo)
-
-- Utenti demo creati; **saldi riserva a zero**
-- **Nessuna** ricarica pending pre-caricata
-- Cambio default: **50_000 €/BTC**; altezza blocco stimata (`ChainState`)
-
-### 1. Admin — cambio, catena, wallet
-
-1. Login come **Admin**
-2. Dashboard → pannello admin
-3. Verifica **Cambio BTC/€** e **Altezza blocco**
-4. Tabella **Wallet on-chain**: saldi regtest + equivalente €
-5. Opzionale: **Reset demo** (azzera DB e bitcoind via `./bin/regtest reset`)
-
-### 2. Depositi on-chain (Alice e Bob)
-
-1. Switch **Alice** → **Deposita su conto riserva** (default 0,1 BTC)
-2. Switch **Bob** → deposito (default 0,2 BTC nel form; nel demo-spec 0,1 BTC)
-
-Ogni deposito trasferisce dal **Wallet esterno** (`l1_external_wallet`) e avanza la catena simulata di **6 blocchi**.
-
-### 3. Apertura deal
-
-1. Switch **Alice** → **Ricarica conto spesa** (es. 1_000 €)
-2. Switch **Bob** → **Ricariche in attesa** → **Accetta rischio e attiva**
-
-Il sistema:
-
-- Verifica saldo spendibile on-chain (peg + investor + fee funding)
-- Provisiona il **lock collaterale 2-of-2** + il **contratto DLC 2-of-2** (`L1::ProvisionEscrowService` → `Dlc::ContractSetupService`)
-- Fissa `peg_eur_per_btc` e mint **1_000 €** nominali ad Alice sul **conto spesa / risparmio**
-
-### 4. Spesa token (Alice → Claude → David)
-
-1. Switch **Alice** → **Invia Denaro**
-2. Invia token a Claude / David come nel demo
-
-I transfer usano `WalletTransferService` e possono attingere a più deal se l’utente ne ha più di uno attivo.
-
-### 5. Settlement a scadenza
-
-Quando `ChainState.block_height >= maturity_block_height`:
-
-- **Automatico:** aggiornando l’altezza blocco (admin) scatta `Budgets::AutoSettleService`
-- **Manuale:** Admin → budget attivo → **Settlement**
-
-Il settlement **FloorEUR**:
-
-1. Calcola liability € (notional + interessi)
-2. Converte in sats al **spot** di chiusura
-3. Cap: `total_holder = min(gross, escrow − mining_fee)` (fee default 5_000 sats)
-4. **Redemption RGB:** ogni holder restituisce il saldo EURT al wallet **issuer/treasury** (`Rgb::RedeemService`) — rgb-lib 0.3 non ha un burn nativo, quindi la redemption all'issuer ritira i token dalla circolazione. La proiezione DB (`TokenAccount`/`RgbAssignment`) viene azzerata come cache (`Rgb::ProjectionService.apply_redeem!`)
-5. **DLC settlement:** l'oracle (Pythia) firma l'outcome numerico, `Dlc::SettlementService` esegue la **CET** (che rilascia il `peg_pot`) e `Dlc::Distribution` lo distribuisce pro-rata agli holder sulla riserva L1
-6. Sync saldi riserva
-
-### Esempio numerico — 1000 €, peg 50k, 1 mese @ 1%, spot 50k
-
-```
-Escrow totale:           4_000_000 sats  (Alice 1× + Bob 1×)
-Liability holder:        1_010,00 €      (interesse 1%)
-Gross holder @ 50k:      2_020_000 sats
-Distributable:           3_995_000 sats  (escrow − 5_000 fee)
+```bash
+./bin/regtest up
 ```
 
-Con **transfer parziale** il payout holder segue le quote correnti — vedi `spec/scenarios/payoff_spec_section11_spec.rb` e `spec/integration/demo_end_to_end_flow_spec.rb`.
+Servizi principali:
 
-### 6. Margin call e top-up (opzionale)
+- bitcoind: `127.0.0.1:18443`
+- RLN Alice/Bob/Claude/David: `3001..3004`
+- RLN issuer: `3005`
+- DLC node (`dlc-rs`): da config `DLC_NODE_URL`
+- Oracle Pythia: da config `DLC_ORACLE_URL`
 
-1. Admin abbassa il cambio BTC/€ con deal attivo
-2. Se LTV ≥ 70%, Bob vede **margin call** in dashboard
-3. Bob → dettaglio ricarica → **Versa collateral aggiuntivo**
-4. Se LTV ≥ 90%, liquidazione automatica al prossimo aggiornamento cambio
+Reset ambiente demo:
+
+```bash
+./bin/regtest reset
+```
+
+
+
+## Demo flow (funzionale)
+
+1. Admin imposta rate BTC/EUR
+2. Alice e Bob depositano nella riserva
+3. Alice crea budget
+4. Bob attiva il budget (funding DLC da riserve reali)
+5. Alice trasferisce parte dei token a Claude/David
+6. Al maturity block avviene settlement DLC
+7. Holder ricevono `peg_pot` distribuito, investor riceve output CET investor
+
+
 
 ## Test
 
 ```bash
-bundle exec rspec          # unit + integration (spec :rgb_lib reali se i nodi RLN sono attivi)
-./bin/demo-spec            # flusso demo end-to-end su regtest
-./bin/system-spec          # stesso flusso via browser (Capybara + nodi RLN reali)
-```
-
-Per suite pulite senza dati seed che alterano i conteggi:
-
-```bash
-bin/rails db:schema:load RAILS_ENV=test
 bundle exec rspec
+./bin/demo-spec
+./bin/system-spec
 ```
 
-`bin/demo-spec` richiede regtest + nodi RGB Lightning (`./bin/regtest up`). Eseguilo dopo modifiche a payoff, settlement L1, RGB o saldi dashboard.
+- `bundle exec rspec`: suite completa (unit + integration + system)
+- `bin/demo-spec`: scenario end-to-end non browser
+- `bin/system-spec`: scenario end-to-end via UI
 
-`bin/system-spec` replica lo stesso flusso nell'UI (login, switch utente dev, depositi, attivazione deal, transfer, settlement admin). Utile per debuggare errori RGB su **Accetta rischio e attiva** con screenshot in `tmp/capybara/` al fallimento. Esempio rapido: `./bin/system-spec --example "attiva un deal"`.
 
-### RGB — RGB Lightning Node (RLN), un nodo per utente
 
-`./bin/regtest up` avvia **bitcoind**, **electrs**, **rgb-proxy** e **N nodi RGB Lightning** (uno per utente demo + issuer), costruiti dal submodule `vendor/rgb-lightning-node` (build Rust al primo avvio). Il legacy `rgb-sidecar` è stato rimosso: l'intero stack RGB gira sui nodi RLN.
+## File/servizi chiave
 
-| Nodo | Porta API host | Utente |
-|------|----------------|--------|
-| `rln-alice` | `3001` | alice@example.com |
-| `rln-bob` | `3002` | bob@example.com |
-| `rln-claude` | `3003` | claude@example.com |
-| `rln-david` | `3004` | david@example.com |
-| `rln-issuer` | `3005` | issuer/treasury (redemption) |
+- `app/services/dlc/contract_setup_service.rb`
+- `app/services/dlc/settlement_service.rb`
+- `app/services/dlc/distribution.rb`
+- `app/services/settlements/execute_service.rb`
+- `app/services/l1/provision_escrow_service.rb`
+- `lib/dlc/node_client.rb`
+- `dlc-rs/src/main.rs`
+- `spec/integration/demo_end_to_end_flow_spec.rb`
+- `spec/system/demo_end_to_end_flow_spec.rb`
 
-```bash
-./bin/regtest up        # build immagine RLN + avvio stack, attende i nodi su 3001-3005
-```
 
-Variabili principali (`lib/rgb/config.rb`):
 
-| Variabile | Default | Ruolo |
-|-----------|---------|--------|
-| `RLN_PASSWORD` | `regtestpassword` | password init/unlock nodi |
-| `RLN_ISSUER_URL` | `http://127.0.0.1:3005` | nodo issuer/treasury |
-| `RLN_TOKEN` | _(vuoto)_ | Biscuit bearer opzionale (nodi con `--disable-authentication`) |
+## Limitazioni note
 
-Il mapping utente→nodo (`BtcAccount#rln_node_url`) è impostato da `DemoData::ResetService`. `Rgb::IssueService` / `Rgb::TransferService` / `Rgb::RedeemService` operano sul nodo dell'utente (`Rgb::Config.ensure_node!`); la dashboard mostra la card **RGB (RLN)** con i saldi NIA letti da `/assetbalance`.
+- Ambiente orientato a regtest/demo, non hardening produzione.
+- Dipendenza da stack locale Docker e servizi oracle/DLC.
+- Alcune parti legacy DB restano solo per compatibilita' storica.
 
-Per un reset RGB pulito riavviare i container (`./bin/regtest reset`): i nodi RLN non espongono un "reset wallet", lo stato si azzera ricreando i container. Le spec `:rgb_lib` (`spec/integration/rgb_lib_transfer_spec.rb`) girano sui nodi RLN reali quando lo stack è attivo, altrimenti vengono saltate.
+## Sviluppi futuri necessari
 
-**Nota Docker:** se `docker pull` / `docker compose build` restano bloccati senza output, il credential helper Desktop può essere in stallo. Workaround: `mkdir -p /tmp/docker-nocreds && echo '{"auths":{}}' > /tmp/docker-nocreds/config.json` poi `DOCKER_CONFIG=/tmp/docker-nocreds docker pull …`.
+Per arrivare a un'architettura economicamente sostenibile e scalabile, il PoC
+deve evolvere oltre il settlement e la distribuzione prevalentemente on-chain.
 
-## Architettura
+### 1. Ridurre l'uso di Layer 1
 
-- **Ibrido:** token e stato deal in PostgreSQL/SQLite; **BTC riserva ed escrow on-chain** (regtest)
-- **Un budget = un deal** — niente epoch/pool globale
-- **Servizi principali**
-  - `Budgets::CreateService`, `Budgets::ActivateService`, `Budgets::ReserveRequirement`
-  - `Budgets::InvestorCollateralTopUpService`, `Budgets::AutoLiquidationService`, `Budgets::AutoSettleService`
-  - `Tokens::WalletTransferService`
-  - `Payoffs::FloorEurCalculator`, `Settlements::ExecuteService`
-- **Gap verso M2+:** oracle firmato, Path B CLTV in produzione, margin annex on-chain — vedi [`docs/rgb-design/`](docs/rgb-design/)
-- **RGB (M3):** RGB Lightning Node per utente (obbligatorio con `./bin/regtest up`)
+Lo stato attuale usa Bitcoin L1 per:
 
-## Stato roadmap (`main`)
+- funding del DLC / lock del collateral
+- ritorno del collateral investitore via CET
+- distribuzione del `peg_pot` agli holder
 
-| Fase | Stato |
-|------|--------|
-| **M0** | Fatto — payoff FloorEUR, LTV, spec §11 |
-| **M1** | **Fatto** — regtest multisig 2-of-3, funding PSBT §3.2, settlement on-chain FloorEUR via `SettlementPsbtService`, recovery package con `psbt_maturity` unsigned, `bin/demo-spec`, 92 spec |
-| **M6** | Fatto — budget-as-deal, settlement per budget, L1 wiring (merged in `main`) |
-| **M3** | **In corso** — RGB20 NIA via RGB Lightning Node per utente (`./bin/regtest up`), issue su activate, transfer parziale on-chain, redemption a settlement, card dashboard |
-| **M2+** | Bot facilitatore / oracle firmato, Path B CLTV in prodotto, margin annex on-chain |
+Questo e' corretto per un PoC verificabile, ma su volumi reali introduce:
 
-## L1 — multisig regtest
+- costi miner fee per activation / settlement / distribution
+- latenza di conferma
+- bassa efficienza per payout frazionati a molti holder
 
-Modulo `lib/l1/` per il **lock collaterale 2-of-2 P2WSH** {peg, investor} su Bitcoin Core regtest (JSON-RPC). Il settlement è gestito dal DLC (CET oracle-attested); il lock 2-of-2 vincola solo il collaterale on-chain, recuperabile via refund timelock (Path B).
+La direzione naturale e' mantenere su L1 solo il minimo necessario
+(`funding`/`refund`/ancoraggio finale), spostando i payout operativi su
+Lightning.
 
-| Componente | Ruolo |
-|------------|--------|
-| `L1::UserWallet` | `createwallet` / `loadwallet` per utente; `spendable_sats` |
-| `L1::ExchangeWallet` | Wallet esterno: mining regtest + transfer verso wallet utente |
-| `L1::DepositReserveService` | Transfer Wallet esterno + sync + **+6 blocchi** catena simulata |
-| `L1::SyncReserveBalanceService` | Allinea `BtcAccount#balance_sats` al saldo spendibile on-chain |
-| `L1::WalletInventoryService` | Riepilogo admin wallet caricati + equivalente € |
-| `L1::RegtestResetService` | Ricrea bitcoind al reset demo (`./bin/regtest reset`) |
-| `L1::ProvisionEscrowService` | Chiamato da `ActivateService`: funding DLC da riserve (lock nel funding 2-of-2) + RGB issue |
-| `L1::RefundPsbtBuilder` | Path B: refund timelock peg + investor (2-of-2) |
-| `L1::RecoveryPackage` | Export JSON §6 |
-| `GET /budgets/:id/recovery_package` | Download JSON (richiedente, investitore, admin) |
+### 2. Distribuzione holder via Lightning anziche' payout L1
 
-> Il settlement passa esclusivamente dal DLC; il vecchio ramo escrow-settlement è stato rimosso.
+Oggi `Dlc::Distribution` spende l'output CET peg-side verso gli indirizzi di
+riserva L1 degli holder. Per scalabilita' e costi, il passo successivo e':
 
-Campi DB su `Budget`: `peg_party_pubkey`, `investor_pubkey`, `escrow_txid`, `escrow_vout`, `refund_delay_blocks` (default 1008), `recovery_package` (`bot_pubkey` resta come colonna legacy inutilizzata).
+- sostituire il fan-out on-chain con pagamenti Lightning
+- usare invoice per-holder invece di UTXO per-holder
+- evitare una transazione L1 con N output per ogni settlement
 
-## Console walkthrough
+Questo riduce fee e dimensione dei payout, soprattutto quando il `peg_pot`
+deve essere distribuito a molti destinatari.
 
-Richiede `./bin/regtest up` e depositi on-chain:
+### 3. Pending / HODL invoices per atomicita'
 
-```ruby
-admin = User.find_by!(email: "admin@example.com")
-alice = User.find_by!(email: "alice@example.com")
-bob = User.find_by!(email: "bob@example.com")
-claude = User.find_by!(email: "claude@example.com")
+Il passaggio importante non e' solo "usare LN", ma usare **pending invoices**
+(o HODL invoices) per legare atomicamente:
 
-L1::DepositReserveService.call(user: alice, amount_sats: 10_000_000)
-L1::DepositReserveService.call(user: bob, amount_sats: 10_000_000)
-MarketRate.current.update!(btc_eur_per_btc: 50_000, set_by: admin)
+- redemption / burn / ritiro dei token lato RGB
+- ricezione del payout BTC lato Lightning
 
-budget = Budgets::CreateService.call(
-  borrower: alice,
-  amount_eur_cents: 100_000,
-  period_start: Date.current,
-  period_end: Date.current + 1.month
-)
-Budgets::ActivateService.call(budget: budget, investor: bob)
+L'obiettivo e':
 
-Tokens::WalletTransferService.call(from_user: alice, to_user: claude, amount_cents: 30_000)
-ChainState.update_block_height!(budget.maturity_block_height, auto_settle: false)
+1. l'holder presenta una invoice Lightning pending
+2. il settlement DLC determina l'ammontare dovuto
+3. il sistema prepara il pagamento ma non lo finalizza subito
+4. il completamento avviene solo quando la condizione atomica e' soddisfatta
+   (es. redemption valida / segreto oracle / stato applicativo coerente)
 
-result = Settlements::ExecuteService.call(budget: budget, end_btc_eur_rate: 50_000)
-result.payouts.each { |p| puts "#{p.user.name}: #{p.btc_sats} sats" }
-puts "Investitore: #{result.investor_btc_sats} sats"
-```
+In questo modo si evita il rischio di:
+
+- token ritirati ma payout non ricevuto
+- payout inviato ma stato token non aggiornato
+
+### 4. Fattibilita' pratica
+
+Per passare a questo modello servono ancora alcuni passi infrastrutturali:
+
+- supporto affidabile a pending/HODL invoices nel nodo Lightning usato
+- gestione lifecycle invoice (`open` / `held` / `settled` / `cancelled`)
+- mapping chiaro tra payout DLC, holder position e invoice LN
+- recovery / retry in caso di errori parziali
+- accounting applicativo che distingua:
+  - collateral L1
+  - payout CET
+  - payout LN pendenti / regolati
+
+### 5. Architettura target ragionevole
+
+Una direzione realistica per una versione piu' matura e':
+
+- **L1 Bitcoin**: collateral lock del DLC, refund, casi eccezionali / recovery
+- **DLC**: settlement principale del deal e determinazione del payout
+- **Lightning**: distribuzione dei payout agli holder
+- **RGB**: ownership / trasferibilita' del nominale EUR
+
+In questo assetto:
+
+- L1 resta il layer di sicurezza e finalita'
+- LN diventa il layer operativo per i payout frequenti
+- i costi marginali per settlement multi-holder si abbassano molto
+
+### 6. Stato del progetto rispetto a questa roadmap
+
+Attualmente il repository copre:
+
+- DLC reserve-funded funzionante su regtest
+- investor return reale sulla riserva
+- distribution holder reale ma ancora **on-chain**
+
+Quindi il prossimo salto architetturale importante non e' il DLC in se', ma la
+**migrazione della distribution verso LN con pending invoices**, mantenendo L1
+solo dove serve davvero.
+

@@ -69,7 +69,6 @@ node ../dlc-shim/refund_test.js      # CREATE / REFUND
 ## Future alternative (Variant A)
 
 A full peer-to-peer DLC node — `ddk-node` (dlcdevkit, gRPC + Nostr transport +
-Kormir oracle + BDK wallet + esplora) — is documented in
-[`../docs/rgb-design/DLC-RLN-PLAN.md`](../docs/rgb-design/DLC-RLN-PLAN.md). It is
+Kormir oracle + BDK wallet + esplora) remains a valid future direction. It is
 heavier (two nodes + relay + esplora) but also `rust-dlc`-based, so the concepts
 here carry over.

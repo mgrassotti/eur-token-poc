@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module Payoffs
-  # FloorEUR payoff — see docs/rgb-design/PAYOFF-SPEC.md
+  # FloorEUR payoff engine used by settlement and specs.
   class FloorEurCalculator
     HolderAllocation = Data.define(:share_cents, :btc_sats)
 

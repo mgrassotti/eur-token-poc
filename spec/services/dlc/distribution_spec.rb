@@ -27,7 +27,13 @@ RSpec.describe Dlc::Distribution do
     TokenAccount.create!(budget: budget, user: david, balance_cents: 20_000)
 
     allow(node).to receive(:distribute).and_return(
-      Dlc::NodeClient::DistributionResult.new(txid: "cd" * 32, payouts: [], raw: {})
+      Dlc::NodeClient::DistributionResult.new(
+        txid: "cd" * 32,
+        payouts: [],
+        investor_payout_sats: 123_456,
+        investor_payout_address: "bcrt1investor",
+        raw: {}
+      )
     )
   end
 
@@ -72,7 +78,29 @@ RSpec.describe Dlc::Distribution do
     distribution = budget.reload.recovery_package["dlc_distribution"]
     expect(distribution["txid"]).to eq("cd" * 32)
     expect(distribution["peg_pot_sats"]).to eq(1_000_000)
+    expect(distribution["investor_payout_sats"]).to eq(123_456)
+    expect(distribution["investor_payout_address"]).to eq("bcrt1investor")
     expect(distribution["payouts"].sum { |p| p["sats"] }).to eq(1_000_000)
+  end
+
+  it "trusts exact holder amounts echoed by the node" do
+    allow(node).to receive(:distribute).and_return(
+      Dlc::NodeClient::DistributionResult.new(
+        txid: "cd" * 32,
+        payouts: [
+          { "address" => "addr-#{alice.id}", "sats" => 500_000 },
+          { "address" => "addr-#{claude.id}", "sats" => 300_000 },
+          { "address" => "addr-#{david.id}", "sats" => 200_000 }
+        ],
+        investor_payout_sats: 111,
+        investor_payout_address: "bcrt1investor",
+        raw: {}
+      )
+    )
+
+    payouts = described_class.call(budget: budget, peg_pot_sats: 1_000_000, node: node, address_resolver: resolver)
+
+    expect(payouts.map(&:sats)).to eq([500_000, 300_000, 200_000])
   end
 
   it "wraps node failures in a distribution error" do

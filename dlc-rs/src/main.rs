@@ -401,6 +401,13 @@ struct Contract {
     // that `distribute` later spends to fan the peg_pot out to the holders.
     peg_payout_outpoint: Option<OutPoint>,
     peg_payout_value: Option<u64>,
+    // The investor-side CET output is also sidecar-controlled and later spent by
+    // `distribute`, which forwards the investor remainder to the real reserve
+    // wallet while absorbing the holder fanout fee on the investor side.
+    investor_payout_outpoint: Option<OutPoint>,
+    investor_payout_value: Option<u64>,
+    investor_payout_spk: ScriptBuf,
+    investor_payout_address: String,
 }
 
 struct App {
@@ -540,6 +547,10 @@ fn handle_create(app: &mut App, body: &Value) -> Result<Value> {
             .as_str()
             .ok_or_else(|| anyhow!("investor_payout_address"))?,
     )?;
+    let investor_payout_address = body["investor_payout_address"]
+        .as_str()
+        .ok_or_else(|| anyhow!("investor_payout_address"))?
+        .to_string();
 
     let (peg_input_infos, peg_input_amount) = party_inputs(&peg_inputs);
     let (investor_input_infos, investor_input_amount) = party_inputs(&investor_inputs);
@@ -564,8 +575,10 @@ fn handle_create(app: &mut App, body: &Value) -> Result<Value> {
     let accept_params = PartyParams {
         fund_pubkey: app.investor.pk,
         change_script_pubkey: investor_change_spk,
-        // Investor collateral returns straight to the investor's L1 reserve.
-        payout_script_pubkey: investor_payout_spk,
+        // The investor CET output stays sidecar-controlled so `distribute` can use
+        // it to absorb the holder fanout fee, then forward the remainder to the
+        // investor's real L1 reserve wallet.
+        payout_script_pubkey: app.investor.spk.clone(),
         payout_serial_id: thread_rng().gen(),
         change_serial_id: thread_rng().gen(),
         inputs: investor_input_infos,
@@ -652,6 +665,10 @@ fn handle_create(app: &mut App, body: &Value) -> Result<Value> {
             status: "pending_funding".to_string(),
             peg_payout_outpoint: None,
             peg_payout_value: None,
+            investor_payout_outpoint: None,
+            investor_payout_value: None,
+            investor_payout_spk,
+            investor_payout_address,
         },
     );
 
@@ -762,7 +779,7 @@ fn handle_execute(app: &mut App, id: &str, body: &Value) -> Result<Value> {
         .iter()
         .enumerate()
         .find(|(_, o)| o.script_pubkey == app.peg.spk);
-    let (peg_sats, investor_sats) = match peg_output {
+    let peg_sats = match peg_output {
         Some((idx, txout)) => {
             let value = txout.value.to_sat();
             c.peg_payout_outpoint = Some(OutPoint {
@@ -770,10 +787,34 @@ fn handle_execute(app: &mut App, id: &str, body: &Value) -> Result<Value> {
                 vout: idx as u32,
             });
             c.peg_payout_value = Some(value);
-            (value as i64, c.total - value as i64)
+            value as i64
         }
-        // Peg output dust-discarded (peg received nothing): investor took it all.
-        None => (0, c.total),
+        None => {
+            c.peg_payout_outpoint = None;
+            c.peg_payout_value = Some(0);
+            0
+        }
+    };
+    let investor_output = cet
+        .output
+        .iter()
+        .enumerate()
+        .find(|(_, o)| o.script_pubkey == app.investor.spk);
+    let investor_sats = match investor_output {
+        Some((idx, txout)) => {
+            let value = txout.value.to_sat();
+            c.investor_payout_outpoint = Some(OutPoint {
+                txid: cet_txid_parsed,
+                vout: idx as u32,
+            });
+            c.investor_payout_value = Some(value);
+            value as i64
+        }
+        None => {
+            c.investor_payout_outpoint = None;
+            c.investor_payout_value = Some(0);
+            0
+        }
     };
 
     c.status = "executed".to_string();
@@ -851,6 +892,10 @@ fn handle_distribute(app: &App, id: &str, body: &Value) -> Result<Value> {
         (Some(op), Some(v)) => (op, v),
         _ => bail!("peg CET output not recorded; execute the contract first"),
     };
+    let investor_input = match (c.investor_payout_outpoint, c.investor_payout_value) {
+        (Some(op), Some(v)) if v > 0 => Some((op, v)),
+        _ => None,
+    };
 
     let fee_rate = body["fee_rate_sats_vb"].as_u64().unwrap_or(5);
     let mut requested: Vec<(String, ScriptBuf, u64)> = Vec::new();
@@ -873,45 +918,60 @@ fn handle_distribute(app: &App, id: &str, body: &Value) -> Result<Value> {
         bail!("distribute: total requested is zero");
     }
 
-    // Estimated vsize: 11 (overhead) + 68 (1 P2WPKH input) + 31 per P2WPKH output.
-    let est_vsize = 11 + 68 + 31 * requested.len() as u64;
-    let fee = est_vsize * fee_rate;
-    if peg_value <= fee {
-        bail!("peg CET output {} too small for fee {}", peg_value, fee);
-    }
-    let available = peg_value - fee;
+    let input_count = if investor_input.is_some() { 2 } else { 1 };
+    let total_inputs = peg_value + investor_input.map(|(_, v)| v).unwrap_or(0);
+    // Estimated vsize: 11 overhead + 68 per P2WPKH input + 31 per P2WPKH output.
+    let base_output_count = requested.len() as u64;
+    let with_investor_output_vsize = 11 + 68 * input_count + 31 * (base_output_count + 1);
+    let mut fee = with_investor_output_vsize * fee_rate;
+    let mut investor_payout_sats = total_inputs
+        .checked_sub(total_requested + fee)
+        .ok_or_else(|| anyhow!("distribute: CET outputs cannot cover exact holder payouts plus fee"))?;
 
-    // Scale each requested payout to the actually-spendable amount (peg output
-    // minus the fee), giving the remainder to the last holder so the sum is exact.
-    let mut amounts: Vec<u64> = requested
-        .iter()
-        .map(|(_, _, sats)| {
-            ((*sats as u128) * (available as u128) / (total_requested as u128)) as u64
-        })
-        .collect();
-    let assigned: u64 = amounts.iter().sum();
-    if let Some(last) = amounts.last_mut() {
-        *last += available - assigned;
+    // Avoid creating a dust investor change output; let that remainder become fee.
+    let include_investor_output = investor_payout_sats >= 546;
+    if !include_investor_output {
+        let holder_only_vsize = 11 + 68 * input_count + 31 * base_output_count;
+        fee = holder_only_vsize * fee_rate;
+        investor_payout_sats = total_inputs
+            .checked_sub(total_requested + fee)
+            .ok_or_else(|| anyhow!("distribute: CET outputs cannot cover exact holder payouts plus fee"))?;
     }
 
-    let outputs: Vec<TxOut> = requested
+    let mut outputs: Vec<TxOut> = requested
         .iter()
-        .zip(amounts.iter())
-        .map(|((_, spk, _), amt)| TxOut {
+        .map(|(_, spk, amt)| TxOut {
             value: Amount::from_sat(*amt),
             script_pubkey: spk.clone(),
         })
         .collect();
+    if include_investor_output {
+        outputs.push(TxOut {
+            value: Amount::from_sat(investor_payout_sats),
+            script_pubkey: c.investor_payout_spk.clone(),
+        });
+    }
 
     let mut tx = Transaction {
         version: Version::TWO,
         lock_time: LockTime::ZERO,
-        input: vec![TxIn {
-            previous_output: peg_outpoint,
-            script_sig: ScriptBuf::new(),
-            sequence: Sequence::MAX,
-            witness: Witness::new(),
-        }],
+        input: {
+            let mut inputs = vec![TxIn {
+                previous_output: peg_outpoint,
+                script_sig: ScriptBuf::new(),
+                sequence: Sequence::MAX,
+                witness: Witness::new(),
+            }];
+            if let Some((investor_outpoint, _)) = investor_input {
+                inputs.push(TxIn {
+                    previous_output: investor_outpoint,
+                    script_sig: ScriptBuf::new(),
+                    sequence: Sequence::MAX,
+                    witness: Witness::new(),
+                });
+            }
+            inputs
+        },
         output: outputs,
     };
     dlc::util::sign_p2wpkh_input(
@@ -923,16 +983,31 @@ fn handle_distribute(app: &App, id: &str, body: &Value) -> Result<Value> {
         Amount::from_sat(peg_value),
     )
     .map_err(|e| anyhow!("distribute sign_p2wpkh_input: {:?}", e))?;
+    if let Some((_, investor_value)) = investor_input {
+        dlc::util::sign_p2wpkh_input(
+            &app.secp,
+            &app.investor.sk,
+            &mut tx,
+            1,
+            EcdsaSighashType::All,
+            Amount::from_sat(investor_value),
+        )
+        .map_err(|e| anyhow!("distribute investor sign_p2wpkh_input: {:?}", e))?;
+    }
 
     let txid = chain.broadcast(&tx)?;
 
     let actual: Vec<Value> = requested
         .iter()
-        .zip(amounts.iter())
-        .map(|((addr, _, _), amt)| json!({ "address": addr, "sats": *amt }))
+        .map(|(addr, _, amt)| json!({ "address": addr, "sats": *amt }))
         .collect();
 
-    Ok(json!({ "txid": txid, "payouts": actual }))
+    Ok(json!({
+        "txid": txid,
+        "payouts": actual,
+        "investor_payout_sats": investor_payout_sats,
+        "investor_payout_address": c.investor_payout_address,
+    }))
 }
 
 // ---------------------------------------------------------------------------

@@ -100,7 +100,12 @@ RSpec.describe Dlc::NodeClient do
       expect(payload["payouts"]).to eq(
         [{ "address" => "bcrt1a", "sats" => 600 }, { "address" => "bcrt1b", "sats" => 400 }]
       )
-      ok("txid" => "12" * 32, "payouts" => payload["payouts"])
+      ok(
+        "txid" => "12" * 32,
+        "payouts" => payload["payouts"],
+        "investor_payout_sats" => 987,
+        "investor_payout_address" => "bcrt1invpay"
+      )
     end
 
     result = client.distribute(
@@ -110,6 +115,8 @@ RSpec.describe Dlc::NodeClient do
 
     expect(result).to be_a(described_class::DistributionResult)
     expect(result.txid).to eq("12" * 32)
+    expect(result.investor_payout_sats).to eq(987)
+    expect(result.investor_payout_address).to eq("bcrt1invpay")
   end
 
   it "broadcasts the timelocked refund" do

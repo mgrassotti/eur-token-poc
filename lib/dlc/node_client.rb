@@ -25,7 +25,7 @@ module Dlc
     Contract = Data.define(:contract_id, :funding_txid, :funding_vout, :funding_address, :funding_tx_hex, :status, :raw)
     Execution = Data.define(:cet_txid, :outcome, :peg_sats, :investor_sats, :raw)
     Refund = Data.define(:refund_txid, :raw)
-    DistributionResult = Data.define(:txid, :payouts, :raw)
+    DistributionResult = Data.define(:txid, :payouts, :investor_payout_sats, :investor_payout_address, :raw)
 
     DEFAULT_READ_TIMEOUT = 60
     INFO_READ_TIMEOUT = 5
@@ -112,7 +112,13 @@ module Dlc
         payouts: Array(payouts).map { |p| normalize_distribution(p) },
         fee_rate_sats_vb: Integer(fee_rate)
       })
-      DistributionResult.new(txid: raw["txid"], payouts: Array(raw["payouts"]), raw: raw)
+      DistributionResult.new(
+        txid: raw["txid"],
+        payouts: Array(raw["payouts"]),
+        investor_payout_sats: raw["investor_payout_sats"]&.to_i,
+        investor_payout_address: raw["investor_payout_address"],
+        raw: raw
+      )
     end
 
     private

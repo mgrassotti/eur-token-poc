@@ -46,10 +46,10 @@ module Dlc
 
       outputs = shares.map { |s| { address: address_resolver.call(s[:user]), sats: s[:sats] } }
       result = node.distribute(contract_id: contract.ddk_contract_id, payouts: outputs)
+      @last_result = result
 
-      # The node spends the real peg CET output and deducts a network fee, so the
-      # on-chain amounts can be slightly below the requested shares. Record the
-      # ACTUAL amounts the node paid so the reserves match the recovery package.
+      # The node spends the CET outputs and pushes the fanout fee onto the
+      # investor side, so holders should receive the exact requested shares.
       actual = actual_amounts(shares, result)
       persist!(result.txid, shares, outputs, actual)
 
@@ -117,6 +117,8 @@ module Dlc
       package["dlc_distribution"] = {
         "txid" => txid,
         "peg_pot_sats" => actual.sum,
+        "investor_payout_sats" => @last_result&.investor_payout_sats,
+        "investor_payout_address" => @last_result&.investor_payout_address,
         "payouts" => shares.each_with_index.map do |s, i|
           { "user_id" => s[:user].id, "sats" => actual[i], "address" => outputs[i][:address] }
         end

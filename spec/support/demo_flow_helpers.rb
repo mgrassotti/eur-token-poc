@@ -77,7 +77,7 @@ module DemoFlowHelpers
 
   # Investor collateral returned to reserve by the CET (accept-side output).
   def dlc_investor_return_sats(budget)
-    budget.reload.dlc_settlement&.investor_sats.to_i
+    budget.reload.recovery_package&.dig("dlc_distribution", "investor_payout_sats").to_i
   end
 
   # Actual per-holder peg_pot payout recorded by Dlc::Distribution (sats), keyed

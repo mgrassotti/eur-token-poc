@@ -149,25 +149,8 @@
   <% if @budget.investor_id == current_user.id && @market_rate.set? && @budget.margin_call_threshold_reached?(@market_rate.btc_eur_per_btc) %>
     <div class="alert alert-warning">
       <strong>Margin call:</strong> LTV ≥ <%= (Budget::MARGIN_CALL_LTV_THRESHOLD * 100).to_i %>%.
-      Versa collateral aggiuntivo nel multisig per abbassare il LTV ed evitare la liquidazione automatica al <%= (Budget::LIQUIDATION_LTV_THRESHOLD * 100).to_i %>%.
-    </div>
-  <% end %>
-
-  <% if @budget.investor_id == current_user.id && @market_rate.set? %>
-    <div class="card mb-4 border-secondary">
-      <div class="card-header">Versa collateral aggiuntivo</div>
-      <div class="card-body">
-        <p class="text-muted small">Top-up sullo stesso escrow del deal (simula annex multisig). Riduce il LTV immediatamente.</p>
-        <%= form_with url: budget_investor_collateral_deposit_path(@budget), class: "row g-2 align-items-end" do %>
-          <div class="col-auto">
-            <%= label_tag :amount_eur, "Importo (€)", class: "form-label" %>
-            <%= number_field_tag :amount_eur, nil, class: "form-control form-control-sm", step: 0.01, min: 0.01, required: true %>
-          </div>
-          <div class="col-auto">
-            <%= submit_tag "Versa", class: "btn btn-sm btn-outline-secondary" %>
-          </div>
-        <% end %>
-      </div>
+      Il deal è in area di rischio e, se l'LTV raggiunge il <%= (Budget::LIQUIDATION_LTV_THRESHOLD * 100).to_i %>%,
+      verrà liquidato automaticamente tramite settlement DLC forzato.
     </div>
   <% end %>
 

@@ -154,7 +154,8 @@
     <div class="alert alert-warning">
       <strong>Margin call (LTV ≥ <%= (Budget::MARGIN_CALL_LTV_THRESHOLD * 100).to_i %>%):</strong>
       il collateral del deal non copre più adeguatamente gli EURT al cambio corrente.
-      Versa collateral aggiuntivo per evitare la liquidazione automatica al <%= (Budget::LIQUIDATION_LTV_THRESHOLD * 100).to_i %>%.
+      Se l'LTV raggiunge il <%= (Budget::LIQUIDATION_LTV_THRESHOLD * 100).to_i %>%,
+      il deal verrà liquidato automaticamente tramite settlement DLC forzato.
       <ul class="mb-0 mt-2">
         <% @margin_call_budgets.each do |budget| %>
           <li><%= link_to "Ricarica ##{budget.id}", budget %> — LTV <%= number_to_percentage(budget.loan_to_value_ratio(@market_rate.btc_eur_per_btc) * 100, precision: 0) %></li>

@@ -23,7 +23,7 @@ module Admin
       end
       if margin_calls.any?
         ids = margin_calls.map(&:id).join(", ")
-        notice += " Margin call (LTV ≥ #{(Budget::MARGIN_CALL_LTV_THRESHOLD * 100).to_i}%): deal ##{ids}."
+        notice += " Warning LTV (≥ #{(Budget::MARGIN_CALL_LTV_THRESHOLD * 100).to_i}%): deal ##{ids} in area di rischio."
       end
       redirect_to root_path, notice: notice
     rescue ActiveRecord::RecordInvalid => e

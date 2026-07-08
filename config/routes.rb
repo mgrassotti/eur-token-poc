@@ -17,10 +17,7 @@ Rails.application.routes.draw do
 
     resource :recovery_package, only: :show, controller: "budget_recovery_packages"
 
-    resource :investor_collateral_deposit, only: :create, controller: "investor_collateral_deposits"
-
     resources :token_transfers, only: %i[new create]
-    resource :investor_collateral_deposit, only: :create
     resource :settlement, only: %i[new create], controller: "settlements"
   end
 

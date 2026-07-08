@@ -8,7 +8,7 @@
 <% if @spendable_accounts.many? %>
   <ul class="small text-muted mb-4">
     <% @spendable_accounts.each do |account| %>
-      <li>Deal #<%= account.budget_id %> — <%= format_eur(account.balance_cents) %></li>
+      <li>Deal #<%= account.budget.id %> — <%= format_eur(account.balance_cents) %></li>
     <% end %>
   </ul>
 <% end %>

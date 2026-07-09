@@ -2,25 +2,24 @@
   <div class="col-md-5">
     <div class="card shadow-sm">
       <div class="card-body">
-        <h1 class="h3 mb-4">Login</h1>
+        <h1 class="h3 mb-4"><%= t(".title") %></h1>
         <% if @demo_users_missing %>
           <div class="alert alert-warning">
-            Database senza utenti demo. Dalla root del progetto esegui
-            <code>bin/rails db:seed</code> (oppure <code>bin/rails db:setup</code>).
+            <%= t(".demo_users_missing_html") %>
           </div>
         <% end %>
         <%= form_with url: session_path do |f| %>
           <div class="mb-3">
-            <%= label_tag :email, "Email", class: "form-label" %>
+            <%= label_tag :email, t(".form.email"), class: "form-label" %>
             <%= email_field_tag :email, params[:email], class: "form-control", required: true %>
           </div>
           <div class="mb-3">
-            <%= label_tag :password, "Password", class: "form-label" %>
+            <%= label_tag :password, t(".form.password"), class: "form-label" %>
             <%= password_field_tag :password, nil, class: "form-control", required: true %>
           </div>
-          <%= submit_tag "Log in", class: "btn btn-primary w-100" %>
+          <%= submit_tag t(".form.submit"), class: "btn btn-primary w-100" %>
         <% end %>
-        <p class="text-muted small mt-3 mb-0">Demo: admin@example.com, alice@example.com / password</p>
+        <p class="text-muted small mt-3 mb-0"><%= t(".demo_credentials") %></p>
       </div>
     </div>
   </div>

@@ -1,100 +1,106 @@
-<h1 class="h3 mb-4">Ricarica</h1>
+<h1 class="h3 mb-4"><%= t(".title") %></h1>
 
 <div class="card mb-4">
   <div class="card-body">
     <div class="d-flex justify-content-between align-items-start mb-3">
       <div>
-        <h2 class="h5 mb-1">Ricarica #<%= @budget.id %></h2>
+        <h2 class="h5 mb-1"><%= t(".summary.heading", id: @budget.id) %></h2>
         <%= budget_status_badge(@budget) %>
       </div>
     </div>
 
     <dl class="row mb-0">
-      <dt class="col-sm-3">Richiedente</dt>
+      <dt class="col-sm-3"><%= t(".summary.borrower") %></dt>
       <dd class="col-sm-9"><%= @budget.borrower.name %></dd>
-      <dt class="col-sm-3">Investitore</dt>
-      <dd class="col-sm-9"><%= @budget.investor&.name || "—" %></dd>
-      <dt class="col-sm-3">Importo richiesto</dt>
+      <dt class="col-sm-3"><%= t(".summary.investor") %></dt>
+      <dd class="col-sm-9"><%= @budget.investor&.name || t("common.not_available") %></dd>
+      <dt class="col-sm-3"><%= t(".summary.requested_amount") %></dt>
       <dd class="col-sm-9"><%= format_eur(@budget.amount_eur_cents) %></dd>
-      <dt class="col-sm-3">Collateral richiedente</dt>
+      <dt class="col-sm-3"><%= t(".summary.borrower_collateral") %></dt>
       <dd class="col-sm-9">
         <% if @budget.borrower_locked_sats.positive? %>
-          <%= format_sats(@budget.borrower_locked_sats) %> (<%= format_eur(@budget.amount_eur_cents) %>) — non rimborsato
+          <%= t(".summary.borrower_collateral_value",
+            sats: format_sats(@budget.borrower_locked_sats),
+            amount: format_eur(@budget.amount_eur_cents)) %>
         <% else %>
-          —
+          <%= t("common.not_available") %>
         <% end %>
       </dd>
-      <dt class="col-sm-3">Collateral investitore</dt>
+      <dt class="col-sm-3"><%= t(".summary.investor_collateral") %></dt>
       <dd class="col-sm-9">
         <% if @budget.investor_locked_sats.positive? %>
-          <%= format_sats(@budget.investor_locked_sats) %> (<%= format_eur(@budget.collateral_eur_cents) %>) — rischio FX
+          <%= t(".summary.investor_collateral_value",
+            sats: format_sats(@budget.investor_locked_sats),
+            amount: format_eur(@budget.collateral_eur_cents)) %>
         <% else %>
-          <%= format_eur(@budget.collateral_eur_cents) %> — in attesa di attivazione
+          <%= t(".summary.investor_collateral_pending", amount: format_eur(@budget.collateral_eur_cents)) %>
         <% end %>
       </dd>
       <% if @budget.peg_set? %>
-        <dt class="col-sm-3">Peg BTC/€</dt>
-        <dd class="col-sm-9"><%= number_with_delimiter(@budget.peg_eur_per_btc) %> €/BTC</dd>
+        <dt class="col-sm-3"><%= t(".summary.peg_rate") %></dt>
+        <dd class="col-sm-9"><%= t(".summary.peg_rate_value", rate: number_with_delimiter(@budget.peg_eur_per_btc)) %></dd>
       <% elsif @market_rate.set? %>
-        <dt class="col-sm-3">Peg BTC/€</dt>
+        <dt class="col-sm-3"><%= t(".summary.peg_rate") %></dt>
         <dd class="col-sm-9">
-          <%= number_with_delimiter(@market_rate.btc_eur_per_btc) %> €/BTC
-          <span class="text-muted small">(cambio attuale — fissato all'attivazione)</span>
+          <%= t(".summary.peg_rate_value", rate: number_with_delimiter(@market_rate.btc_eur_per_btc)) %>
+          <span class="text-muted small">(<%= t(".summary.current_rate_note") %>)</span>
         </dd>
       <% end %>
-      <dt class="col-sm-3">Periodo</dt>
+      <dt class="col-sm-3"><%= t(".summary.period") %></dt>
       <dd class="col-sm-9"><%= @budget.period_start %> – <%= @budget.period_end %></dd>
       <% if @budget.genesis_block_height %>
-        <dt class="col-sm-3">Blocchi deal</dt>
+        <dt class="col-sm-3"><%= t(".summary.deal_blocks") %></dt>
         <dd class="col-sm-9">
           <%= number_with_delimiter(@budget.genesis_block_height) %> – <%= number_with_delimiter(@budget.maturity_block_height) %>
           <% if @budget.active? %>
-            (<%= number_with_delimiter(@budget.blocks_remaining) %> rimanenti, altezza corrente <%= number_with_delimiter(ChainState.block_height) %>)
+            (<%= t(".summary.blocks_remaining",
+              count: number_with_delimiter(@budget.blocks_remaining),
+              current_height: number_with_delimiter(ChainState.block_height)) %>)
           <% end %>
         </dd>
       <% end %>
       <% if @budget.active? && @market_rate.set? %>
         <% ltv = @budget.loan_to_value_ratio(@market_rate.btc_eur_per_btc) %>
-        <dt class="col-sm-3">LTV corrente</dt>
+        <dt class="col-sm-3"><%= t(".summary.current_ltv") %></dt>
         <dd class="col-sm-9"><%= budget_ltv_badge(@budget, @market_rate.btc_eur_per_btc) %></dd>
       <% end %>
       <% if @budget.l1_multisig_provisioned? %>
-        <dt class="col-sm-3">Collateral lock L1</dt>
+        <dt class="col-sm-3"><%= t(".summary.l1_collateral_lock") %></dt>
         <dd class="col-sm-9">
           <code><%= @budget.escrow_outpoint %></code>
           <% if @budget.recovery_package.dig("escrow", "address") %>
             <span class="text-muted small d-block"><%= @budget.recovery_package.dig("escrow", "address") %></span>
           <% end %>
         </dd>
-        <dt class="col-sm-3">Pubkeys (2-of-2)</dt>
+        <dt class="col-sm-3"><%= t(".summary.pubkeys") %></dt>
         <dd class="col-sm-9">
-          <span class="text-muted small d-block">peg: <code><%= truncate_hex(@budget.peg_party_pubkey) %></code></span>
-          <span class="text-muted small d-block">investor: <code><%= truncate_hex(@budget.investor_pubkey) %></code></span>
+          <span class="text-muted small d-block"><%= t(".summary.pubkey_peg") %>: <code><%= truncate_hex(@budget.peg_party_pubkey) %></code></span>
+          <span class="text-muted small d-block"><%= t(".summary.pubkey_investor") %>: <code><%= truncate_hex(@budget.investor_pubkey) %></code></span>
         </dd>
       <% elsif @budget.active? %>
-        <dt class="col-sm-3">Escrow L1</dt>
-        <dd class="col-sm-9"><span class="text-warning">Non provisionato</span></dd>
+        <dt class="col-sm-3"><%= t(".summary.l1_escrow") %></dt>
+        <dd class="col-sm-9"><span class="text-warning"><%= t(".summary.not_provisioned") %></span></dd>
       <% end %>
       <% if @budget.dlc_contract.present? %>
         <% dlc = @budget.dlc_contract %>
-        <dt class="col-sm-3">Contratto DLC (2-of-2)</dt>
+        <dt class="col-sm-3"><%= t(".summary.dlc_contract") %></dt>
         <dd class="col-sm-9">
-          <span class="text-muted small d-block">funding {peg, investor}: <code><%= dlc.funding_outpoint %></code></span>
-          <span class="text-muted small d-block">stato: <code><%= dlc.status %></code></span>
-          <span class="text-muted small d-block">oracle event: <code><%= dlc.oracle_event_id %></code> (<%= dlc.num_digits %> digit, <%= dlc.unit %>)</span>
+          <span class="text-muted small d-block"><%= t(".summary.dlc_funding") %>: <code><%= dlc.funding_outpoint %></code></span>
+          <span class="text-muted small d-block"><%= t(".summary.dlc_status") %>: <code><%= dlc.status %></code></span>
+          <span class="text-muted small d-block"><%= t(".summary.dlc_oracle_event") %>: <code><%= dlc.oracle_event_id %></code> (<%= t(".summary.dlc_digits", count: dlc.num_digits, unit: dlc.unit) %>)</span>
         </dd>
         <% if @budget.dlc_settlement&.executed? %>
           <% st = @budget.dlc_settlement %>
-          <dt class="col-sm-3">Settlement DLC</dt>
+          <dt class="col-sm-3"><%= t(".summary.dlc_settlement") %></dt>
           <dd class="col-sm-9">
-            <span class="text-muted small d-block">CET txid: <code><%= truncate_hex(st.cet_txid) %></code></span>
+            <span class="text-muted small d-block"><%= t(".summary.cet_txid") %>: <code><%= truncate_hex(st.cet_txid) %></code></span>
             <span class="text-muted small d-block">
-              outcome: <%= number_with_delimiter(st.outcome) %> €/BTC ·
-              peg_pot: <%= format_sats(st.peg_pot_sats) %> ·
-              investor: <%= format_sats(st.investor_sats) %>
+              <%= t(".summary.dlc_outcome") %>: <%= t(".summary.peg_rate_value", rate: number_with_delimiter(st.outcome)) %> ·
+              <%= t(".summary.peg_pot") %>: <%= format_sats(st.peg_pot_sats) %> ·
+              <%= t(".summary.investor") %>: <%= format_sats(st.investor_sats) %>
             </span>
             <% if @budget.recovery_package.dig("dlc_distribution", "txid") %>
-              <span class="text-muted small d-block">distribuzione: <code><%= truncate_hex(@budget.recovery_package.dig("dlc_distribution", "txid")) %></code></span>
+              <span class="text-muted small d-block"><%= t(".summary.distribution") %>: <code><%= truncate_hex(@budget.recovery_package.dig("dlc_distribution", "txid")) %></code></span>
             <% end %>
           </dd>
         <% end %>
@@ -102,10 +108,10 @@
     </dl>
     <% if @budget.recovery_package.present? && (admin? || @budget.borrower_id == current_user.id || @budget.investor_id == current_user.id) %>
       <div class="mt-3 pt-3 border-top">
-        <%= link_to "Scarica recovery package (JSON)", budget_recovery_package_path(@budget),
+        <%= link_to t(".summary.download_recovery_package"), budget_recovery_package_path(@budget),
           class: "btn btn-sm btn-outline-primary",
           data: { turbo: false } %>
-        <span class="text-muted small ms-2">MULTISIG-SPEC §6 — deal params, outpoint, refund locktime</span>
+        <span class="text-muted small ms-2"><%= t(".summary.recovery_package_note") %></span>
       </div>
     <% end %>
   </div>
@@ -113,55 +119,54 @@
 
 <% if @budget.pending? && @budget.borrower_id != current_user.id && @market_rate.set? %>
   <div class="card mb-4 border-warning">
-    <div class="card-header bg-warning-subtle">Accetta e collateralizza</div>
+    <div class="card-header bg-warning-subtle"><%= t(".activation.title") %></div>
     <div class="card-body">
       <p class="mb-3">
-        Peg al momento dell'attivazione: <strong><%= number_with_delimiter(@market_rate.btc_eur_per_btc) %> €/BTC</strong>
-        <span class="text-muted small">(cambio corrente)</span>
+        <%= t(".activation.peg_rate_html", rate: number_with_delimiter(@market_rate.btc_eur_per_btc)) %>
+        <span class="text-muted small">(<%= t(".activation.current_rate") %>)</span>
       </p>
       <p class="text-muted mb-3">
         <% investor_required_sats = Budgets::ReserveRequirement.investor_sats_for(@budget, @market_rate.btc_eur_per_btc) %>
         <% investor_available_sats = Budgets::ReserveRequirement.available_sats_for(current_user) %>
-        Dal conto di riserva verranno decurtati
-        <strong><%= format_sats(investor_required_sats) %></strong>
-        (collateral <%= format_eur(@budget.collateral_eur_cents) %>, inclusa fee stimata funding L1).
-        Disponibili sul conto: <strong><%= format_sats(investor_available_sats) %></strong>.
+        <%= t(".activation.reserve_impact_html",
+          required_sats: format_sats(investor_required_sats),
+          collateral: format_eur(@budget.collateral_eur_cents),
+          available_sats: format_sats(investor_available_sats)) %>
       </p>
       <p class="text-muted small mb-3">
-        All'attivazione verrà creato un contratto DLC 2-of-2 {peg, investor}
-        con settlement vincolato all'oracle su regtest
-        (richiede <code>./bin/regtest up</code>).
+        <%= t(".activation.contract_note_html") %>
       </p>
-      <%= button_to "Accetta rischio e attiva la richiesta", activate_budget_path(@budget), method: :post, class: "btn btn-warning" %>
+      <%= button_to t(".activation.submit"), activate_budget_path(@budget), method: :post, class: "btn btn-warning" %>
     </div>
   </div>
 <% end %>
 
 <% if @budget.pending? && @budget.borrower_id == current_user.id %>
-  <div class="alert alert-info">In attesa di un investitore.</div>
+  <div class="alert alert-info"><%= t(".pending.awaiting_investor") %></div>
 <% end %>
 
 <% if @budget.pending? && !@market_rate.set? %>
-  <div class="alert alert-secondary">In attesa che l'admin imposti il cambio BTC/€ corrente.</div>
+  <div class="alert alert-secondary"><%= t(".pending.awaiting_market_rate") %></div>
 <% end %>
 
 <% if @budget.active? %>
   <% if @budget.investor_id == current_user.id && @market_rate.set? && @budget.margin_call_threshold_reached?(@market_rate.btc_eur_per_btc) %>
     <div class="alert alert-warning">
-      <strong>Margin call:</strong> LTV ≥ <%= (Budget::MARGIN_CALL_LTV_THRESHOLD * 100).to_i %>%.
-      Il deal è in area di rischio e, se l'LTV raggiunge il <%= (Budget::LIQUIDATION_LTV_THRESHOLD * 100).to_i %>%,
-      verrà liquidato automaticamente tramite settlement DLC forzato.
+      <strong><%= t(".active.margin_call_title") %></strong>
+      <%= t(".active.margin_call_body",
+        margin_threshold: (Budget::MARGIN_CALL_LTV_THRESHOLD * 100).to_i,
+        liquidation_threshold: (Budget::LIQUIDATION_LTV_THRESHOLD * 100).to_i) %>
     </div>
   <% end %>
 
   <div class="card mb-4">
-    <div class="card-header">Token in circolazione</div>
+    <div class="card-header"><%= t(".active.token_supply.title") %></div>
     <div class="table-responsive">
       <table class="table mb-0">
         <thead>
           <tr>
-            <th>Utente</th>
-            <th>Saldo EURT</th>
+            <th><%= t(".active.token_supply.user") %></th>
+            <th><%= t(".active.token_supply.balance") %></th>
           </tr>
         </thead>
         <tbody>
@@ -178,22 +183,22 @@
 
   <% if admin? %>
     <div class="d-flex gap-2 mb-4">
-      <%= link_to "Settlement fine mese", new_budget_settlement_path(@budget), class: "btn btn-danger" %>
+      <%= link_to t(".active.run_settlement"), new_budget_settlement_path(@budget), class: "btn btn-danger" %>
     </div>
   <% end %>
 <% end %>
 
 <% if @budget.token_transfers.any? %>
   <div class="card mb-4">
-    <div class="card-header">Storico trasferimenti token</div>
+    <div class="card-header"><%= t(".transfers.title") %></div>
     <div class="table-responsive">
       <table class="table mb-0">
         <thead>
           <tr>
-            <th>Da</th>
-            <th>A</th>
-            <th>Importo</th>
-            <th>Data</th>
+            <th><%= t(".transfers.from") %></th>
+            <th><%= t(".transfers.to") %></th>
+            <th><%= t(".transfers.amount") %></th>
+            <th><%= t(".transfers.date") %></th>
           </tr>
         </thead>
         <tbody>
@@ -214,14 +219,14 @@
 <% if @budget.settlement.present? %>
   <% s = @budget.settlement %>
   <div class="card border-success">
-    <div class="card-header bg-success-subtle">Settlement eseguito</div>
+    <div class="card-header bg-success-subtle"><%= t(".settlement.title") %></div>
     <div class="card-body">
-      <p>Cambio corrente fine mese: <strong><%= number_with_delimiter(s.end_btc_eur_rate) %> €/BTC</strong></p>
-      <p>Peg budget: <strong><%= number_with_delimiter(@budget.peg_eur_per_btc) %> €/BTC</strong></p>
-      <p>BTC ai detentori token: <strong><%= format_sats(s.total_btc_to_holders_sats) %></strong></p>
-      <p>BTC a <%= @budget.investor.name %> (residuo collateral): <strong><%= format_sats(s.btc_to_investor_sats) %></strong></p>
+      <p><%= t(".settlement.end_rate_html", rate: number_with_delimiter(s.end_btc_eur_rate)) %></p>
+      <p><%= t(".settlement.peg_rate_html", rate: number_with_delimiter(@budget.peg_eur_per_btc)) %></p>
+      <p><%= t(".settlement.holders_btc_html", amount: format_sats(s.total_btc_to_holders_sats)) %></p>
+      <p><%= t(".settlement.investor_btc_html", investor: @budget.investor.name, amount: format_sats(s.btc_to_investor_sats)) %></p>
     </div>
   </div>
 <% end %>
 
-<%= link_to "← Dashboard", root_path, class: "btn btn-link mt-3 px-0" %>
+<%= link_to t("common.actions.back_to_dashboard"), root_path, class: "btn btn-link mt-3 px-0" %>

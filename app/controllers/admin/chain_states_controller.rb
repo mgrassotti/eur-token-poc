@@ -7,14 +7,14 @@ module Admin
 
     def update
       height = params[:bitcoin_block_height].to_i
-      raise ArgumentError, "Altezza blocco non valida" if height.negative?
+      raise ArgumentError, I18n.t("flash.admin.chain_state.invalid_height") if height.negative?
 
       settled_before = Budget.settled.count
       ChainState.update_block_height!(height)
       settled_count = Budget.settled.count - settled_before
 
-      notice = "Altezza blocco aggiornata a #{height}."
-      notice += " Settlement automatico eseguito per #{settled_count} deal." if settled_count.positive?
+      notice = t("flash.admin.chain_state.updated", height: height)
+      notice += " #{t("flash.admin.chain_state.auto_settled", count: settled_count)}" if settled_count.positive?
 
       redirect_to root_path, notice: notice
     rescue ArgumentError, ActiveRecord::RecordInvalid => e

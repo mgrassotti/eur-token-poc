@@ -48,8 +48,8 @@ module Rgb
     attr_reader :budget
 
     def validate!
-      raise Error, "Budget non attivo" unless budget.active?
-      raise Error, "Escrow non provisionato" unless budget.l1_multisig_provisioned?
+      raise Error, I18n.t("services.rgb.lib_issue.budget_not_active") unless budget.active?
+      raise Error, I18n.t("services.rgb.lib_issue.escrow_not_provisioned") unless budget.l1_multisig_provisioned?
     end
   end
 end

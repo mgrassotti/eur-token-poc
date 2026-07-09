@@ -17,6 +17,6 @@ class TokenTransfer < ApplicationRecord
   def different_users
     return if from_user_id != to_user_id
 
-    errors.add(:to_user, "must be different from sender")
+    errors.add(:to_user, :must_be_different_from_sender)
   end
 end

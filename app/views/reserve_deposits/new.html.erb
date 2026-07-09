@@ -1,28 +1,30 @@
-<h1 class="h3 mb-4">Deposita su conto di riserva</h1>
+<h1 class="h3 mb-4"><%= t(".title") %></h1>
 
 <div class="card mb-4">
   <div class="card-body">
     <p class="text-muted">
-      Simula un bonifico BTC dal <strong><%= L1::ExchangeWallet::DISPLAY_NAME %></strong> (<code><%= L1::ExchangeWallet::WALLET_NAME %></code>,
-      float demo <%= BtcConversion.format_btc(L1::ExchangeWallet::INITIAL_BALANCE_SATS) %>) verso il tuo wallet regtest personale.
-      Alla conferma la <strong>catena simulata</strong> avanza di <%= L1::DepositReserveService::BLOCKS_PER_DEPOSIT %> blocchi.
+      <%= t(".description_html",
+        wallet_name: L1::ExchangeWallet::DISPLAY_NAME,
+        wallet_code: L1::ExchangeWallet::WALLET_NAME,
+        float_balance: BtcConversion.format_btc(L1::ExchangeWallet::INITIAL_BALANCE_SATS),
+        blocks: L1::DepositReserveService::BLOCKS_PER_DEPOSIT) %>
     </p>
 
     <%= form_with url: reserve_deposit_path, method: :post, class: "row g-3 align-items-end" do %>
       <div class="col-auto">
-        <%= label_tag :amount_btc, "Importo (BTC)", class: "form-label" %>
+        <%= label_tag :amount_btc, t(".form.amount"), class: "form-label" %>
         <%= number_field_tag :amount_btc, @amount_btc,
           class: "form-control",
           step: 0.00000001,
           min: 0.00000001,
           required: true %>
-        <div class="form-text">Default demo: Alice 0,1 · Bob 0,2 BTC</div>
+        <div class="form-text"><%= t(".form.default_values") %></div>
       </div>
       <div class="col-auto">
-        <%= submit_tag "Conferma deposito", class: "btn btn-success" %>
+        <%= submit_tag t(".form.submit"), class: "btn btn-success" %>
       </div>
     <% end %>
   </div>
 </div>
 
-<%= link_to "← Dashboard", root_path, class: "btn btn-link px-0" %>
+<%= link_to t("common.actions.back_to_dashboard"), root_path, class: "btn btn-link px-0" %>

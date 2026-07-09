@@ -1,14 +1,14 @@
-<h1 class="h3 mb-4">Tutti i budget</h1>
+<h1 class="h3 mb-4"><%= t(".title") %></h1>
 
 <div class="table-responsive">
   <table class="table table-striped">
     <thead>
       <tr>
         <th>ID</th>
-        <th>Richiedente</th>
-        <th>Investitore</th>
-        <th>Importo</th>
-        <th>Stato</th>
+        <th><%= t(".table.borrower") %></th>
+        <th><%= t(".table.investor") %></th>
+        <th><%= t(".table.amount") %></th>
+        <th><%= t(".table.status") %></th>
         <th></th>
       </tr>
     </thead>
@@ -17,14 +17,14 @@
         <tr>
           <td>#<%= budget.id %></td>
           <td><%= budget.borrower.name %></td>
-          <td><%= budget.investor&.name || "—" %></td>
+          <td><%= budget.investor&.name || t("common.not_available") %></td>
           <td><%= format_eur(budget.amount_eur_cents) %></td>
           <td><%= budget_status_badge(budget) %></td>
-          <td><%= link_to "Apri", budget, class: "btn btn-sm btn-outline-primary" %></td>
+          <td><%= link_to t("common.actions.open"), budget, class: "btn btn-sm btn-outline-primary" %></td>
         </tr>
       <% end %>
     </tbody>
   </table>
 </div>
 
-<%= link_to "← Dashboard", root_path, class: "btn btn-link px-0" %>
+<%= link_to t("common.actions.back_to_dashboard"), root_path, class: "btn btn-link px-0" %>

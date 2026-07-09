@@ -21,7 +21,7 @@ module Rgb
 
     # Returns the ready LightningClient for the user (raises if unavailable).
     def self.ensure_for!(user)
-      call(user: user) || raise(Error, "RGB node non configurato per utente #{user.id}")
+      call(user: user) || raise(Error, I18n.t("services.rgb.wallet_setup.node_not_configured", user_id: user.id))
     end
 
     def initialize(user:)

@@ -17,13 +17,18 @@ module Admin
       margin_calls = Budget.active.where.not(id: settled_ids).select { |b| b.margin_call_threshold_reached?(rate.btc_eur_per_btc) }
       notice = if liquidations.any?
         ids = settled_ids.join(", ")
-        "Liquidazione automatica (LTV ≥ #{(Budget::LIQUIDATION_LTV_THRESHOLD * 100).to_i}%): deal ##{ids} chiusi al cambio #{params[:btc_eur_per_btc]} €/BTC."
+        t("flash.admin.market_rate.liquidations",
+          threshold: (Budget::LIQUIDATION_LTV_THRESHOLD * 100).to_i,
+          ids: ids,
+          rate: params[:btc_eur_per_btc])
       else
-        "Cambio BTC/€ aggiornato a #{params[:btc_eur_per_btc]} €/BTC."
+        t("flash.admin.market_rate.updated", rate: params[:btc_eur_per_btc])
       end
       if margin_calls.any?
         ids = margin_calls.map(&:id).join(", ")
-        notice += " Warning LTV (≥ #{(Budget::MARGIN_CALL_LTV_THRESHOLD * 100).to_i}%): deal ##{ids} in area di rischio."
+        notice += " #{t("flash.admin.market_rate.margin_calls",
+          threshold: (Budget::MARGIN_CALL_LTV_THRESHOLD * 100).to_i,
+          ids: ids)}"
       end
       redirect_to root_path, notice: notice
     rescue ActiveRecord::RecordInvalid => e

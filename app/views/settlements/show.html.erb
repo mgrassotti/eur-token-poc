@@ -1,32 +1,35 @@
-<h1 class="h3 mb-4">Settlement completato</h1>
+<h1 class="h3 mb-4"><%= t(".title") %></h1>
 
 <div class="card mb-4">
-  <div class="card-header">Riepilogo FloorEUR</div>
+  <div class="card-header"><%= t(".summary.title") %></div>
   <div class="card-body">
-    <p>Strike (peg) budget: <strong><%= number_with_delimiter(@result.peg_eur_per_btc) %> €/BTC</strong></p>
-    <p>Spot oracle (settlement): <strong><%= number_with_delimiter(@result.end_btc_eur_rate) %> €/BTC</strong></p>
-    <p>Passività totale deal: <strong><%= format_eur(@result.payoff.liability_eur_cents) %></strong>
-      (<%= @result.payoff.months_elapsed %> mesi × <%= @budget.rate_bps_monthly / 100.0 %>%/mese)</p>
-    <p>Payout holder (lordo): <strong><%= format_sats(@result.payoff.gross_holder_sats) %></strong>
-      — effettivo dopo cap escrow: <strong><%= format_sats(@result.payoff.total_holder_sats) %></strong></p>
+    <p><%= t(".summary.peg_rate_html", rate: number_with_delimiter(@result.peg_eur_per_btc)) %></p>
+    <p><%= t(".summary.spot_rate_html", rate: number_with_delimiter(@result.end_btc_eur_rate)) %></p>
+    <p><%= t(".summary.total_liability_html",
+      amount: format_eur(@result.payoff.liability_eur_cents),
+      months: @result.payoff.months_elapsed,
+      monthly_rate: @budget.rate_bps_monthly / 100.0) %></p>
+    <p><%= t(".summary.holder_payout_html",
+      gross: format_sats(@result.payoff.gross_holder_sats),
+      net: format_sats(@result.payoff.total_holder_sats)) %></p>
     <% if @result.payoff.insolvent %>
-      <p class="text-warning mb-0">Escrow insufficiente: payout holder limitato al distributable (PAYOFF-SPEC §7).</p>
+      <p class="text-warning mb-0"><%= t(".summary.insolvent") %></p>
     <% elsif @result.market_rate_updated %>
-      <p class="text-success mb-0">Cambio BTC/€ in dashboard aggiornato a fine settlement.</p>
+      <p class="text-success mb-0"><%= t(".summary.market_rate_updated") %></p>
     <% end %>
   </div>
 </div>
 
 <div class="card mb-4">
-  <div class="card-header">Detentori token — quota liability € in sats</div>
+  <div class="card-header"><%= t(".holders.title") %></div>
   <div class="table-responsive">
     <table class="table mb-0">
       <thead>
         <tr>
-          <th>Utente</th>
-          <th>Token bruciati</th>
-          <th>Quota € a maturity</th>
-          <th>BTC accreditati</th>
+          <th><%= t(".holders.user") %></th>
+          <th><%= t(".holders.burned_tokens") %></th>
+          <th><%= t(".holders.maturity_share") %></th>
+          <th><%= t(".holders.btc_credited") %></th>
         </tr>
       </thead>
       <tbody>
@@ -44,12 +47,12 @@
 </div>
 
 <div class="card mb-4 border-warning">
-  <div class="card-header bg-warning-subtle">Investitore — residuo escrow</div>
+  <div class="card-header bg-warning-subtle"><%= t(".investor.title") %></div>
   <div class="card-body">
-    <p><%= @result.investor.name %> riceve il residuo del pool dopo i payout holder e le mining fee stimate:</p>
+    <p><%= t(".investor.description", name: @result.investor.name) %></p>
     <p class="display-6 mb-1"><%= format_sats(@result.investor_btc_sats) %></p>
-    <p class="text-muted mb-0">Valore allo spot: <%= format_savings_eur(@result.investor_eur_at_end) %></p>
+    <p class="text-muted mb-0"><%= t(".investor.spot_value", amount: format_savings_eur(@result.investor_eur_at_end)) %></p>
   </div>
 </div>
 
-<%= link_to "Torna al budget", @budget, class: "btn btn-primary" %>
+<%= link_to t(".back"), @budget, class: "btn btn-primary" %>

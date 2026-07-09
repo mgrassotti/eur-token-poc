@@ -26,13 +26,13 @@ module ApplicationHelper
 
   def budget_status_badge(budget)
     color = { "pending" => "warning", "active" => "success", "settled" => "secondary" }[budget.status]
-    label = { "pending" => "In attesa", "active" => "Attiva", "settled" => "Chiusa" }[budget.status]
+    label = t("budget.statuses.#{budget.status}")
     tag.span label, class: "badge text-bg-#{color}"
   end
 
   def budget_ltv_badge(budget, btc_eur_per_btc)
     ltv = budget.loan_to_value_ratio(btc_eur_per_btc)
-    return tag.span "LTV —", class: "badge text-bg-secondary" unless ltv
+    return tag.span t("dashboard.common.ltv_missing"), class: "badge text-bg-secondary" unless ltv
 
     color = if ltv >= Budget::LIQUIDATION_LTV_THRESHOLD
               "danger"
@@ -43,7 +43,8 @@ module ApplicationHelper
             else
               "secondary"
             end
-    tag.span "LTV #{number_to_percentage(ltv * 100, precision: 0)}", class: "badge text-bg-#{color}"
+    tag.span t("dashboard.common.ltv_value", value: number_to_percentage(ltv * 100, precision: 0)),
+             class: "badge text-bg-#{color}"
   end
 
   def fund_importo_cents(user, budget)

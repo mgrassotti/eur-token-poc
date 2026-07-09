@@ -22,7 +22,7 @@ module Rgb
       validate!
 
       asset_id = budget.rgb_asset_id
-      raise Error, "rgb_asset_id mancante sul deal" if asset_id.blank?
+      raise Error, I18n.t("services.rgb.lib_transfer.missing_asset_id") if asset_id.blank?
 
       sender = WalletSetupService.ensure_for!(from_user)
       recipient = WalletSetupService.ensure_for!(to_user)
@@ -55,11 +55,11 @@ module Rgb
     attr_reader :budget, :from_user, :to_user, :amount_cents
 
     def validate!
-      raise Error, "Budget non attivo" unless budget.active?
-      raise Error, "Importo non positivo" unless amount_cents.positive?
+      raise Error, I18n.t("services.rgb.lib_transfer.budget_not_active") unless budget.active?
+      raise Error, I18n.t("services.rgb.lib_transfer.invalid_amount") unless amount_cents.positive?
 
       sender_balance = BalanceService.settled(user: from_user, budget: budget)
-      raise Error, "RGB balance insufficiente" if sender_balance < amount_cents
+      raise Error, I18n.t("services.rgb.lib_transfer.insufficient_balance") if sender_balance < amount_cents
     end
   end
 end

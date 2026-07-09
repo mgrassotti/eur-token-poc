@@ -44,7 +44,7 @@ module Settlements
 
         budget.collateral_lock.lock!
 
-        raise Error, "Collateral insufficient for token redemptions" if payoff.investor_remainder_sats.negative?
+        raise Error, I18n.t("services.settlements.execute.collateral_insufficient") if payoff.investor_remainder_sats.negative?
 
         settlement = Settlement.create!(
           budget: budget,
@@ -95,13 +95,13 @@ module Settlements
     attr_reader :budget, :end_btc_eur_rate, :set_by, :force_liquidation
 
     def validate!
-      raise Error, "Budget is not active" unless budget.active?
-      raise Error, "End BTC/EUR rate must be positive" unless end_btc_eur_rate.positive?
-      raise Error, "Budget peg is missing" unless budget.peg_set?
-      raise Error, "Budget already settled" if budget.settlement.present?
+      raise Error, I18n.t("services.settlements.execute.budget_not_active") unless budget.active?
+      raise Error, I18n.t("services.settlements.execute.invalid_end_rate") unless end_btc_eur_rate.positive?
+      raise Error, I18n.t("services.settlements.execute.missing_peg") unless budget.peg_set?
+      raise Error, I18n.t("services.settlements.execute.already_settled") if budget.settlement.present?
       return if force_liquidation || budget.ready_for_settlement?
 
-      raise Error, "Settlement disponibile dal blocco #{budget.maturity_block_height}"
+      raise Error, I18n.t("services.settlements.execute.available_from_block", maturity_block_height: budget.maturity_block_height)
     end
 
     def update_market_rate!
@@ -115,7 +115,7 @@ module Settlements
     end
 
     def settle!(token_accounts, payoff)
-      raise Error, "Contratto DLC non finanziato" unless budget.dlc_contract&.funded?
+      raise Error, I18n.t("services.settlements.execute.dlc_not_funded") unless budget.dlc_contract&.funded?
 
       # Snapshot holder allocations before redemption zeroes the token balances;
       # the DLC peg_pot distribution fans out on these maturity shares.

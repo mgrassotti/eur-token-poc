@@ -1,7 +1,7 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="<%= I18n.locale %>">
   <head>
-    <title><%= content_for(:title) || "BTC wallet PoC" %></title>
+    <title><%= content_for(:title) || t("app.title") %></title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
@@ -12,9 +12,18 @@
   <body class="bg-light">
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
       <div class="container">
-        <%= link_to "BTC wallet PoC", root_path, class: "navbar-brand" %>
-        <% if logged_in? %>
-          <div class="navbar-nav ms-auto align-items-lg-center gap-lg-3">
+        <%= link_to t("app.title"), root_path, class: "navbar-brand" %>
+        <div class="navbar-nav ms-auto align-items-lg-center gap-2 gap-lg-3 flex-row flex-wrap">
+          <div class="btn-group btn-group-sm" role="group" aria-label="<%= t("layout.language_switch.label") %>">
+            <% available_locales.each do |locale| %>
+              <% active = I18n.locale == locale %>
+              <%= link_to t("layout.language_switch.#{locale}"),
+                locale_switch_url(locale),
+                class: "btn #{active ? 'btn-light' : 'btn-outline-light'}",
+                hreflang: locale %>
+            <% end %>
+          </div>
+          <% if logged_in? %>
             <% if Rails.env.development? || Rails.env.test? %>
               <%= form_with url: dev_user_switch_path, method: :post, class: "d-flex align-items-center" do %>
                 <%= select_tag :user_id,
@@ -23,9 +32,9 @@
                   onchange: "this.form.requestSubmit()" %>
               <% end %>
             <% end %>
-            <%= button_to "Logout", logout_path, method: :delete, class: "btn btn-sm btn-outline-light" %>
-          </div>
-        <% end %>
+            <%= button_to t("layout.nav.logout"), logout_path, method: :delete, class: "btn btn-sm btn-outline-light" %>
+          <% end %>
+        </div>
       </div>
     </nav>
 

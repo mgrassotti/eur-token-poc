@@ -29,7 +29,7 @@ module Budgets
         if available_sats < required_sats
           raise Error,
                 ReserveRequirement.insufficient_message(
-                  label: "l'investitore",
+                  label: I18n.t("services.budgets.reserve_requirement.investor_label"),
                   required_sats: required_sats,
                   available_sats: available_sats,
                   eur_per_btc: peg_eur_per_btc
@@ -67,13 +67,13 @@ module Budgets
     attr_reader :budget, :investor
 
     def validate!
-      raise Error, "Budget is not pending" unless budget.pending?
-      raise Error, "L'investitore non può essere il richiedente" if investor.id == budget.borrower_id
-      raise Error, "L'admin deve impostare il cambio BTC/€ corrente" unless MarketRate.current.set?
+      raise Error, I18n.t("services.budgets.activate.not_pending") unless budget.pending?
+      raise Error, I18n.t("services.budgets.activate.investor_is_borrower") if investor.id == budget.borrower_id
+      raise Error, I18n.t("services.budgets.create.market_rate_required") unless MarketRate.current.set?
 
       return if L1::Bitcoind::Client.new.available?
 
-      raise Error, "bitcoind regtest non raggiungibile. Avvia: ./bin/regtest up"
+      raise Error, I18n.t("services.shared.bitcoind_unreachable")
     end
   end
 end

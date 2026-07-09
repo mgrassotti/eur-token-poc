@@ -1,14 +1,13 @@
-<h1 class="h3 mb-4">Invia Denaro</h1>
+<h1 class="h3 mb-4"><%= t(".title") %></h1>
 
 <p class="text-muted mb-2">
-  Saldo spendibile: <strong><%= format_eur(@spendable_total_cents) %></strong>
-  su <%= @spendable_accounts.size %> <%= @spendable_accounts.size == 1 ? "budget" : "budget" %>.
+  <%= t(".spendable_balance_html", amount: format_eur(@spendable_total_cents), count: @spendable_accounts.size) %>
 </p>
 
 <% if @spendable_accounts.many? %>
   <ul class="small text-muted mb-4">
     <% @spendable_accounts.each do |account| %>
-      <li>Deal #<%= account.budget.id %> — <%= format_eur(account.balance_cents) %></li>
+      <li><%= t(".account_balance", id: account.budget.id, amount: format_eur(account.balance_cents)) %></li>
     <% end %>
   </ul>
 <% end %>
@@ -17,18 +16,18 @@
   <div class="card-body">
     <%= form_with url: (@preferred_budget ? budget_token_transfers_path(@preferred_budget) : token_transfer_path) do %>
       <div class="mb-3">
-        <%= label_tag :to_user_id, "Destinatario", class: "form-label" %>
+        <%= label_tag :to_user_id, t(".form.recipient"), class: "form-label" %>
         <%= select_tag :to_user_id, options_from_collection_for_select(@users, :id, :name), class: "form-select", required: true %>
       </div>
       <div class="mb-3">
-        <%= label_tag :amount_eur, "Importo (€)", class: "form-label" %>
+        <%= label_tag :amount_eur, t(".form.amount"), class: "form-label" %>
         <%= number_field_tag :amount_eur, nil, class: "form-control", step: 0.01, min: 0.01, max: (@spendable_total_cents / 100.0), required: true %>
       </div>
       <p class="text-muted small">
-        Il prelievo usa un deal con saldo sufficiente; altrimenti combina più deal (come gli UTXO Bitcoin).
+        <%= t(".form.help") %>
       </p>
-      <%= submit_tag "Invia Denaro", class: "btn btn-primary" %>
-      <%= link_to "Annulla", root_path, class: "btn btn-link" %>
+      <%= submit_tag t(".form.submit"), class: "btn btn-primary" %>
+      <%= link_to t("common.actions.cancel"), root_path, class: "btn btn-link" %>
     <% end %>
   </div>
 </div>

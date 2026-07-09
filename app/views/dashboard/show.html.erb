@@ -1,18 +1,17 @@
-<% if admin? %><span class="badge text-bg-info mb-4 d-inline-block">Admin</span><% end %>
+<% if admin? %><span class="badge text-bg-info mb-4 d-inline-block"><%= t(".admin.badge") %></span><% end %>
 
 <% if admin? %>
   <div class="card mb-4 border-info">
-    <div class="card-header bg-info-subtle">Pannello admin</div>
+    <div class="card-header bg-info-subtle"><%= t(".admin.panel_title") %></div>
     <div class="card-body">
-      <h2 class="h6">Catena Bitcoin (simulata)</h2>
+      <h2 class="h6"><%= t(".admin.chain.title") %></h2>
       <p class="text-muted small mb-3">
-        Altezza blocco: <strong><%= number_with_delimiter(@market_rate.bitcoin_block_height) %></strong>
-        — i deal si chiudono automaticamente al raggiungimento del blocco maturity.
+        <%= t(".admin.chain.block_height_html", height: number_with_delimiter(@market_rate.bitcoin_block_height)) %>
       </p>
 
       <%= form_with url: admin_chain_state_path, method: :patch, class: "row g-2 align-items-end mb-4" do %>
         <div class="col-auto">
-          <%= label_tag :bitcoin_block_height, "Altezza blocco", class: "form-label" %>
+          <%= label_tag :bitcoin_block_height, t(".admin.chain.field"), class: "form-label" %>
           <%= number_field_tag :bitcoin_block_height,
             @market_rate.bitcoin_block_height,
             class: "form-control form-control-sm",
@@ -21,11 +20,11 @@
             required: true %>
         </div>
         <div class="col-auto">
-          <%= submit_tag "Aggiorna blocco", class: "btn btn-sm btn-outline-info" %>
+          <%= submit_tag t(".admin.chain.submit"), class: "btn btn-sm btn-outline-info" %>
         </div>
       <% end %>
 
-      <h2 class="h6">Cambio BTC/€ corrente</h2>
+      <h2 class="h6"><%= t(".admin.market_rate.title") %></h2>
       <%= form_with url: admin_market_rate_path, method: :patch, class: "row g-2 align-items-end mb-4" do %>
         <div class="col-auto">
           <%= label_tag :btc_eur_per_btc, "€/BTC", class: "form-label" %>
@@ -37,63 +36,66 @@
             required: true %>
         </div>
         <div class="col-auto">
-          <%= submit_tag "Aggiorna cambio", class: "btn btn-sm btn-info" %>
+          <%= submit_tag t(".admin.market_rate.submit"), class: "btn btn-sm btn-info" %>
         </div>
       <% end %>
       <% if @market_rate.set? %>
-        <p class="text-muted small mb-4">Cambio attuale: <strong><%= number_with_delimiter(@market_rate.btc_eur_per_btc) %> €/BTC</strong></p>
+        <p class="text-muted small mb-4"><%= t(".admin.market_rate.current_html", rate: number_with_delimiter(@market_rate.btc_eur_per_btc)) %></p>
       <% end %>
 
       <% if @active_budgets.any? %>
-        <h2 class="h6">Budget attivi — settlement</h2>
+        <h2 class="h6"><%= t(".admin.active_budgets.title") %></h2>
         <ul class="list-group mb-4">
           <% @active_budgets.each do |budget| %>
             <% ltv = budget.loan_to_value_ratio(@market_rate.btc_eur_per_btc) %>
             <li class="list-group-item d-flex justify-content-between align-items-center flex-wrap gap-2">
               <span>
-                #<%= budget.id %> — peg <%= number_with_delimiter(budget.peg_eur_per_btc) %> €/BTC
+                <%= t(".admin.active_budgets.row_html", id: budget.id, rate: number_with_delimiter(budget.peg_eur_per_btc)) %>
                 <% if budget.maturity_block_height %>
                   <span class="text-muted small d-block">
-                    Maturity blocco <strong><%= number_with_delimiter(budget.maturity_block_height) %></strong>
-                    (<%= number_with_delimiter(budget.blocks_remaining) %> rimanenti)
+                    <%= t(".admin.active_budgets.maturity_html",
+                      height: number_with_delimiter(budget.maturity_block_height),
+                      remaining: number_with_delimiter(budget.blocks_remaining)) %>
                   </span>
                 <% end %>
                 <% if ltv.present? %>
                   <%= budget_ltv_badge(budget, @market_rate.btc_eur_per_btc) %>
                 <% end %>
               </span>
-              <%= link_to "Settlement", new_budget_settlement_path(budget),
+              <%= link_to t(".admin.active_budgets.action"), new_budget_settlement_path(budget),
                 class: "btn btn-sm btn-danger #{'disabled' unless budget.ready_for_settlement?}",
                 aria: { disabled: !budget.ready_for_settlement? } %>
             </li>
           <% end %>
         </ul>
       <% elsif @market_rate.set? %>
-        <p class="text-muted mb-4">Nessun budget attivo in attesa di settlement.</p>
+        <p class="text-muted mb-4"><%= t(".admin.active_budgets.empty") %></p>
       <% end %>
 
       <% unless @market_rate.set? %>
-        <p class="text-muted mb-4">Imposta il cambio corrente per abilitare l'attivazione dei budget.</p>
+        <p class="text-muted mb-4"><%= t(".admin.market_rate.required") %></p>
       <% end %>
 
       <hr>
-      <h2 class="h6">Multisig L1 (regtest)</h2>
+      <h2 class="h6"><%= t(".admin.wallets.title") %></h2>
       <p class="text-muted small mb-2">
-        Wallet regtest per utente; depositi dal <%= L1::ExchangeWallet::DISPLAY_NAME %> (<code><%= L1::ExchangeWallet::WALLET_NAME %></code>).
-        Ogni deposito avanza la catena simulata di <%= L1::DepositReserveService::BLOCKS_PER_DEPOSIT %> blocchi.
+        <%= t(".admin.wallets.description_html",
+          wallet_name: L1::ExchangeWallet::DISPLAY_NAME,
+          wallet_code: L1::ExchangeWallet::WALLET_NAME,
+          blocks: L1::DepositReserveService::BLOCKS_PER_DEPOSIT) %>
       </p>
 
-      <h3 class="h6 mt-3">Wallet on-chain</h3>
+      <h3 class="h6 mt-3"><%= t(".admin.wallets.on_chain_title") %></h3>
       <% if @on_chain_wallets.available %>
         <% if @on_chain_wallets.rows.any? %>
           <div class="table-responsive mb-3">
             <table class="table table-sm table-striped align-middle mb-0">
               <thead>
                 <tr>
-                  <th>Wallet</th>
-                  <th>Nome</th>
-                  <th class="text-end">Saldo</th>
-                  <th class="text-end">Equivalente €</th>
+                  <th><%= t(".admin.wallets.table.wallet") %></th>
+                  <th><%= t(".admin.wallets.table.name") %></th>
+                  <th class="text-end"><%= t(".admin.wallets.table.balance") %></th>
+                  <th class="text-end"><%= t(".admin.wallets.table.eur") %></th>
                 </tr>
               </thead>
               <tbody>
@@ -106,7 +108,7 @@
                       <% if row.eur.present? %>
                         <%= format_savings_eur(row.eur) %>
                       <% else %>
-                        <span class="text-muted">—</span>
+                        <span class="text-muted"><%= t("common.not_available") %></span>
                       <% end %>
                     </td>
                   </tr>
@@ -114,13 +116,13 @@
               </tbody>
               <tfoot>
                 <tr class="fw-semibold">
-                  <td colspan="2">Totale</td>
+                  <td colspan="2"><%= t(".admin.wallets.table.total") %></td>
                   <td class="text-end"><%= format_sats(@on_chain_wallets.total_sats) %></td>
                   <td class="text-end">
                     <% if @on_chain_wallets.total_eur.present? %>
                       <%= format_savings_eur(@on_chain_wallets.total_eur) %>
                     <% else %>
-                      <span class="text-muted">—</span>
+                      <span class="text-muted"><%= t("common.not_available") %></span>
                     <% end %>
                   </td>
                 </tr>
@@ -128,37 +130,35 @@
             </table>
           </div>
           <% unless @market_rate.set? %>
-            <p class="text-muted small mb-0">Imposta il cambio BTC/€ per l'equivalente in euro.</p>
+            <p class="text-muted small mb-0"><%= t(".admin.wallets.rate_required") %></p>
           <% end %>
         <% else %>
-          <p class="text-muted small mb-3">Nessun wallet caricato su bitcoind.</p>
+          <p class="text-muted small mb-3"><%= t(".admin.wallets.empty") %></p>
         <% end %>
       <% else %>
         <p class="text-warning small mb-3"><%= @on_chain_wallets.error_message %></p>
       <% end %>
 
       <hr>
-      <%= button_to "Reset demo DB",
+      <%= button_to t(".admin.reset.button"),
         admin_demo_reset_path,
         method: :post,
         class: "btn btn-outline-danger btn-sm",
-        data: { turbo_confirm: "Confermi il reset? Tutti i budget e i token verranno eliminati." } %>
+        data: { turbo_confirm: t(".admin.reset.confirm") } %>
     </div>
   </div>
 <% end %>
 
 <% unless admin? %>
-  <h1 class="h3 mb-4">Ciao, <%= current_user.name %></h1>
+  <h1 class="h3 mb-4"><%= t(".user.greeting", name: current_user.name) %></h1>
 
   <% if @margin_call_budgets.any? %>
     <div class="alert alert-warning">
-      <strong>Margin call (LTV ≥ <%= (Budget::MARGIN_CALL_LTV_THRESHOLD * 100).to_i %>%):</strong>
-      il collateral del deal non copre più adeguatamente gli EURT al cambio corrente.
-      Se l'LTV raggiunge il <%= (Budget::LIQUIDATION_LTV_THRESHOLD * 100).to_i %>%,
-      il deal verrà liquidato automaticamente tramite settlement DLC forzato.
+      <strong><%= t(".user.margin_call.title", threshold: (Budget::MARGIN_CALL_LTV_THRESHOLD * 100).to_i) %></strong>
+      <%= t(".user.margin_call.body", liquidation_threshold: (Budget::LIQUIDATION_LTV_THRESHOLD * 100).to_i) %>
       <ul class="mb-0 mt-2">
         <% @margin_call_budgets.each do |budget| %>
-          <li><%= link_to "Ricarica ##{budget.id}", budget %> — LTV <%= number_to_percentage(budget.loan_to_value_ratio(@market_rate.btc_eur_per_btc) * 100, precision: 0) %></li>
+          <li><%= link_to t(".user.margin_call.budget_link", id: budget.id), budget %> - <%= t("dashboard.common.ltv_value", value: number_to_percentage(budget.loan_to_value_ratio(@market_rate.btc_eur_per_btc) * 100, precision: 0)) %></li>
         <% end %>
       </ul>
     </div>
@@ -170,7 +170,7 @@
   <div class="col-md-4">
     <div class="card h-100">
       <div class="card-body">
-        <h2 class="h6 text-muted">Conto di riserva (BTC)</h2>
+        <h2 class="h6 text-muted"><%= t(".user.cards.reserve.title") %></h2>
         <% if @savings_eur.present? %>
           <p class="display-6 mb-1"><%= format_savings_eur(@savings_eur) %></p>
           <p class="text-muted mb-0">= <%= format_sats(@savings_sats) %></p>
@@ -178,9 +178,9 @@
           <p class="display-6 mb-1"><%= format_sats(@savings_sats) %></p>
         <% end %>
         <% if current_user.btc_account.bitcoind_wallet_name.present? %>
-          <p class="text-muted small mb-0 mt-1">Wallet regtest: <code><%= current_user.btc_account.bitcoind_wallet_name %></code></p>
+          <p class="text-muted small mb-0 mt-1"><%= t(".user.cards.reserve.wallet_html", wallet: current_user.btc_account.bitcoind_wallet_name) %></p>
         <% else %>
-          <p class="text-muted small mb-0 mt-1">Nessun wallet — premi «Deposita su conto riserva».</p>
+          <p class="text-muted small mb-0 mt-1"><%= t(".user.cards.reserve.no_wallet") %></p>
         <% end %>
       </div>
     </div>
@@ -188,11 +188,11 @@
   <div class="col-md-4">
     <div class="card h-100">
       <div class="card-body">
-        <h2 class="h6 text-muted">Conto spesa / risparmio</h2>
+        <h2 class="h6 text-muted"><%= t(".user.cards.spending.title") %></h2>
         <% if @spending_budget_total_cents.positive? %>
           <p class="display-6 mb-0"><%= format_eur(@spending_budget_total_cents) %></p>
         <% else %>
-          <p class="mb-0 text-muted">Nessun saldo sul conto corrente.</p>
+          <p class="mb-0 text-muted"><%= t(".user.cards.spending.empty") %></p>
         <% end %>
       </div>
     </div>
@@ -200,7 +200,7 @@
   <div class="col-md-4">
     <div class="card h-100">
       <div class="card-body">
-        <h2 class="h6 text-muted">Conto investimento</h2>
+        <h2 class="h6 text-muted"><%= t(".user.cards.investment.title") %></h2>
         <% if @investment_sats.positive? %>
           <% if @investment_eur.present? %>
             <p class="display-6 mb-1"><%= format_savings_eur(@investment_eur) %></p>
@@ -209,10 +209,10 @@
             <p class="display-6 mb-1"><%= format_sats(@investment_sats) %></p>
           <% end %>
           <% @investment_budgets.each do |budget| %>
-            <p class="text-muted small mb-0">Scadenza: <%= l(budget.period_end, format: :long) %></p>
+            <p class="text-muted small mb-0"><%= t(".user.cards.investment.maturity", date: l(budget.period_end, format: :long)) %></p>
           <% end %>
         <% else %>
-          <p class="mb-0 text-muted">Nessun deal attivo.</p>
+          <p class="mb-0 text-muted"><%= t(".user.cards.investment.empty") %></p>
         <% end %>
       </div>
     </div>
@@ -220,22 +220,22 @@
 </div>
 <% if @rgb_node_error %>
   <div class="card mb-4 border-danger">
-    <div class="card-header bg-danger-subtle">RGB (RLN)</div>
+    <div class="card-header bg-danger-subtle"><%= t(".user.rgb.title") %></div>
     <div class="card-body">
-      <p class="mb-0 text-danger">Nodo RGB Lightning non raggiungibile. Avvia lo stack con <code>./bin/regtest up</code>.</p>
+      <p class="mb-0 text-danger"><%= t(".user.rgb.unavailable_html") %></p>
     </div>
   </div>
 <% else %>
   <div class="card mb-4 border-primary">
-    <div class="card-header bg-primary-subtle">RGB (RLN)</div>
+    <div class="card-header bg-primary-subtle"><%= t(".user.rgb.title") %></div>
     <div class="card-body">
-      <p class="text-muted small mb-3">Saldo asset RGB20 on-chain via RGB Lightning Node regtest. I transfer «Invia Denaro» aggiornano anche il nodo RGB.</p>
+      <p class="text-muted small mb-3"><%= t(".user.rgb.description") %></p>
       <% if @rgb_assets.present? %>
         <ul class="list-group">
           <% @rgb_assets.each do |asset| %>
             <li class="list-group-item d-flex justify-content-between align-items-center">
               <span>
-                <strong><%= asset["ticker"] %></strong> — <%= asset["name"] %>
+                <strong><%= asset["ticker"] %></strong> - <%= asset["name"] %>
                 <span class="text-muted small d-block"><code><%= asset["asset_id"] %></code></span>
               </span>
               <span class="badge text-bg-primary">
@@ -245,7 +245,7 @@
           <% end %>
         </ul>
       <% else %>
-        <p class="mb-0 text-muted">Nessun asset RGB sul wallet. Attiva un deal per emettere RGB20.</p>
+        <p class="mb-0 text-muted"><%= t(".user.rgb.empty") %></p>
       <% end %>
     </div>
   </div>
@@ -254,31 +254,31 @@
 
 <div class="d-flex gap-2 mb-4 flex-wrap">
   <% unless admin? %>
-    <%= link_to "Deposita su conto riserva", new_reserve_deposit_path, class: "btn btn-success" %>
-    <%= link_to "Ricarica conto spesa", new_budget_path, class: "btn btn-primary" %>
+    <%= link_to t(".user.actions.deposit"), new_reserve_deposit_path, class: "btn btn-success" %>
+    <%= link_to t(".user.actions.new_budget"), new_budget_path, class: "btn btn-primary" %>
     <% if @spendable_token_cents.positive? %>
-      <%= link_to "Invia Denaro", new_token_transfer_path, class: "btn btn-outline-primary" %>
+      <%= link_to t(".user.actions.send_money"), new_token_transfer_path, class: "btn btn-outline-primary" %>
     <% else %>
-      <span class="btn btn-outline-secondary disabled" aria-disabled="true">Invia Denaro</span>
+      <span class="btn btn-outline-secondary disabled" aria-disabled="true"><%= t(".user.actions.send_money") %></span>
     <% end %>
   <% end %>
   <% if admin? %>
-    <%= link_to "Tutti i budget", budgets_path, class: "btn btn-outline-secondary" %>
+    <%= link_to t(".admin.actions.all_budgets"), budgets_path, class: "btn btn-outline-secondary" %>
   <% end %>
 </div>
 
 <% if @investable_budgets.any? %>
   <div class="card mb-4">
-    <div class="card-header">Ricariche in attesa di investitore</div>
+    <div class="card-header"><%= t(".user.investable.title") %></div>
     <div class="table-responsive">
       <table class="table mb-0">
         <thead>
           <tr>
-            <th>Richiedente</th>
-            <th>Importo</th>
-            <th>Collateral</th>
-            <th>Cambio attuale</th>
-            <th>Periodo</th>
+            <th><%= t(".user.investable.table.borrower") %></th>
+            <th><%= t(".user.investable.table.amount") %></th>
+            <th><%= t(".user.investable.table.collateral") %></th>
+            <th><%= t(".user.investable.table.current_rate") %></th>
+            <th><%= t(".user.investable.table.period") %></th>
             <th></th>
           </tr>
         </thead>
@@ -288,9 +288,9 @@
               <td><%= budget.borrower.name %></td>
               <td><%= format_eur(budget.amount_eur_cents) %></td>
               <td><%= format_eur(budget.collateral_eur_cents) %></td>
-              <td><%= @market_rate.set? ? number_with_delimiter(@market_rate.btc_eur_per_btc) : "—" %></td>
+              <td><%= @market_rate.set? ? number_with_delimiter(@market_rate.btc_eur_per_btc) : t("common.not_available") %></td>
               <td><%= budget.period_start %> – <%= budget.period_end %></td>
-              <td><%= link_to "Dettagli", budget, class: "btn btn-sm btn-outline-primary" %></td>
+              <td><%= link_to t(".user.investable.table.details"), budget, class: "btn btn-sm btn-outline-primary" %></td>
             </tr>
           <% end %>
         </tbody>
@@ -301,15 +301,15 @@
 
 <% unless admin? %>
 <div class="card">
-  <div class="card-header">Le mie ricariche</div>
+  <div class="card-header"><%= t(".user.my_budgets.title") %></div>
   <div class="table-responsive">
     <table class="table mb-0">
       <thead>
         <tr>
           <th>ID</th>
-          <th>Importo</th>
-          <th>Stato</th>
-          <th>Scadenza</th>
+          <th><%= t(".user.my_budgets.table.amount") %></th>
+          <th><%= t(".user.my_budgets.table.status") %></th>
+          <th><%= t(".user.my_budgets.table.maturity") %></th>
           <th></th>
         </tr>
       </thead>
@@ -323,15 +323,15 @@
               <td>
                 <%= l(budget.period_end, format: :long) %>
                 <% if budget.maturity_block_height %>
-                  <span class="text-muted d-block small">blocco <%= number_with_delimiter(budget.maturity_block_height) %></span>
+                  <span class="text-muted d-block small"><%= t(".user.my_budgets.table.block", height: number_with_delimiter(budget.maturity_block_height)) %></span>
                 <% end %>
               </td>
-              <td><%= link_to "Apri", budget, class: "btn btn-sm btn-outline-primary" %></td>
+              <td><%= link_to t("common.actions.open"), budget, class: "btn btn-sm btn-outline-primary" %></td>
             </tr>
           <% end %>
         <% else %>
           <tr>
-            <td colspan="5" class="text-muted">Nessuna ricarica effettuata.</td>
+            <td colspan="5" class="text-muted"><%= t(".user.my_budgets.empty") %></td>
           </tr>
         <% end %>
       </tbody>
@@ -340,16 +340,16 @@
 </div>
 
 <div class="card mt-4">
-  <div class="card-header">I miei fondi</div>
+  <div class="card-header"><%= t(".user.funds.title") %></div>
   <div class="table-responsive">
     <table class="table mb-0">
       <thead>
         <tr>
-          <th>Importo</th>
-          <th>Ricevuto</th>
-          <th>Scadenza</th>
-          <th>Importo rimanente</th>
-          <th>Interessi alla scadenza</th>
+          <th><%= t(".user.funds.table.amount") %></th>
+          <th><%= t(".user.funds.table.received") %></th>
+          <th><%= t(".user.funds.table.maturity") %></th>
+          <th><%= t(".user.funds.table.remaining_amount") %></th>
+          <th><%= t(".user.funds.table.interest_at_maturity") %></th>
           <th></th>
         </tr>
       </thead>
@@ -362,22 +362,22 @@
               <td><%= format_eur(fund_importo_cents(current_user, budget)) %></td>
               <td>
                 <% received_at = first_token_received_at(current_user, budget) %>
-                <%= received_at ? l(received_at, format: :long) : "—" %>
+                <%= received_at ? l(received_at, format: :long) : t("common.not_available") %>
               </td>
               <td>
                 <%= l(budget.period_end, format: :long) %>
                 <% if budget.maturity_block_height %>
-                  <span class="text-muted d-block small">blocco <%= number_with_delimiter(budget.maturity_block_height) %></span>
+                  <span class="text-muted d-block small"><%= t(".user.funds.table.block", height: number_with_delimiter(budget.maturity_block_height)) %></span>
                 <% end %>
               </td>
-              <td><%= balance_cents.positive? ? format_eur(balance_cents) : "—" %></td>
-              <td><%= balance_cents.positive? ? format_eur(budget.holder_interest_at_maturity_cents(balance_cents)) : "—" %></td>
-              <td><%= link_to "Apri", budget, class: "btn btn-sm btn-outline-primary" %></td>
+              <td><%= balance_cents.positive? ? format_eur(balance_cents) : t("common.not_available") %></td>
+              <td><%= balance_cents.positive? ? format_eur(budget.holder_interest_at_maturity_cents(balance_cents)) : t("common.not_available") %></td>
+              <td><%= link_to t("common.actions.open"), budget, class: "btn btn-sm btn-outline-primary" %></td>
             </tr>
           <% end %>
         <% else %>
           <tr>
-            <td colspan="6" class="text-muted">Nessun token EURT ricevuto.</td>
+            <td colspan="6" class="text-muted"><%= t(".user.funds.empty") %></td>
           </tr>
         <% end %>
       </tbody>

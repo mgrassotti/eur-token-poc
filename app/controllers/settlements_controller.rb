@@ -26,11 +26,14 @@ class SettlementsController < ApplicationController
   def set_budget
     @budget = Budget.find(params[:budget_id])
     unless @budget.active?
-      redirect_to @budget, alert: "Settlement is only available for active budgets."
+      redirect_to @budget, alert: t("flash.settlements.active_only")
       return
     end
     return if @budget.ready_for_settlement?
 
-    redirect_to @budget, alert: "Settlement disponibile dal blocco #{@budget.maturity_block_height} (attuale: #{ChainState.block_height})."
+    redirect_to @budget,
+                alert: t("flash.settlements.available_from_block",
+                  maturity_block_height: @budget.maturity_block_height,
+                  current_block_height: ChainState.block_height)
   end
 end

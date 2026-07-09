@@ -62,7 +62,9 @@ module Rgb
         to_account = budget.token_accounts.lock.find_or_create_by!(user: to_user)
 
         if from_account.balance_cents < amount_cents
-          raise Error, "Proiezione: saldo token insufficiente (#{from_account.balance_cents} < #{amount_cents})"
+          raise Error, I18n.t("services.rgb.projection.insufficient_balance",
+            from_balance: from_account.balance_cents,
+            amount: amount_cents)
         end
 
         from_account.update!(balance_cents: from_account.balance_cents - amount_cents)

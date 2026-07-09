@@ -39,7 +39,7 @@ module Dlc
 
     def call
       contract = budget.dlc_contract
-      raise Error, "Nessun contratto DLC per il budget #{budget.id}" if contract.nil?
+      raise Error, I18n.t("services.dlc.distribution.missing_contract", budget_id: budget.id) if contract.nil?
 
       shares = compute_shares
       return [] if shares.empty?
@@ -57,7 +57,7 @@ module Dlc
         Payout.new(user: s[:user], sats: actual[i], address: outputs[i][:address], txid: result.txid)
       end
     rescue NodeClient::Error, Rgb::Nodes::Error, Rgb::LightningClient::Error => e
-      raise Error, "Distribuzione DLC fallita: #{e.message}"
+      raise Error, I18n.t("services.dlc.distribution.failed", message: e.message)
     end
 
     private
@@ -71,7 +71,7 @@ module Dlc
       return [] if allocations.empty?
 
       total_cents = allocations.sum { |a| a[:cents] }
-      raise Error, "Allocazione holder vuota" if total_cents.zero?
+      raise Error, I18n.t("services.dlc.distribution.empty_allocations") if total_cents.zero?
 
       shares = []
       assigned = 0

@@ -36,14 +36,14 @@ class TokenTransfersController < ApplicationController
 
     return if @spendable_total_cents.positive?
 
-    redirect_to root_path, alert: "Nessun saldo EURT disponibile sui deal attivi."
+    redirect_to root_path, alert: t("flash.token_transfers.no_balance")
   end
 
   def transfer_notice(to_user:, amount_cents:, parts:)
-    base = "Inviati #{BtcConversion.format_eur(amount_cents)} a #{to_user.name}."
+    base = t("flash.token_transfers.sent", amount: BtcConversion.format_eur(amount_cents), recipient: to_user.name)
     return base if parts.size == 1
 
     deal_ids = parts.map { |part| "##{part.budget.id}" }.join(", ")
-    "#{base} Prelevato da #{parts.size} deal (#{deal_ids})."
+    t("flash.token_transfers.multi_deal", base: base, count: parts.size, deal_ids: deal_ids)
   end
 end

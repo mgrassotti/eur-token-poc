@@ -35,7 +35,7 @@ module Budgets
         if available_sats < locked_sats
           raise Error,
                 ReserveRequirement.insufficient_message(
-                  label: "il richiedente",
+                  label: I18n.t("services.budgets.reserve_requirement.borrower_label"),
                   required_sats: locked_sats,
                   available_sats: available_sats,
                   eur_per_btc: peg_eur_per_btc
@@ -59,9 +59,9 @@ module Budgets
     attr_reader :borrower, :amount_eur_cents, :period_start, :period_end
 
     def validate!
-      raise Error, "L'admin deve impostare il cambio BTC/€ corrente" unless MarketRate.current.set?
-      raise Error, "Importo richiesto non valido" unless amount_eur_cents.to_i.positive?
-      raise Error, "Periodo non valido" if period_start.blank? || period_end.blank? || period_end < period_start
+      raise Error, I18n.t("services.budgets.create.market_rate_required") unless MarketRate.current.set?
+      raise Error, I18n.t("services.budgets.create.invalid_amount") unless amount_eur_cents.to_i.positive?
+      raise Error, I18n.t("services.budgets.create.invalid_period") if period_start.blank? || period_end.blank? || period_end < period_start
     end
   end
 end

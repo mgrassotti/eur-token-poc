@@ -12,9 +12,11 @@ class ReserveDepositsController < ApplicationController
     amount_sats = BtcConversion.btc_to_sats(params[:amount_btc])
     account = L1::DepositReserveService.call(user: current_user, amount_sats: amount_sats)
     redirect_to root_path,
-                notice: "Deposito da #{L1::ExchangeWallet::DISPLAY_NAME} accreditato: #{BtcConversion.format_btc(amount_sats)} " \
-                         "(saldo riserva: #{BtcConversion.format_btc(account.balance_sats)}). " \
-                         "Catena simulata +#{L1::DepositReserveService::BLOCKS_PER_DEPOSIT} blocchi."
+                notice: t("flash.reserve_deposits.created",
+                  wallet_name: L1::ExchangeWallet::DISPLAY_NAME,
+                  amount: BtcConversion.format_btc(amount_sats),
+                  balance: BtcConversion.format_btc(account.balance_sats),
+                  blocks: L1::DepositReserveService::BLOCKS_PER_DEPOSIT)
   rescue L1::DepositReserveService::Error => e
     redirect_to new_reserve_deposit_path, alert: e.message
   end

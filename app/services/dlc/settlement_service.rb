@@ -26,7 +26,7 @@ module Dlc
 
     def call
       contract = budget.dlc_contract
-      raise Error, "Nessun contratto DLC per il budget #{budget.id}" if contract.nil?
+      raise Error, I18n.t("services.dlc.settlement.missing_contract", budget_id: budget.id) if contract.nil?
 
       existing = budget.dlc_settlement
       return result_for(existing) if existing&.executed?
@@ -54,7 +54,7 @@ module Dlc
 
       result_for(settlement)
     rescue OracleClient::Error, NodeClient::Error => e
-      raise Error, "Settlement DLC fallito: #{e.message}"
+      raise Error, I18n.t("services.dlc.settlement.failed", message: e.message)
     end
 
     private

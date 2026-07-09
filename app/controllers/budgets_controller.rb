@@ -33,7 +33,7 @@ class BudgetsController < ApplicationController
       period_start: budget_params[:period_start],
       period_end: budget_params[:period_end]
     )
-    redirect_to @budget, notice: "Budget spesa creato. In attesa di un investitore."
+    redirect_to @budget, notice: t("flash.budgets.created")
   rescue Budgets::CreateService::Error => e
     @market_rate = MarketRate.current
     @max_borrowable_eur = Budgets::ReserveRequirement.max_eur_for(current_user)
@@ -48,12 +48,12 @@ class BudgetsController < ApplicationController
 
   def activate
     if @budget.borrower_id == current_user.id
-      redirect_to @budget, alert: "Cannot invest in your own budget."
+      redirect_to @budget, alert: t("flash.budgets.cannot_invest_own")
       return
     end
 
     unless MarketRate.current.set?
-      redirect_to @budget, alert: "L'admin deve impostare il cambio BTC/€ corrente."
+      redirect_to @budget, alert: t("services.budgets.create.market_rate_required")
       return
     end
 
@@ -61,9 +61,9 @@ class BudgetsController < ApplicationController
       budget: @budget,
       investor: current_user
     )
-    notice = "Budget attivato. #{BtcConversion.format_btc(budget.investor_locked_sats)} decurtati dal conto di riserva."
+    notice = t("flash.budgets.activated", amount: BtcConversion.format_btc(budget.investor_locked_sats))
     if budget.l1_multisig_provisioned?
-      notice += " Escrow L1 provisionato (#{budget.escrow_outpoint})."
+      notice += " #{t("flash.budgets.escrow_provisioned", outpoint: budget.escrow_outpoint)}"
     end
     redirect_to budget, notice: notice
     rescue Budgets::ActivateService::Error, L1::ProvisionEscrowService::Error,

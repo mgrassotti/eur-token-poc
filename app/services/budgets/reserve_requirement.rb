@@ -38,9 +38,13 @@ module Budgets
     def insufficient_message(label:, required_sats:, available_sats:, eur_per_btc:)
       required_eur = BtcConversion.sats_to_eur(required_sats, eur_per_btc)
       available_eur = BtcConversion.sats_to_eur(available_sats, eur_per_btc)
-      "Saldo insufficiente sul conto di riserva per #{label} " \
-        "(servono #{required_sats} sats ≈ €#{format('%.2f', required_eur)} @ #{eur_per_btc.to_i}, " \
-        "disponibili #{available_sats} sats ≈ €#{format('%.2f', available_eur)})"
+      I18n.t("services.budgets.reserve_requirement.insufficient",
+        label: label,
+        required_sats: required_sats,
+        required_eur: format("%.2f", required_eur),
+        eur_per_btc: eur_per_btc.to_i,
+        available_sats: available_sats,
+        available_eur: format("%.2f", available_eur))
     end
   end
 end

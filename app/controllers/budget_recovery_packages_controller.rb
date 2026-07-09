@@ -6,12 +6,12 @@ class BudgetRecoveryPackagesController < ApplicationController
 
   def show
     unless authorized_for_recovery_package?
-      redirect_to root_path, alert: "Non autorizzato."
+      redirect_to root_path, alert: t("flash.recovery_packages.unauthorized")
       return
     end
 
     unless @budget.recovery_package.present?
-      redirect_to @budget, alert: "Recovery package non disponibile per questo deal."
+      redirect_to @budget, alert: t("flash.recovery_packages.missing")
       return
     end
 

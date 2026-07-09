@@ -1,31 +1,381 @@
-# Files in the config/locales directory are used for internationalization and
-# are automatically loaded by Rails. If you want to use locales other than
-# English, add the necessary files in this directory.
-#
-# To use the locales, use `I18n.t`:
-#
-#     I18n.t "hello"
-#
-# In views, this is aliased to just `t`:
-#
-#     <%= t("hello") %>
-#
-# To use a different locale, set it with `I18n.locale`:
-#
-#     I18n.locale = :es
-#
-# This would use the information in config/locales/es.yml.
-#
-# To learn more about the API, please read the Rails Internationalization guide
-# at https://guides.rubyonrails.org/i18n.html.
-#
-# Be aware that YAML interprets the following case-insensitive strings as
-# booleans: `true`, `false`, `on`, `off`, `yes`, `no`. Therefore, these strings
-# must be quoted to be interpreted as strings. For example:
-#
-#     en:
-#       "yes": yup
-#       enabled: "ON"
-
 en:
-  hello: "Hello world"
+  app:
+    title: "BTC wallet PoC"
+  layout:
+    nav:
+      logout: "Logout"
+    language_switch:
+      label: "Language"
+      en: "Eng"
+      it: "Ita"
+  common:
+    not_available: "--"
+    actions:
+      open: "Open"
+      cancel: "Cancel"
+      back_to_dashboard: "<- Dashboard"
+  flash:
+    authorization:
+      admin_only: "Only the admin can perform this action."
+      login_required: "Please log in to continue."
+    sessions:
+      logged_in: "Welcome, %{name}!"
+      invalid_credentials: "Invalid email or password."
+      logged_out: "Logged out."
+    budgets:
+      created: "Spending budget created. Waiting for an investor."
+      cannot_invest_own: "You cannot invest in your own budget."
+      activated: "Budget activated. %{amount} deducted from the reserve account."
+      escrow_provisioned: "L1 escrow provisioned (%{outpoint})."
+    token_transfers:
+      no_balance: "No EURT balance available on active deals."
+      sent: "Sent %{amount} to %{recipient}."
+      multi_deal: "%{base} Debited from %{count} deal(s) (%{deal_ids})."
+    settlements:
+      active_only: "Settlement is only available for active budgets."
+      available_from_block: "Settlement is available from block %{maturity_block_height} (current: %{current_block_height})."
+    reserve_deposits:
+      created: "Deposit from %{wallet_name} credited: %{amount} (reserve balance: %{balance}). Simulated chain +%{blocks} blocks."
+    admin:
+      chain_state:
+        invalid_height: "Invalid block height"
+        updated: "Block height updated to %{height}."
+        auto_settled: "Automatic settlement executed for %{count} deal(s)."
+      market_rate:
+        liquidations: "Automatic liquidation (LTV >= %{threshold}%): deal #%{ids} closed at %{rate} EUR/BTC."
+        updated: "BTC/EUR rate updated to %{rate} EUR/BTC."
+        margin_calls: "LTV warning (>=%{threshold}%): deal #%{ids} entered the risk zone."
+      demo_reset:
+        done: "Demo reset."
+        unavailable_in_production: "Demo reset is not available in production."
+    recovery_packages:
+      unauthorized: "Unauthorized."
+      missing: "Recovery package not available for this deal."
+  services:
+    shared:
+      bitcoind_unreachable: "bitcoind regtest is unreachable. Start it with: ./bin/regtest up"
+    budgets:
+      create:
+        market_rate_required: "The admin must set the current BTC/EUR rate."
+        invalid_amount: "Invalid requested amount."
+        invalid_period: "Invalid period."
+      activate:
+        not_pending: "Budget is not pending."
+        investor_is_borrower: "The investor cannot be the borrower."
+      reserve_requirement:
+        borrower_label: "the borrower"
+        investor_label: "the investor"
+        insufficient: "Insufficient reserve balance for %{label} (required %{required_sats} sats ~= EUR %{required_eur} @ %{eur_per_btc}, available %{available_sats} sats ~= EUR %{available_eur})."
+    l1:
+      deposit_reserve:
+        invalid_amount: "Invalid amount."
+      provision_escrow:
+        not_provisioned: "L1 escrow not provisioned: %{message}"
+    settlements:
+      execute:
+        collateral_insufficient: "Collateral is insufficient for token redemptions."
+        budget_not_active: "Budget is not active."
+        invalid_end_rate: "End BTC/EUR rate must be positive."
+        missing_peg: "Budget peg is missing."
+        already_settled: "Budget already settled."
+        available_from_block: "Settlement is available from block %{maturity_block_height}."
+        dlc_not_funded: "DLC contract is not funded."
+    tokens:
+      transfer:
+        insufficient_balance: "Insufficient token balance."
+        budget_not_active: "Budget is not active."
+        invalid_amount: "Amount must be positive."
+        cannot_transfer_to_self: "You cannot transfer to yourself."
+        escrow_not_provisioned: "Escrow not provisioned."
+        rgb_asset_missing: "RGB asset missing on deal."
+        rgb_genesis_missing: "RGB genesis missing."
+    rgb:
+      lib_issue:
+        budget_not_active: "Budget is not active."
+        escrow_not_provisioned: "Escrow is not provisioned."
+      projection:
+        insufficient_balance: "Projection error: insufficient token balance (%{from_balance} < %{amount})."
+      lib_transfer:
+        missing_asset_id: "Missing rgb_asset_id on deal."
+        budget_not_active: "Budget is not active."
+        invalid_amount: "Amount must be positive."
+        insufficient_balance: "Insufficient RGB balance."
+      wallet_setup:
+        node_not_configured: "RGB node is not configured for user %{user_id}."
+    dlc:
+      contract_setup:
+        missing_peg: "Budget peg missing for DLC."
+        setup_failed: "DLC setup failed: %{message}"
+        funding_failed: "DLC funding failed: %{message}"
+        missing_funding_hex: "Funding tx hex missing from DLC node."
+        incomplete_funding: "DLC funding is incomplete (missing signatures)."
+        changed_txid: "Funding txid changed after signing (%{txid} != %{expected_txid})."
+        insufficient_on_chain_balance: "Insufficient on-chain balance for %{wallet_name} (%{available_sats} < %{required_sats} sats). Deposit into the reserve account."
+      settlement:
+        missing_contract: "No DLC contract for budget %{budget_id}."
+        failed: "DLC settlement failed: %{message}"
+      distribution:
+        missing_contract: "No DLC contract for budget %{budget_id}."
+        failed: "DLC distribution failed: %{message}"
+        empty_allocations: "Holder allocation is empty."
+  budget:
+    statuses:
+      pending: "Pending"
+      active: "Active"
+      settled: "Closed"
+  dashboard:
+    common:
+      ltv_missing: "LTV --"
+      ltv_value: "LTV %{value}"
+    show:
+      admin:
+        badge: "Admin"
+        panel_title: "Admin panel"
+        actions:
+          all_budgets: "All budgets"
+        chain:
+          title: "Bitcoin chain (simulated)"
+          block_height_html: "Block height: <strong>%{height}</strong> - deals close automatically when the maturity block is reached."
+          field: "Block height"
+          submit: "Update block"
+        market_rate:
+          title: "Current BTC/EUR rate"
+          submit: "Update rate"
+          current_html: "Current rate: <strong>%{rate} EUR/BTC</strong>"
+          required: "Set the current rate to enable budget activation."
+        active_budgets:
+          title: "Active budgets - settlement"
+          row_html: "#%{id} - peg %{rate} EUR/BTC"
+          maturity_html: "Maturity block <strong>%{height}</strong> (%{remaining} remaining)"
+          action: "Settlement"
+          empty: "No active budgets waiting for settlement."
+        wallets:
+          title: "L1 multisig (regtest)"
+          description_html: "Per-user regtest wallets; deposits come from <strong>%{wallet_name}</strong> (<code>%{wallet_code}</code>). Each deposit advances the simulated chain by %{blocks} blocks."
+          on_chain_title: "On-chain wallets"
+          rate_required: "Set the BTC/EUR rate to show the EUR equivalent."
+          empty: "No wallets loaded on bitcoind."
+          table:
+            wallet: "Wallet"
+            name: "Name"
+            balance: "Balance"
+            eur: "EUR equivalent"
+            total: "Total"
+        reset:
+          button: "Reset demo DB"
+          confirm: "Confirm reset? All budgets and tokens will be deleted."
+      user:
+        greeting: "Hello, %{name}"
+        margin_call:
+          title: "Margin call (LTV >= %{threshold}%):"
+          body: "the deal collateral no longer covers EURT adequately at the current rate. If LTV reaches %{liquidation_threshold}%, the deal will be automatically liquidated through forced DLC settlement."
+          budget_link: "Budget #%{id}"
+        actions:
+          deposit: "Deposit to reserve account"
+          new_budget: "Top up spending account"
+          send_money: "Send Money"
+        cards:
+          reserve:
+            title: "Reserve account (BTC)"
+            wallet_html: "Regtest wallet: <code>%{wallet}</code>"
+            no_wallet: "No wallet yet - click \"Deposit to reserve account\"."
+          spending:
+            title: "Spending / savings account"
+            empty: "No balance in the current account."
+          investment:
+            title: "Investment account"
+            maturity: "Maturity: %{date}"
+            empty: "No active deals."
+        rgb:
+          title: "RGB (RLN)"
+          unavailable_html: "RGB Lightning Node is unreachable. Start the stack with <code>./bin/regtest up</code>."
+          description: "On-chain RGB20 asset balance via RGB Lightning Node regtest. \"Send Money\" transfers also update the RGB node."
+          empty: "No RGB assets on this wallet. Activate a deal to issue RGB20."
+        investable:
+          title: "Top-ups waiting for an investor"
+          table:
+            borrower: "Borrower"
+            amount: "Amount"
+            collateral: "Collateral"
+            current_rate: "Current rate"
+            period: "Period"
+            details: "Details"
+        my_budgets:
+          title: "My top-ups"
+          empty: "No top-ups created yet."
+          table:
+            amount: "Amount"
+            status: "Status"
+            maturity: "Maturity"
+            block: "block %{height}"
+        funds:
+          title: "My funds"
+          empty: "No EURT tokens received."
+          table:
+            amount: "Amount"
+            received: "Received"
+            maturity: "Maturity"
+            remaining_amount: "Remaining amount"
+            interest_at_maturity: "Interest at maturity"
+            block: "block %{height}"
+  budgets:
+    index:
+      title: "All budgets"
+      table:
+        borrower: "Borrower"
+        investor: "Investor"
+        amount: "Amount"
+        status: "Status"
+    new:
+      title: "Top up spending account"
+      reserve_balance_html: "Reserve account: maximum <strong>%{max_amount}</strong> (%{sats} @ %{rate} EUR/BTC)."
+      form:
+        amount: "Amount (EUR)"
+        amount_help: "BTC equal to 1x the amount will be locked from the reserve account (contract collateral, not reimbursed at settlement). An investor must lock the same amount to cover token FX risk."
+        period_start: "Period start"
+        period_end: "Period end"
+        submit: "Create top-up"
+    show:
+      title: "Top-up"
+      summary:
+        heading: "Top-up #%{id}"
+        borrower: "Borrower"
+        investor: "Investor"
+        requested_amount: "Requested amount"
+        borrower_collateral: "Borrower collateral"
+        borrower_collateral_value: "%{sats} (%{amount}) - not reimbursed"
+        investor_collateral: "Investor collateral"
+        investor_collateral_value: "%{sats} (%{amount}) - FX risk"
+        investor_collateral_pending: "%{amount} - waiting for activation"
+        peg_rate: "BTC/EUR peg"
+        peg_rate_value: "%{rate} EUR/BTC"
+        current_rate_note: "current rate - fixed at activation"
+        period: "Period"
+        deal_blocks: "Deal blocks"
+        blocks_remaining: "%{count} remaining, current height %{current_height}"
+        current_ltv: "Current LTV"
+        l1_collateral_lock: "L1 collateral lock"
+        pubkeys: "Pubkeys (2-of-2)"
+        pubkey_peg: "peg"
+        pubkey_investor: "investor"
+        l1_escrow: "L1 escrow"
+        not_provisioned: "Not provisioned"
+        dlc_contract: "DLC contract (2-of-2)"
+        dlc_funding: "funding {peg, investor}"
+        dlc_status: "status"
+        dlc_oracle_event: "oracle event"
+        dlc_digits: "%{count} digits, %{unit}"
+        dlc_settlement: "DLC settlement"
+        cet_txid: "CET txid"
+        dlc_outcome: "outcome"
+        peg_pot: "peg_pot"
+        distribution: "distribution"
+        download_recovery_package: "Download recovery package (JSON)"
+        recovery_package_note: "MULTISIG-SPEC section 6 - deal params, outpoint, refund locktime"
+      activation:
+        title: "Accept and collateralize"
+        peg_rate_html: "Peg at activation: <strong>%{rate} EUR/BTC</strong>"
+        current_rate: "current rate"
+        reserve_impact_html: "%{required_sats} will be deducted from the reserve account (collateral %{collateral}, estimated L1 funding fee included). Available on account: %{available_sats}."
+        contract_note_html: "Activation creates a 2-of-2 DLC contract {peg, investor} with settlement bound to the regtest oracle (requires <code>./bin/regtest up</code>)."
+        submit: "Accept risk and activate request"
+      pending:
+        awaiting_investor: "Waiting for an investor."
+        awaiting_market_rate: "Waiting for the admin to set the current BTC/EUR rate."
+      active:
+        margin_call_title: "Margin call:"
+        margin_call_body: "LTV >= %{margin_threshold}%. The deal is in the risk zone and, if LTV reaches %{liquidation_threshold}%, it will be automatically liquidated through forced DLC settlement."
+        run_settlement: "Month-end settlement"
+        token_supply:
+          title: "Tokens in circulation"
+          user: "User"
+          balance: "EURT balance"
+      transfers:
+        title: "Token transfer history"
+        from: "From"
+        to: "To"
+        amount: "Amount"
+        date: "Date"
+      settlement:
+        title: "Settlement executed"
+        end_rate_html: "Current month-end rate: <strong>%{rate} EUR/BTC</strong>"
+        peg_rate_html: "Budget peg: <strong>%{rate} EUR/BTC</strong>"
+        holders_btc_html: "BTC to token holders: <strong>%{amount}</strong>"
+        investor_btc_html: "BTC to %{investor} (remaining collateral): <strong>%{amount}</strong>"
+  settlements:
+    new:
+      title: "Month-end settlement"
+      description: "Budget #%{id} - burns tokens and redistributes BTC based on the initial peg and current rate."
+      form:
+        end_rate: "Month-end BTC/EUR price"
+        help_intro: "Month-end current rate (budget peg: %{rate} EUR/BTC)."
+        current_dashboard_rate: "Current dashboard rate: %{rate} EUR/BTC - if you change it, the current rate will be updated as well."
+        payout_note: "Token holders (including %{borrower}) receive BTC at the current rate. The borrower's collateral stays in the pool; the remainder (FX risk) goes to %{investor}."
+        submit: "Run settlement"
+        confirm: "Confirm settlement? Tokens will be burned."
+    show:
+      title: "Settlement completed"
+      back: "Back to budget"
+      summary:
+        title: "FloorEUR summary"
+        peg_rate_html: "Budget strike (peg): <strong>%{rate} EUR/BTC</strong>"
+        spot_rate_html: "Oracle spot (settlement): <strong>%{rate} EUR/BTC</strong>"
+        total_liability_html: "Total deal liability: <strong>%{amount}</strong> (%{months} month(s) x %{monthly_rate}%%/month)"
+        holder_payout_html: "Holder payout (gross): <strong>%{gross}</strong> - effective after escrow cap: <strong>%{net}</strong>"
+        insolvent: "Insufficient escrow: holder payout is capped to the distributable amount (PAYOFF-SPEC section 7)."
+        market_rate_updated: "Dashboard BTC/EUR rate updated at settlement end."
+      holders:
+        title: "Token holders - liability share in sats"
+        user: "User"
+        burned_tokens: "Burned tokens"
+        maturity_share: "EUR share at maturity"
+        btc_credited: "BTC credited"
+      investor:
+        title: "Investor - remaining escrow"
+        description: "%{name} receives the remaining pool after holder payouts and estimated mining fees:"
+        spot_value: "Spot value: %{amount}"
+  token_transfers:
+    new:
+      title: "Send Money"
+      spendable_balance_html: "Spendable balance: <strong>%{amount}</strong> across %{count} budget(s)."
+      account_balance: "Deal #%{id} - %{amount}"
+      form:
+        recipient: "Recipient"
+        amount: "Amount (EUR)"
+        help: "The withdrawal uses a deal with enough balance; otherwise it combines multiple deals (like Bitcoin UTXOs)."
+        submit: "Send Money"
+  sessions:
+    new:
+      title: "Sign in"
+      demo_users_missing_html: "Database has no demo users. From the project root run <code>bin/rails db:seed</code> (or <code>bin/rails db:setup</code>)."
+      demo_credentials: "Demo: admin@example.com, alice@example.com / password"
+      form:
+        email: "Email"
+        password: "Password"
+        submit: "Log in"
+  reserve_deposits:
+    new:
+      title: "Deposit to reserve account"
+      description_html: "Simulate a BTC transfer from <strong>%{wallet_name}</strong> (<code>%{wallet_code}</code>, demo float %{float_balance}) to your personal regtest wallet. On confirmation the <strong>simulated chain</strong> advances by %{blocks} blocks."
+      form:
+        amount: "Amount (BTC)"
+        default_values: "Demo defaults: Alice 0.1 - Bob 0.2 BTC"
+        submit: "Confirm deposit"
+  activerecord:
+    errors:
+      models:
+        budget:
+          attributes:
+            period_end:
+              on_or_after_period_start: "must be on or after the period start"
+        token_transfer:
+          attributes:
+            to_user:
+              must_be_different_from_sender: "must be different from sender"
+  date:
+    formats:
+      long: "%B %-d, %Y"
+  time:
+    formats:
+      short: "%Y-%m-%d %H:%M"
+      long: "%B %-d, %Y %H:%M"

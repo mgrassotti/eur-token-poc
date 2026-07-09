@@ -1,12 +1,12 @@
-<h1 class="h3 mb-4">Settlement fine mese</h1>
+<h1 class="h3 mb-4"><%= t(".title") %></h1>
 
-<p class="text-muted">Budget #<%= @budget.id %> — brucia i token e ridistribuisce BTC in base al peg iniziale e al cambio corrente.</p>
+<p class="text-muted"><%= t(".description", id: @budget.id) %></p>
 
 <div class="card">
   <div class="card-body">
     <%= form_with url: budget_settlement_path(@budget), method: :post do %>
       <div class="mb-3">
-        <%= label_tag :end_btc_eur_rate, "Prezzo BTC/€ a fine mese", class: "form-label" %>
+        <%= label_tag :end_btc_eur_rate, t(".form.end_rate"), class: "form-label" %>
         <%= number_field_tag :end_btc_eur_rate,
           @market_rate.btc_eur_per_btc || 60_000,
           class: "form-control",
@@ -14,17 +14,15 @@
           min: 0.01,
           required: true %>
         <div class="form-text">
-          Cambio corrente a fine mese (peg budget: <%= number_with_delimiter(@budget.peg_eur_per_btc) %> €/BTC).
+          <%= t(".form.help_intro", rate: number_with_delimiter(@budget.peg_eur_per_btc)) %>
           <% if @market_rate.set? %>
-            Cambio attuale in dashboard: <%= number_with_delimiter(@market_rate.btc_eur_per_btc) %> €/BTC —
-            se modifichi il valore, verrà aggiornato anche il cambio corrente.
+            <%= t(".form.current_dashboard_rate", rate: number_with_delimiter(@market_rate.btc_eur_per_btc)) %>
           <% end %>
-          I detentori di token (incluso <%= @budget.borrower.name %>) ricevono BTC al cambio corrente.
-          Il collateral del richiedente resta nel pool; il residuo (rischio FX) va a <%= @budget.investor.name %>.
+          <%= t(".form.payout_note", borrower: @budget.borrower.name, investor: @budget.investor.name) %>
         </div>
       </div>
-      <%= submit_tag "Esegui settlement", class: "btn btn-danger", data: { turbo_confirm: "Confermi il settlement? I token verranno bruciati." } %>
-      <%= link_to "Annulla", @budget, class: "btn btn-link" %>
+      <%= submit_tag t(".form.submit"), class: "btn btn-danger", data: { turbo_confirm: t(".form.confirm") } %>
+      <%= link_to t("common.actions.cancel"), @budget, class: "btn btn-link" %>
     <% end %>
   </div>
 </div>

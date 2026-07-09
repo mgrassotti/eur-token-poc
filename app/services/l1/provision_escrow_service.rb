@@ -31,7 +31,7 @@ module L1
 
       budget.reload
     rescue Bitcoind::Error => e
-      raise Error, "Escrow L1 non provisionato: #{e.message}"
+      raise Error, I18n.t("services.l1.provision_escrow.not_provisioned", message: e.message)
     end
 
     private
@@ -58,7 +58,7 @@ module L1
     def validate_bitcoind!
       return if Bitcoind::Client.new.available?
 
-      raise Error, "bitcoind regtest non raggiungibile. Avvia: ./bin/regtest up"
+      raise Error, I18n.t("services.shared.bitcoind_unreachable")
     end
   end
 end

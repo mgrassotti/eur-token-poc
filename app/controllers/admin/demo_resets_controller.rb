@@ -8,7 +8,7 @@ module Admin
 
     def create
       DemoData::ResetService.call
-      redirect_to root_path, notice: "Demo resettata"
+      redirect_to root_path, notice: t("flash.admin.demo_reset.done")
     end
 
     private
@@ -16,7 +16,7 @@ module Admin
     def ensure_demo_reset_allowed
       return unless Rails.env.production?
 
-      redirect_to root_path, alert: "Reset demo non disponibile in produzione."
+      redirect_to root_path, alert: t("flash.admin.demo_reset.unavailable_in_production")
     end
   end
 end

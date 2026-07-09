@@ -196,6 +196,6 @@ class Budget < ApplicationRecord
     return if period_start.blank? || period_end.blank?
     return if period_end >= period_start
 
-    errors.add(:period_end, "must be on or after period start")
+    errors.add(:period_end, :on_or_after_period_start)
   end
 end

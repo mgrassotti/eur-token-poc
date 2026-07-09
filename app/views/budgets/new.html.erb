@@ -1,9 +1,11 @@
-<h1 class="h3 mb-4">Ricarica conto spesa</h1>
+<h1 class="h3 mb-4"><%= t(".title") %></h1>
 
 <% if @market_rate&.set? && @max_borrowable_eur.positive? %>
   <p class="text-muted mb-3">
-    Conto di riserva: massimo <strong><%= format_eur_amount(@max_borrowable_eur) %></strong>
-    (<%= format_sats(Budgets::ReserveRequirement.available_sats_for(current_user)) %> @ <%= number_with_delimiter(@market_rate.btc_eur_per_btc) %> €/BTC).
+    <%= t(".reserve_balance_html",
+      max_amount: tag.strong(format_eur_amount(@max_borrowable_eur)),
+      sats: format_sats(Budgets::ReserveRequirement.available_sats_for(current_user)),
+      rate: number_with_delimiter(@market_rate.btc_eur_per_btc)) %>
   </p>
 <% end %>
 
@@ -21,7 +23,7 @@
       <% end %>
 
       <div class="mb-3">
-        <%= f.label :amount_eur, "Importo (€)", class: "form-label" %>
+        <%= f.label :amount_eur, t(".form.amount"), class: "form-label" %>
         <%= f.number_field :amount_eur,
           value: @budget.amount_eur_cents ? @budget.amount_eur : nil,
           class: "form-control",
@@ -30,24 +32,23 @@
           max: (@max_borrowable_eur.positive? ? @max_borrowable_eur : nil),
           required: true %>
         <div class="form-text">
-          Dal conto di riserva verranno bloccati BTC per 1× l'importo (collateral del contratto, non rimborsato al settlement).
-          Un investitore dovrà bloccare altrettanto per coprire il rischio di cambio sui token.
+          <%= t(".form.amount_help") %>
         </div>
       </div>
 
       <div class="row">
         <div class="col-md-6 mb-3">
-          <%= f.label :period_start, "Inizio periodo", class: "form-label" %>
+          <%= f.label :period_start, t(".form.period_start"), class: "form-label" %>
           <%= f.date_field :period_start, class: "form-control", required: true %>
         </div>
         <div class="col-md-6 mb-3">
-          <%= f.label :period_end, "Fine periodo", class: "form-label" %>
+          <%= f.label :period_end, t(".form.period_end"), class: "form-label" %>
           <%= f.date_field :period_end, class: "form-control", required: true %>
         </div>
       </div>
 
-      <%= f.submit "Crea ricarica", class: "btn btn-primary" %>
-      <%= link_to "Annulla", root_path, class: "btn btn-link" %>
+      <%= f.submit t(".form.submit"), class: "btn btn-primary" %>
+      <%= link_to t("common.actions.cancel"), root_path, class: "btn btn-link" %>
     <% end %>
   </div>
 </div>

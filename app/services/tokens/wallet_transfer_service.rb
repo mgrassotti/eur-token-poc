@@ -39,8 +39,8 @@ module Tokens
     attr_reader :from_user, :to_user, :amount_cents, :preferred_budget
 
     def validate!
-      raise Error, "Amount must be positive" unless amount_cents.positive?
-      raise Error, "Cannot transfer to yourself" if from_user.id == to_user.id
+      raise Error, I18n.t("services.tokens.transfer.invalid_amount") unless amount_cents.positive?
+      raise Error, I18n.t("services.tokens.transfer.cannot_transfer_to_self") if from_user.id == to_user.id
     end
 
     def spendable_positions
@@ -56,7 +56,7 @@ module Tokens
 
     def plan_transfers(positions)
       total = positions.sum(&:balance_cents)
-      raise Error, "Insufficient token balance" if total < amount_cents
+      raise Error, I18n.t("services.tokens.transfer.insufficient_balance") if total < amount_cents
 
       single = positions.find { |position| position.balance_cents >= amount_cents }
       return [TransferPart.new(budget: single.budget, amount_cents: amount_cents)] if single
@@ -74,7 +74,7 @@ module Tokens
         remaining -= take
       end
 
-      raise Error, "Insufficient token balance" if remaining.positive?
+      raise Error, I18n.t("services.tokens.transfer.insufficient_balance") if remaining.positive?
 
       parts
     end

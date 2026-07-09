@@ -1,0 +1,381 @@
+it:
+  app:
+    title: "BTC wallet PoC"
+  layout:
+    nav:
+      logout: "Logout"
+    language_switch:
+      label: "Lingua"
+      en: "Eng"
+      it: "Ita"
+  common:
+    not_available: "--"
+    actions:
+      open: "Apri"
+      cancel: "Annulla"
+      back_to_dashboard: "<- Dashboard"
+  flash:
+    authorization:
+      admin_only: "Solo l'admin puo' eseguire questa operazione."
+      login_required: "Effettua il login per continuare."
+    sessions:
+      logged_in: "Benvenuto, %{name}!"
+      invalid_credentials: "Email o password non valide."
+      logged_out: "Logout effettuato."
+    budgets:
+      created: "Budget spesa creato. In attesa di un investitore."
+      cannot_invest_own: "Non puoi investire nel tuo stesso budget."
+      activated: "Budget attivato. %{amount} decurtati dal conto di riserva."
+      escrow_provisioned: "Escrow L1 provisionato (%{outpoint})."
+    token_transfers:
+      no_balance: "Nessun saldo EURT disponibile sui deal attivi."
+      sent: "Inviati %{amount} a %{recipient}."
+      multi_deal: "%{base} Prelevato da %{count} deal (%{deal_ids})."
+    settlements:
+      active_only: "Il settlement e' disponibile solo per i budget attivi."
+      available_from_block: "Settlement disponibile dal blocco %{maturity_block_height} (attuale: %{current_block_height})."
+    reserve_deposits:
+      created: "Deposito da %{wallet_name} accreditato: %{amount} (saldo riserva: %{balance}). Catena simulata +%{blocks} blocchi."
+    admin:
+      chain_state:
+        invalid_height: "Altezza blocco non valida"
+        updated: "Altezza blocco aggiornata a %{height}."
+        auto_settled: "Settlement automatico eseguito per %{count} deal."
+      market_rate:
+        liquidations: "Liquidazione automatica (LTV >= %{threshold}%): deal #%{ids} chiusi al cambio %{rate} EUR/BTC."
+        updated: "Cambio BTC/EUR aggiornato a %{rate} EUR/BTC."
+        margin_calls: "Warning LTV (>=%{threshold}%): deal #%{ids} in area di rischio."
+      demo_reset:
+        done: "Demo resettata."
+        unavailable_in_production: "Reset demo non disponibile in produzione."
+    recovery_packages:
+      unauthorized: "Non autorizzato."
+      missing: "Recovery package non disponibile per questo deal."
+  services:
+    shared:
+      bitcoind_unreachable: "bitcoind regtest non raggiungibile. Avvia: ./bin/regtest up"
+    budgets:
+      create:
+        market_rate_required: "L'admin deve impostare il cambio BTC/EUR corrente."
+        invalid_amount: "Importo richiesto non valido."
+        invalid_period: "Periodo non valido."
+      activate:
+        not_pending: "Il budget non e' in attesa."
+        investor_is_borrower: "L'investitore non puo' essere il richiedente."
+      reserve_requirement:
+        borrower_label: "il richiedente"
+        investor_label: "l'investitore"
+        insufficient: "Saldo insufficiente sul conto di riserva per %{label} (servono %{required_sats} sats ~= EUR %{required_eur} @ %{eur_per_btc}, disponibili %{available_sats} sats ~= EUR %{available_eur})."
+    l1:
+      deposit_reserve:
+        invalid_amount: "Importo non valido."
+      provision_escrow:
+        not_provisioned: "Escrow L1 non provisionato: %{message}"
+    settlements:
+      execute:
+        collateral_insufficient: "Collateral insufficiente per i riscatti token."
+        budget_not_active: "Il budget non e' attivo."
+        invalid_end_rate: "Il cambio BTC/EUR finale deve essere positivo."
+        missing_peg: "Manca il peg del budget."
+        already_settled: "Budget gia' chiuso."
+        available_from_block: "Settlement disponibile dal blocco %{maturity_block_height}."
+        dlc_not_funded: "Contratto DLC non finanziato."
+    tokens:
+      transfer:
+        insufficient_balance: "Saldo token insufficiente."
+        budget_not_active: "Il budget non e' attivo."
+        invalid_amount: "L'importo deve essere positivo."
+        cannot_transfer_to_self: "Non puoi trasferire fondi a te stesso."
+        escrow_not_provisioned: "Escrow non provisionato."
+        rgb_asset_missing: "Asset RGB mancante sul deal."
+        rgb_genesis_missing: "Genesis RGB mancante."
+    rgb:
+      lib_issue:
+        budget_not_active: "Budget non attivo."
+        escrow_not_provisioned: "Escrow non provisionato."
+      projection:
+        insufficient_balance: "Proiezione: saldo token insufficiente (%{from_balance} < %{amount})."
+      lib_transfer:
+        missing_asset_id: "rgb_asset_id mancante sul deal."
+        budget_not_active: "Budget non attivo."
+        invalid_amount: "Importo non positivo."
+        insufficient_balance: "Saldo RGB insufficiente."
+      wallet_setup:
+        node_not_configured: "Nodo RGB non configurato per l'utente %{user_id}."
+    dlc:
+      contract_setup:
+        missing_peg: "Peg del budget mancante per il DLC."
+        setup_failed: "Setup DLC fallito: %{message}"
+        funding_failed: "Funding DLC fallito: %{message}"
+        missing_funding_hex: "Funding tx hex mancante dal nodo DLC."
+        incomplete_funding: "Funding DLC incompleto (firme mancanti)."
+        changed_txid: "Funding txid cambiato dopo la firma (%{txid} != %{expected_txid})."
+        insufficient_on_chain_balance: "Saldo on-chain insufficiente per %{wallet_name} (%{available_sats} < %{required_sats} sats). Deposita sul conto riserva."
+      settlement:
+        missing_contract: "Nessun contratto DLC per il budget %{budget_id}."
+        failed: "Settlement DLC fallito: %{message}"
+      distribution:
+        missing_contract: "Nessun contratto DLC per il budget %{budget_id}."
+        failed: "Distribuzione DLC fallita: %{message}"
+        empty_allocations: "Allocazione holder vuota."
+  budget:
+    statuses:
+      pending: "In attesa"
+      active: "Attiva"
+      settled: "Chiusa"
+  dashboard:
+    common:
+      ltv_missing: "LTV --"
+      ltv_value: "LTV %{value}"
+    show:
+      admin:
+        badge: "Admin"
+        panel_title: "Pannello admin"
+        actions:
+          all_budgets: "Tutti i budget"
+        chain:
+          title: "Catena Bitcoin (simulata)"
+          block_height_html: "Altezza blocco: <strong>%{height}</strong> - i deal si chiudono automaticamente al raggiungimento del blocco maturity."
+          field: "Altezza blocco"
+          submit: "Aggiorna blocco"
+        market_rate:
+          title: "Cambio BTC/EUR corrente"
+          submit: "Aggiorna cambio"
+          current_html: "Cambio attuale: <strong>%{rate} EUR/BTC</strong>"
+          required: "Imposta il cambio corrente per abilitare l'attivazione dei budget."
+        active_budgets:
+          title: "Budget attivi - settlement"
+          row_html: "#%{id} - peg %{rate} EUR/BTC"
+          maturity_html: "Maturity blocco <strong>%{height}</strong> (%{remaining} rimanenti)"
+          action: "Settlement"
+          empty: "Nessun budget attivo in attesa di settlement."
+        wallets:
+          title: "Multisig L1 (regtest)"
+          description_html: "Wallet regtest per utente; depositi dal <strong>%{wallet_name}</strong> (<code>%{wallet_code}</code>). Ogni deposito avanza la catena simulata di %{blocks} blocchi."
+          on_chain_title: "Wallet on-chain"
+          rate_required: "Imposta il cambio BTC/EUR per l'equivalente in euro."
+          empty: "Nessun wallet caricato su bitcoind."
+          table:
+            wallet: "Wallet"
+            name: "Nome"
+            balance: "Saldo"
+            eur: "Equivalente EUR"
+            total: "Totale"
+        reset:
+          button: "Reset demo DB"
+          confirm: "Confermi il reset? Tutti i budget e i token verranno eliminati."
+      user:
+        greeting: "Ciao, %{name}"
+        margin_call:
+          title: "Margin call (LTV >= %{threshold}%):"
+          body: "il collateral del deal non copre piu' adeguatamente gli EURT al cambio corrente. Se l'LTV raggiunge il %{liquidation_threshold}%, il deal verra' liquidato automaticamente tramite settlement DLC forzato."
+          budget_link: "Ricarica #%{id}"
+        actions:
+          deposit: "Deposita su conto riserva"
+          new_budget: "Ricarica conto spesa"
+          send_money: "Invia Denaro"
+        cards:
+          reserve:
+            title: "Conto di riserva (BTC)"
+            wallet_html: "Wallet regtest: <code>%{wallet}</code>"
+            no_wallet: "Nessun wallet - premi \"Deposita su conto riserva\"."
+          spending:
+            title: "Conto spesa / risparmio"
+            empty: "Nessun saldo sul conto corrente."
+          investment:
+            title: "Conto investimento"
+            maturity: "Scadenza: %{date}"
+            empty: "Nessun deal attivo."
+        rgb:
+          title: "RGB (RLN)"
+          unavailable_html: "Nodo RGB Lightning non raggiungibile. Avvia lo stack con <code>./bin/regtest up</code>."
+          description: "Saldo asset RGB20 on-chain via RGB Lightning Node regtest. I transfer \"Invia Denaro\" aggiornano anche il nodo RGB."
+          empty: "Nessun asset RGB sul wallet. Attiva un deal per emettere RGB20."
+        investable:
+          title: "Ricariche in attesa di investitore"
+          table:
+            borrower: "Richiedente"
+            amount: "Importo"
+            collateral: "Collateral"
+            current_rate: "Cambio attuale"
+            period: "Periodo"
+            details: "Dettagli"
+        my_budgets:
+          title: "Le mie ricariche"
+          empty: "Nessuna ricarica effettuata."
+          table:
+            amount: "Importo"
+            status: "Stato"
+            maturity: "Scadenza"
+            block: "blocco %{height}"
+        funds:
+          title: "I miei fondi"
+          empty: "Nessun token EURT ricevuto."
+          table:
+            amount: "Importo"
+            received: "Ricevuto"
+            maturity: "Scadenza"
+            remaining_amount: "Importo rimanente"
+            interest_at_maturity: "Interessi alla scadenza"
+            block: "blocco %{height}"
+  budgets:
+    index:
+      title: "Tutti i budget"
+      table:
+        borrower: "Richiedente"
+        investor: "Investitore"
+        amount: "Importo"
+        status: "Stato"
+    new:
+      title: "Ricarica conto spesa"
+      reserve_balance_html: "Conto di riserva: massimo <strong>%{max_amount}</strong> (%{sats} @ %{rate} EUR/BTC)."
+      form:
+        amount: "Importo (EUR)"
+        amount_help: "Dal conto di riserva verranno bloccati BTC per 1x l'importo (collateral del contratto, non rimborsato al settlement). Un investitore dovra' bloccare altrettanto per coprire il rischio di cambio sui token."
+        period_start: "Inizio periodo"
+        period_end: "Fine periodo"
+        submit: "Crea ricarica"
+    show:
+      title: "Ricarica"
+      summary:
+        heading: "Ricarica #%{id}"
+        borrower: "Richiedente"
+        investor: "Investitore"
+        requested_amount: "Importo richiesto"
+        borrower_collateral: "Collateral richiedente"
+        borrower_collateral_value: "%{sats} (%{amount}) - non rimborsato"
+        investor_collateral: "Collateral investitore"
+        investor_collateral_value: "%{sats} (%{amount}) - rischio FX"
+        investor_collateral_pending: "%{amount} - in attesa di attivazione"
+        peg_rate: "Peg BTC/EUR"
+        peg_rate_value: "%{rate} EUR/BTC"
+        current_rate_note: "cambio attuale - fissato all'attivazione"
+        period: "Periodo"
+        deal_blocks: "Blocchi deal"
+        blocks_remaining: "%{count} rimanenti, altezza corrente %{current_height}"
+        current_ltv: "LTV corrente"
+        l1_collateral_lock: "Collateral lock L1"
+        pubkeys: "Pubkeys (2-of-2)"
+        pubkey_peg: "peg"
+        pubkey_investor: "investor"
+        l1_escrow: "Escrow L1"
+        not_provisioned: "Non provisionato"
+        dlc_contract: "Contratto DLC (2-of-2)"
+        dlc_funding: "funding {peg, investor}"
+        dlc_status: "stato"
+        dlc_oracle_event: "oracle event"
+        dlc_digits: "%{count} digit, %{unit}"
+        dlc_settlement: "Settlement DLC"
+        cet_txid: "CET txid"
+        dlc_outcome: "outcome"
+        peg_pot: "peg_pot"
+        distribution: "distribuzione"
+        download_recovery_package: "Scarica recovery package (JSON)"
+        recovery_package_note: "MULTISIG-SPEC sezione 6 - deal params, outpoint, refund locktime"
+      activation:
+        title: "Accetta e collateralizza"
+        peg_rate_html: "Peg al momento dell'attivazione: <strong>%{rate} EUR/BTC</strong>"
+        current_rate: "cambio corrente"
+        reserve_impact_html: "Dal conto di riserva verranno decurtati %{required_sats} (collateral %{collateral}, inclusa fee stimata funding L1). Disponibili sul conto: %{available_sats}."
+        contract_note_html: "All'attivazione verra' creato un contratto DLC 2-of-2 {peg, investor} con settlement vincolato all'oracle su regtest (richiede <code>./bin/regtest up</code>)."
+        submit: "Accetta rischio e attiva la richiesta"
+      pending:
+        awaiting_investor: "In attesa di un investitore."
+        awaiting_market_rate: "In attesa che l'admin imposti il cambio BTC/EUR corrente."
+      active:
+        margin_call_title: "Margin call:"
+        margin_call_body: "LTV >= %{margin_threshold}%. Il deal e' in area di rischio e, se l'LTV raggiunge il %{liquidation_threshold}%, verra' liquidato automaticamente tramite settlement DLC forzato."
+        run_settlement: "Settlement fine mese"
+        token_supply:
+          title: "Token in circolazione"
+          user: "Utente"
+          balance: "Saldo EURT"
+      transfers:
+        title: "Storico trasferimenti token"
+        from: "Da"
+        to: "A"
+        amount: "Importo"
+        date: "Data"
+      settlement:
+        title: "Settlement eseguito"
+        end_rate_html: "Cambio corrente fine mese: <strong>%{rate} EUR/BTC</strong>"
+        peg_rate_html: "Peg budget: <strong>%{rate} EUR/BTC</strong>"
+        holders_btc_html: "BTC ai detentori token: <strong>%{amount}</strong>"
+        investor_btc_html: "BTC a %{investor} (residuo collateral): <strong>%{amount}</strong>"
+  settlements:
+    new:
+      title: "Settlement fine mese"
+      description: "Budget #%{id} - brucia i token e ridistribuisce BTC in base al peg iniziale e al cambio corrente."
+      form:
+        end_rate: "Prezzo BTC/EUR a fine mese"
+        help_intro: "Cambio corrente a fine mese (peg budget: %{rate} EUR/BTC)."
+        current_dashboard_rate: "Cambio attuale in dashboard: %{rate} EUR/BTC - se modifichi il valore, verra' aggiornato anche il cambio corrente."
+        payout_note: "I detentori di token (incluso %{borrower}) ricevono BTC al cambio corrente. Il collateral del richiedente resta nel pool; il residuo (rischio FX) va a %{investor}."
+        submit: "Esegui settlement"
+        confirm: "Confermi il settlement? I token verranno bruciati."
+    show:
+      title: "Settlement completato"
+      back: "Torna al budget"
+      summary:
+        title: "Riepilogo FloorEUR"
+        peg_rate_html: "Strike (peg) budget: <strong>%{rate} EUR/BTC</strong>"
+        spot_rate_html: "Spot oracle (settlement): <strong>%{rate} EUR/BTC</strong>"
+        total_liability_html: "Passivita' totale deal: <strong>%{amount}</strong> (%{months} mesi x %{monthly_rate}%%/mese)"
+        holder_payout_html: "Payout holder (lordo): <strong>%{gross}</strong> - effettivo dopo cap escrow: <strong>%{net}</strong>"
+        insolvent: "Escrow insufficiente: payout holder limitato al distributable (PAYOFF-SPEC sezione 7)."
+        market_rate_updated: "Cambio BTC/EUR in dashboard aggiornato a fine settlement."
+      holders:
+        title: "Detentori token - quota liability EUR in sats"
+        user: "Utente"
+        burned_tokens: "Token bruciati"
+        maturity_share: "Quota EUR a maturity"
+        btc_credited: "BTC accreditati"
+      investor:
+        title: "Investitore - residuo escrow"
+        description: "%{name} riceve il residuo del pool dopo i payout holder e le mining fee stimate:"
+        spot_value: "Valore allo spot: %{amount}"
+  token_transfers:
+    new:
+      title: "Invia Denaro"
+      spendable_balance_html: "Saldo spendibile: <strong>%{amount}</strong> su %{count} budget."
+      account_balance: "Deal #%{id} - %{amount}"
+      form:
+        recipient: "Destinatario"
+        amount: "Importo (EUR)"
+        help: "Il prelievo usa un deal con saldo sufficiente; altrimenti combina piu' deal (come gli UTXO Bitcoin)."
+        submit: "Invia Denaro"
+  sessions:
+    new:
+      title: "Login"
+      demo_users_missing_html: "Database senza utenti demo. Dalla root del progetto esegui <code>bin/rails db:seed</code> (oppure <code>bin/rails db:setup</code>)."
+      demo_credentials: "Demo: admin@example.com, alice@example.com / password"
+      form:
+        email: "Email"
+        password: "Password"
+        submit: "Log in"
+  reserve_deposits:
+    new:
+      title: "Deposita su conto di riserva"
+      description_html: "Simula un bonifico BTC dal <strong>%{wallet_name}</strong> (<code>%{wallet_code}</code>, float demo %{float_balance}) verso il tuo wallet regtest personale. Alla conferma la <strong>catena simulata</strong> avanza di %{blocks} blocchi."
+      form:
+        amount: "Importo (BTC)"
+        default_values: "Default demo: Alice 0.1 - Bob 0.2 BTC"
+        submit: "Conferma deposito"
+  activerecord:
+    errors:
+      models:
+        budget:
+          attributes:
+            period_end:
+              on_or_after_period_start: "deve essere uguale o successiva all'inizio periodo"
+        token_transfer:
+          attributes:
+            to_user:
+              must_be_different_from_sender: "deve essere diverso dal mittente"
+  date:
+    formats:
+      long: "%-d %B %Y"
+  time:
+    formats:
+      short: "%d/%m/%Y %H:%M"
+      long: "%-d %B %Y %H:%M"

@@ -33,7 +33,7 @@ module Dlc
 
     def call
       return budget.dlc_contract if budget.dlc_contract.present?
-      raise Error, "Budget peg mancante per il DLC" unless budget.peg_set?
+      raise Error, I18n.t("services.dlc.contract_setup.missing_peg") unless budget.peg_set?
 
       announcement = oracle.announce_numeric(event_id: event_id, maturity_epoch: maturity_epoch)
       num_digits = announcement.num_digits || Config.num_digits
@@ -83,9 +83,9 @@ module Dlc
         status: :funded
       )
     rescue OracleClient::Error, NodeClient::Error => e
-      raise Error, "Setup DLC fallito: #{e.message}"
+      raise Error, I18n.t("services.dlc.contract_setup.setup_failed", message: e.message)
     rescue L1::Bitcoind::Error => e
-      raise Error, "Funding DLC fallito: #{e.message}"
+      raise Error, I18n.t("services.dlc.contract_setup.funding_failed", message: e.message)
     end
 
     private
@@ -97,16 +97,16 @@ module Dlc
     # txid is stable pre-witness, so it must match the funding_txid the sidecar
     # bound the CETs to — otherwise the CETs would be invalid (STOP condition).
     def broadcast_funding!(contract, peg_wallet, investor_wallet)
-      raise Error, "Funding tx hex mancante dal nodo DLC" if contract.funding_tx_hex.blank?
+      raise Error, I18n.t("services.dlc.contract_setup.missing_funding_hex") if contract.funding_tx_hex.blank?
 
       signed = peg_wallet.client.call("signrawtransactionwithwallet", contract.funding_tx_hex)
       signed = investor_wallet.client.call("signrawtransactionwithwallet", signed.fetch("hex"))
-      raise Error, "Funding DLC incompleta (firme mancanti)" unless signed.fetch("complete")
+      raise Error, I18n.t("services.dlc.contract_setup.incomplete_funding") unless signed.fetch("complete")
 
       hex = signed.fetch("hex")
       txid = @global_client.call("sendrawtransaction", hex)
       if contract.funding_txid.present? && txid != contract.funding_txid
-        raise Error, "Funding txid cambiato dopo la firma (#{txid} != #{contract.funding_txid})"
+        raise Error, I18n.t("services.dlc.contract_setup.changed_txid", txid: txid, expected_txid: contract.funding_txid)
       end
 
       L1::RegtestHarness.new(wallet_name: L1::SHARED_REGTEST_WALLET).mine_blocks(1)
@@ -141,16 +141,20 @@ module Dlc
       required_peg = peg_sats + FUNDING_FEE_BUFFER_SATS
       if peg_wallet.spendable_sats < required_peg
         raise Error,
-              "Saldo on-chain insufficiente per #{peg_wallet.wallet_name} " \
-              "(#{peg_wallet.spendable_sats} < #{required_peg} sats). Deposita sul conto riserva."
+              I18n.t("services.dlc.contract_setup.insufficient_on_chain_balance",
+                wallet_name: peg_wallet.wallet_name,
+                available_sats: peg_wallet.spendable_sats,
+                required_sats: required_peg)
       end
 
       required_investor = investor_sats + FUNDING_FEE_BUFFER_SATS
       return if investor_wallet.spendable_sats >= required_investor
 
       raise Error,
-            "Saldo on-chain insufficiente per #{investor_wallet.wallet_name} " \
-            "(#{investor_wallet.spendable_sats} < #{required_investor} sats). Deposita sul conto riserva."
+            I18n.t("services.dlc.contract_setup.insufficient_on_chain_balance",
+              wallet_name: investor_wallet.wallet_name,
+              available_sats: investor_wallet.spendable_sats,
+              required_sats: required_investor)
     end
 
     def coins_to_inputs(coins)

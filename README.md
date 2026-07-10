@@ -1,5 +1,9 @@
 # MAT PoC (Rails + DLC + RGB on regtest)
 
+<p align="center">
+  <img src="docs/images/dashboard.png" alt="MAT PoC dashboard — reserve, spending, and RGB (RLN) accounts" width="900">
+</p>
+
 Rails proof-of-concept for bilateral P2P deals (`Budget`), with:
 
 - real BTC collateral on regtest

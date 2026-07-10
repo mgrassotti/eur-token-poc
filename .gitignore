@@ -34,3 +34,4 @@
 /config/*.key
 
 /dlc-shim/node_modules
+.DS_Store

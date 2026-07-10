@@ -1,95 +1,101 @@
 # MAT PoC (Rails + DLC + RGB on regtest)
 
-Proof-of-concept Rails per deal P2P bilaterali (`Budget`), con:
+Rails proof-of-concept for bilateral P2P deals (`Budget`), with:
 
-- collateral BTC reale su regtest
-- token EUR nominali trasferibili tra utenti
-- settlement a scadenza via DLC (oracle-attested CET)
+- real BTC collateral on regtest
+- EUR-denominated tokens transferable between users
+- maturity settlement via DLC (oracle-attested CET)
 
-## Stato attuale di implementazione
+## Current implementation status
 
-- **Settlement unico:** DLC (Discreet Log Contract)
-- **I**l funding del DLC usa UTXO reali delle riserve utente.
-- **Single lock model:** il funding 2-of-2 del DLC e' il lock del collateral.
-- **RGB stack:** nodi RGB Lightning reali su regtest (uno per utente + issuer).
-- **Demo/test end-to-end:** integrazione e system test allineati al flusso reale.
+- **Single settlement path:** DLC (Discreet Log Contract)
+- **Reserve-funded DLC:** funding inputs come from users' real L1 reserve UTXOs
+- **Single lock model:** the 2-of-2 DLC funding transaction is the collateral lock
+- **RGB stack:** real RGB Lightning Nodes on regtest (one per user + issuer)
+- **Demo / E2E tests:** integration and system specs aligned with the real flow
 
+## Functional architecture
 
+Each `Budget` is an autonomous deal:
 
-## Architettura funzionale
+- the borrower opens a request (EUR notional amount)
+- the hodler activates the deal
+- EUR nominal tokens are issued to the borrower
+- tokens can be transferred to other users
+- at maturity the DLC executes the CET, then the `peg_pot` is distributed pro-rata to holders
 
-Ogni `Budget` rappresenta un deal autonomo:
+### Collateral and payout
 
-- il borrower apre la richiesta (importo EUR nominale)
-- l'investitore attiva il deal
-- vengono emessi i token EUR nominali al borrower
-- i token possono essere trasferiti ad altri utenti
-- a maturity il DLC esegue la CET, poi il `peg_pot` viene distribuito pro-rata agli holder
+- borrower + hodler collateral is locked in the **2-of-2 DLC funding output**
+- the investor-side CET output returns to the hodler's L1 reserve
+- the peg-side CET output is distributed to holders via `Dlc::Distribution`
 
-### Collateral e payout
+### Important: DLC vs holder distribution
 
-- collateral borrower + investor bloccato nel **funding output DLC 2-of-2**
-- output investor CET torna direttamente alla riserva dell'investitore
-- output peg CET viene distribuito agli holder via `Dlc::Distribution`
+The DLC contract is signed once at activation. It only fixes:
 
+- how much of the pool goes to the **peg side** vs the **hodler side** for each oracle price outcome
 
+It does **not** enumerate individual holders. At settlement:
 
-## Architettura tecnica
+1. the CET pays the total `peg_pot` to a sidecar-controlled peg address
+2. Rails snapshots RGB/token balances at maturity
+3. `Dlc::Distribution` asks the sidecar to fan out that output pro-rata to holder reserve addresses
 
-### Componenti principali
+RGB therefore influences L1 payouts **indirectly** through the Rails orchestrator reading token ownership — not through a trustless on-chain link between RGB state and the DLC spend path. Transfers do not require re-signing the DLC.
 
-- **Rails app:** orchestration, stato dominio, dashboard, demo flow
-- **bitcoind regtest:** catena e wallet on-chain
-- **Pythia oracle:** annuncio/attestazione dell'evento numerico DLC
-- `dlc-rs` **sidecar (Rust):**
-  - costruisce DLC tx set (funding/CET/refund)
-  - riceve input reali da Ruby
-  - restituisce funding tx unsigned
-  - esegue CET alla maturity
-  - distribuisce il `peg_pot` dagli output reali CET
-- **RGB Lightning Nodes:** uno per utente + issuer
+## Technical architecture
 
-### Flusso di activation (stato corrente)
+### Main components
 
-`Budgets::ActivateService` -> `L1::ProvisionEscrowService`:
+- **Rails app:** orchestration, domain state, dashboard, demo flow
+- **bitcoind regtest:** chain and on-chain wallets
+- **Pythia oracle:** numeric DLC event announce / attest
+- **`dlc-rs` sidecar (Rust):**
+  - builds the DLC tx set (funding / CET / refund)
+  - accepts real reserve inputs from Ruby
+  - returns the unsigned funding tx
+  - executes the CET at maturity
+  - distributes the `peg_pot` from real CET outputs
+- **RGB Lightning Nodes:** one per user + issuer
 
-1. annuncia evento oracle
-2. seleziona UTXO reserve borrower/investor
-3. chiama `Dlc::NodeClient#create_contract` con:
-  - `peg_inputs` / `investor_inputs`
-  - change addresses
-  - investor payout address
-4. firma funding tx con i wallet reserve in Ruby
-5. broadcast funding tx
-6. salva outpoint funding DLC su `Budget` (`escrow_txid` / `escrow_vout`)
+### Activation flow (current)
+
+`Budgets::ActivateService` → `L1::ProvisionEscrowService`:
+
+1. announce the oracle event
+2. select borrower / hodler reserve UTXOs
+3. call `Dlc::NodeClient#create_contract` with:
+   - `peg_inputs` / `investor_inputs`
+   - change addresses
+   - investor payout address
+4. sign the funding tx with reserve wallets in Ruby
+5. broadcast the funding tx
+6. persist the DLC funding outpoint on `Budget` (`escrow_txid` / `escrow_vout`)
 7. issue RGB
 
-### Flusso di settlement
+### Settlement flow
 
 `Settlements::ExecuteService`:
 
-1. valida maturity + contratto funded
-2. redemption token RGB
-3. `Dlc::SettlementService` esegue CET con attestazione oracle
-4. `Dlc::Distribution` distribuisce il `peg_pot` agli holder
-5. sync riserve on-chain
+1. validate maturity + funded contract
+2. RGB token redemption
+3. `Dlc::SettlementService` executes the CET with the oracle attestation
+4. `Dlc::Distribution` distributes the `peg_pot` to holders
+5. sync on-chain reserves
 
+## Data model (essential)
 
+- `Budget`: deal lifecycle + collateral lock outpoint (DLC funding)
+- `DlcContract`: DLC contract metadata and funding outpoint
+- `DlcSettlement`: CET result (`cet_txid`, outcome, peg / investor sats)
+- `TokenAccount` / `TokenTransfer` / `RgbAssignment`: token state and ownership
+- `CollateralLock`: domain-level collateral lock accounting
+- `BtcAccount`: user spendable reserve balance
 
-## Modello dati (essenziale)
+Note: some legacy DB columns may still exist for backward compatibility, but runtime follows the DLC-only model above.
 
-- `Budget`: ciclo vita deal + outpoint collateral lock (funding DLC)
-- `DlcContract`: metadati contratto DLC e funding outpoint
-- `DlcSettlement`: risultato CET (`cet_txid`, outcome, peg/investor sats)
-- `TokenAccount` / `TokenTransfer` / `RgbAssignment`: stato token e ownership
-- `CollateralLock`: tracking contabile lock collateral lato dominio
-- `BtcAccount`: saldo riserva spendibile utente
-
-Nota: alcune colonne legacy possono ancora esistere a DB per backward compatibility, ma il runtime segue il modello DLC-only sopra.
-
-
-
-## Setup rapido
+## Quick setup
 
 ```bash
 cd ~/dev/eur-token-poc
@@ -98,9 +104,9 @@ bin/rails db:setup
 bin/dev
 ```
 
-`bin/dev` avvia Rails e lo stack regtest richiesto.
+`bin/dev` starts Rails and the required regtest stack.
 
-Login demo:
+Demo login:
 
 - `admin@example.com` / `password`
 - `alice@example.com` / `password`
@@ -108,41 +114,37 @@ Login demo:
 - `claude@example.com` / `password`
 - `david@example.com` / `password`
 
-## Stack regtest / RGB / DLC
+## Regtest / RGB / DLC stack
 
 ```bash
 ./bin/regtest up
 ```
 
-Servizi principali:
+Main services:
 
 - bitcoind: `127.0.0.1:18443`
-- RLN Alice/Bob/Claude/David: `3001..3004`
+- RLN Alice / Bob / Claude / David: `3001..3004`
 - RLN issuer: `3005`
-- DLC node (`dlc-rs`): da config `DLC_NODE_URL`
-- Oracle Pythia: da config `DLC_ORACLE_URL`
+- DLC node (`dlc-rs`): from `DLC_NODE_URL`
+- Pythia oracle: from `DLC_ORACLE_URL`
 
-Reset ambiente demo:
+Reset demo environment:
 
 ```bash
 ./bin/regtest reset
 ```
 
+## Demo flow
 
+1. Admin sets the BTC/EUR rate
+2. Alice and Bob deposit into their reserves
+3. Alice creates a budget
+4. Bob activates the budget (DLC funded from real reserves)
+5. Alice transfers part of her tokens to Claude / David
+6. At the maturity block, DLC settlement runs
+7. Holders receive the distributed `peg_pot`; the hodler receives the investor CET output
 
-## Demo flow (funzionale)
-
-1. Admin imposta rate BTC/EUR
-2. Alice e Bob depositano nella riserva
-3. Alice crea budget
-4. Bob attiva il budget (funding DLC da riserve reali)
-5. Alice trasferisce parte dei token a Claude/David
-6. Al maturity block avviene settlement DLC
-7. Holder ricevono `peg_pot` distribuito, investor riceve output CET investor
-
-
-
-## Test
+## Tests
 
 ```bash
 bundle exec rspec
@@ -150,13 +152,11 @@ bundle exec rspec
 ./bin/system-spec
 ```
 
-- `bundle exec rspec`: suite completa (unit + integration + system)
-- `bin/demo-spec`: scenario end-to-end non browser
-- `bin/system-spec`: scenario end-to-end via UI
+- `bundle exec rspec`: full suite (unit + integration + system)
+- `bin/demo-spec`: non-browser end-to-end scenario
+- `bin/system-spec`: end-to-end scenario via UI
 
-
-
-## File/servizi chiave
+## Key files / services
 
 - `app/services/dlc/contract_setup_service.rb`
 - `app/services/dlc/settlement_service.rb`
@@ -168,107 +168,101 @@ bundle exec rspec
 - `spec/integration/demo_end_to_end_flow_spec.rb`
 - `spec/system/demo_end_to_end_flow_spec.rb`
 
+## Known limitations
 
+- Regtest / demo oriented environment, not production hardening.
+- Depends on local Docker stack and oracle / DLC services.
+- Some legacy DB artifacts remain only for historical compatibility.
+- Holder distribution is orchestrated by Rails + sidecar, not atomically bound to RGB on-chain.
 
-## Limitazioni note
+## Required future developments
 
-- Ambiente orientato a regtest/demo, non hardening produzione.
-- Dipendenza da stack locale Docker e servizi oracle/DLC.
-- Alcune parti legacy DB restano solo per compatibilita' storica.
+To reach an economically sustainable and scalable architecture, the PoC must evolve beyond predominantly on-chain settlement and distribution.
 
-## Sviluppi futuri necessari
+### 1. Reduce Layer 1 usage
 
-Per arrivare a un'architettura economicamente sostenibile e scalabile, il PoC
-deve evolvere oltre il settlement e la distribuzione prevalentemente on-chain.
+The current state uses Bitcoin L1 for:
 
-### 1. Ridurre l'uso di Layer 1
+- DLC funding / collateral lock
+- hodler collateral return via CET
+- `peg_pot` distribution to holders
 
-Lo stato attuale usa Bitcoin L1 per:
+This is correct for a verifiable PoC, but at real volume it introduces:
 
-- funding del DLC / lock del collateral
-- ritorno del collateral investitore via CET
-- distribuzione del `peg_pot` agli holder
+- miner fees for activation / settlement / distribution
+- confirmation latency
+- poor efficiency for fractional payouts to many holders
 
-Questo e' corretto per un PoC verificabile, ma su volumi reali introduce:
+The natural direction is to keep on L1 only what is strictly necessary (`funding` / `refund` / final anchoring) and move operational payouts to Lightning.
 
-- costi miner fee per activation / settlement / distribution
-- latenza di conferma
-- bassa efficienza per payout frazionati a molti holder
+### 2. Holder distribution via Lightning instead of L1 payout
 
-La direzione naturale e' mantenere su L1 solo il minimo necessario
-(`funding`/`refund`/ancoraggio finale), spostando i payout operativi su
-Lightning.
+Today `Dlc::Distribution` spends the peg-side CET output to holder L1 reserve addresses. For scalability and cost, the next step is:
 
-### 2. Distribuzione holder via Lightning anziche' payout L1
+- replace on-chain fan-out with Lightning payments
+- use per-holder invoices instead of per-holder UTXOs
+- avoid one L1 transaction with N outputs on every settlement
 
-Oggi `Dlc::Distribution` spende l'output CET peg-side verso gli indirizzi di
-riserva L1 degli holder. Per scalabilita' e costi, il passo successivo e':
+This reduces fees and payout size, especially when the `peg_pot` must be split across many recipients.
 
-- sostituire il fan-out on-chain con pagamenti Lightning
-- usare invoice per-holder invece di UTXO per-holder
-- evitare una transazione L1 con N output per ogni settlement
+### 3. Pending / HODL invoices for atomicity
 
-Questo riduce fee e dimensione dei payout, soprattutto quando il `peg_pot`
-deve essere distribuito a molti destinatari.
+The important step is not just "use LN", but **pending invoices** (or HODL invoices) to atomically bind:
 
-### 3. Pending / HODL invoices per atomicita'
+- RGB token redemption / burn / withdrawal
+- BTC payout receipt on Lightning
 
-Il passaggio importante non e' solo "usare LN", ma usare **pending invoices**
-(o HODL invoices) per legare atomicamente:
+Target flow:
 
-- redemption / burn / ritiro dei token lato RGB
-- ricezione del payout BTC lato Lightning
+1. the holder presents a pending Lightning invoice
+2. DLC settlement determines the amount owed
+3. the system prepares payment but does not finalize immediately
+4. completion happens only when the atomic condition is satisfied (e.g. valid redemption / oracle secret / coherent application state)
 
-L'obiettivo e':
+This avoids:
 
-1. l'holder presenta una invoice Lightning pending
-2. il settlement DLC determina l'ammontare dovuto
-3. il sistema prepara il pagamento ma non lo finalizza subito
-4. il completamento avviene solo quando la condizione atomica e' soddisfatta
-   (es. redemption valida / segreto oracle / stato applicativo coerente)
+- tokens redeemed but payout not received
+- payout sent but token state not updated
 
-In questo modo si evita il rischio di:
+### 4. Practical feasibility
 
-- token ritirati ma payout non ricevuto
-- payout inviato ma stato token non aggiornato
+To move to this model, some infrastructure work is still required:
 
-### 4. Fattibilita' pratica
+- reliable pending / HODL invoice support on the Lightning node used
+- invoice lifecycle management (`open` / `held` / `settled` / `cancelled`)
+- clear mapping between DLC payout, holder position, and LN invoice
+- recovery / retry on partial failures
+- application accounting that distinguishes:
+  - L1 collateral
+  - CET payout
+  - pending / settled LN payouts
 
-Per passare a questo modello servono ancora alcuni passi infrastrutturali:
+### 5. Reasonable target architecture
 
-- supporto affidabile a pending/HODL invoices nel nodo Lightning usato
-- gestione lifecycle invoice (`open` / `held` / `settled` / `cancelled`)
-- mapping chiaro tra payout DLC, holder position e invoice LN
-- recovery / retry in caso di errori parziali
-- accounting applicativo che distingua:
-  - collateral L1
-  - payout CET
-  - payout LN pendenti / regolati
+A realistic direction for a more mature version:
 
-### 5. Architettura target ragionevole
+- **Bitcoin L1:** DLC collateral lock, refund, exceptional / recovery cases
+- **DLC:** main deal settlement and payout determination
+- **Lightning:** holder payout distribution
+- **RGB:** EUR nominal ownership / transferability
 
-Una direzione realistica per una versione piu' matura e':
+In this layout:
 
-- **L1 Bitcoin**: collateral lock del DLC, refund, casi eccezionali / recovery
-- **DLC**: settlement principale del deal e determinazione del payout
-- **Lightning**: distribuzione dei payout agli holder
-- **RGB**: ownership / trasferibilita' del nominale EUR
+- L1 remains the security and finality layer
+- LN becomes the operational layer for frequent payouts
+- marginal costs for multi-holder settlement drop significantly
 
-In questo assetto:
+### 6. Project status vs this roadmap
 
-- L1 resta il layer di sicurezza e finalita'
-- LN diventa il layer operativo per i payout frequenti
-- i costi marginali per settlement multi-holder si abbassano molto
+The repository currently covers:
 
-### 6. Stato del progetto rispetto a questa roadmap
+- working reserve-funded DLC on regtest
+- real hodler return to reserve
+- real holder distribution, but still **on-chain**
 
-Attualmente il repository copre:
+So the next major architectural step is not the DLC itself, but **migrating distribution to LN with pending invoices**, keeping L1 only where it is truly needed.
 
-- DLC reserve-funded funzionante su regtest
-- investor return reale sulla riserva
-- distribution holder reale ma ancora **on-chain**
+## Documentation
 
-Quindi il prossimo salto architetturale importante non e' il DLC in se', ma la
-**migrazione della distribution verso LN con pending invoices**, mantenendo L1
-solo dove serve davvero.
-
+- English: `README.md` (this file)
+- Italian: `README-ita.md`

@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mat.local/schemas/deal-offer.schema.json",
+  "title": "DealOffer",
+  "description": "Borrower-published deal terms (mat-core wire format v1)",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "deal_id",
+    "borrower_pubkey",
+    "amount_eur_cents",
+    "collateral_eur_cents",
+    "rate_bps_monthly",
+    "period",
+    "created_at_epoch"
+  ],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "deal_id": { "type": "string", "minLength": 1 },
+    "borrower_pubkey": { "type": "string", "minLength": 1 },
+    "amount_eur_cents": { "type": "integer", "minimum": 1 },
+    "collateral_eur_cents": { "type": "integer", "minimum": 1 },
+    "rate_bps_monthly": { "type": "integer", "minimum": 0 },
+    "period": { "$ref": "#/$defs/period" },
+    "created_at_epoch": { "type": "integer", "minimum": 0 }
+  },
+  "$defs": {
+    "date": {
+      "type": "object",
+      "required": ["year", "month"],
+      "properties": {
+        "year": { "type": "integer" },
+        "month": { "type": "integer", "minimum": 1, "maximum": 12 }
+      }
+    },
+    "period": {
+      "type": "object",
+      "required": ["start", "end"],
+      "properties": {
+        "start": { "$ref": "#/$defs/date" },
+        "end": { "$ref": "#/$defs/date" }
+      }
+    }
+  },
+  "additionalProperties": false
+}

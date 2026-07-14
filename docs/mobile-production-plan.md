@@ -379,6 +379,7 @@ Replacing the DLC funding transaction with a **plain Lightning channel open** do
 
 ## Related documents
 
+- [mat-core/README.md](../mat-core/README.md) — Phase 0 Rust kernel (FloorEUR, wire schemas, test vectors)
 - [README.md](../README.md) — current PoC architecture and LN roadmap
 - [README-ita.md](../README-ita.md) — Italian overview
 - [dlc-rs/README.md](../dlc-rs/README.md) — sidecar / rust-dlc integration (PoC)

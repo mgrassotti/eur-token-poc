@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mat.local/schemas/deal-accept.schema.json",
+  "title": "DealAccept",
+  "description": "Hodler acceptance with peg lock (mat-core wire format v1)",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "deal_id",
+    "investor_pubkey",
+    "peg_eur_per_btc",
+    "investor_collateral_sats",
+    "oracle_event_id",
+    "accepted_at_epoch"
+  ],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "deal_id": { "type": "string", "minLength": 1 },
+    "investor_pubkey": { "type": "string", "minLength": 1 },
+    "peg_eur_per_btc": { "type": "integer", "minimum": 1 },
+    "investor_collateral_sats": { "type": "integer", "minimum": 1 },
+    "oracle_event_id": { "type": "string", "minLength": 1 },
+    "accepted_at_epoch": { "type": "integer", "minimum": 0 }
+  },
+  "additionalProperties": false
+}

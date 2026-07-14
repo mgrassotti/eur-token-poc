@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mat.local/schemas/settlement-package.schema.json",
+  "title": "SettlementPackage",
+  "description": "Post-CET settlement bundle for holder payouts and recovery (mat-core wire format v1)",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "deal_id",
+    "status",
+    "end_btc_eur_rate",
+    "cet_txid",
+    "peg_pot_sats",
+    "investor_sats",
+    "holder_allocations"
+  ],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "deal_id": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["pending", "active", "settled"] },
+    "end_btc_eur_rate": { "type": "integer", "minimum": 1 },
+    "cet_txid": { "type": "string", "minLength": 1 },
+    "peg_pot_sats": { "type": "integer", "minimum": 0 },
+    "investor_sats": { "type": "integer", "minimum": 0 },
+    "oracle_attestation_hex": { "type": ["string", "null"] },
+    "holder_allocations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/holder_allocation" }
+    }
+  },
+  "$defs": {
+    "holder_allocation": {
+      "type": "object",
+      "required": ["holder_id", "share_cents", "btc_sats"],
+      "properties": {
+        "holder_id": { "type": "string", "minLength": 1 },
+        "share_cents": { "type": "integer", "minimum": 0 },
+        "btc_sats": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

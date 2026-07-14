@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mat.local/schemas/funding-package.schema.json",
+  "title": "FundingPackage",
+  "description": "Unsigned DLC funding PSBT exchanged before broadcast (mat-core wire format v1)",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "deal_id",
+    "unsigned_psbt_base64",
+    "peg_collateral_sats",
+    "investor_collateral_sats",
+    "oracle_announcement_hex"
+  ],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "deal_id": { "type": "string", "minLength": 1 },
+    "unsigned_psbt_base64": { "type": "string", "minLength": 1 },
+    "funding_outpoint": { "type": ["string", "null"] },
+    "peg_collateral_sats": { "type": "integer", "minimum": 0 },
+    "investor_collateral_sats": { "type": "integer", "minimum": 0 },
+    "oracle_announcement_hex": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": false
+}

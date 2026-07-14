@@ -39,6 +39,7 @@ RSpec.describe Settlements::ExecuteService do
     end_rate = 50_000
     collateral_sats = budget.collateral_lock.amount_sats
     fee = Budget::ESTIMATED_SETTLEMENT_FEE_SATS
+    dist_fee = Dlc::Distribution.fee_estimate(3)
     expected_total_holder = 10_600_000
 
     result = described_class.call(budget: budget, end_btc_eur_rate: end_rate)
@@ -46,7 +47,7 @@ RSpec.describe Settlements::ExecuteService do
     expect(result.payoff.liability_eur_cents).to eq(530_000)
     expect(result.payoff.total_holder_sats).to eq(expected_total_holder)
     expect(result.payouts.sum(&:btc_sats)).to eq(expected_total_holder)
-    expect(result.investor_btc_sats).to eq(collateral_sats - expected_total_holder - fee)
+    expect(result.investor_btc_sats).to eq(collateral_sats - expected_total_holder - fee - dist_fee)
     expect(budget.reload).to be_settled
   end
 
@@ -70,9 +71,11 @@ RSpec.describe Settlements::ExecuteService do
       test_budget = activate_fresh_budget
       escrow = test_budget.collateral_lock.amount_sats
       fee = Budget::ESTIMATED_SETTLEMENT_FEE_SATS
+      holder_count = test_budget.token_accounts.where("balance_cents > 0").count
+      dist_fee = Dlc::Distribution.fee_estimate(holder_count)
 
       result = described_class.call(budget: test_budget, end_btc_eur_rate: end_rate)
-      total = result.payoff.total_holder_sats + result.investor_btc_sats + fee
+      total = result.payouts.sum(&:btc_sats) + result.investor_btc_sats + fee + dist_fee
       expect(total).to eq(escrow)
     end
   end
@@ -88,7 +91,7 @@ RSpec.describe Settlements::ExecuteService do
   it "rejects inactive budgets" do
     expect do
       described_class.call(budget: create(:budget, borrower: alice), end_btc_eur_rate: 60_000)
-    end.to raise_error(Settlements::ExecuteService::Error, "Budget is not active")
+    end.to raise_error(Settlements::ExecuteService::Error, I18n.t("services.settlements.execute.budget_not_active"))
   end
 
   it "updates the dashboard market rate when the end rate differs" do

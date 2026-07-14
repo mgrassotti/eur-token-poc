@@ -37,6 +37,30 @@ RSpec.describe Dlc::Distribution do
     )
   end
 
+  it "uses explicit holder_targets instead of pro-rata peg_pot" do
+    payouts = described_class.call(
+      budget: budget,
+      peg_pot_sats: 2_000_000,
+      holder_targets: [
+        { user: alice, sats: 1_010_000 },
+        { user: claude, sats: 606_000 },
+        { user: david, sats: 404_000 }
+      ],
+      node: node,
+      address_resolver: resolver
+    )
+
+    expect(node).to have_received(:distribute).with(
+      contract_id: "c-1",
+      payouts: [
+        { address: "addr-#{alice.id}", sats: 1_010_000 },
+        { address: "addr-#{claude.id}", sats: 606_000 },
+        { address: "addr-#{david.id}", sats: 404_000 }
+      ]
+    )
+    expect(payouts.sum(&:sats)).to eq(2_020_000)
+  end
+
   it "splits the peg_pot pro-rata on token balances and conserves the total" do
     payouts = described_class.call(
       budget: budget, peg_pot_sats: 1_000_000, node: node, address_resolver: resolver

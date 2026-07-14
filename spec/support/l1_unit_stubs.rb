@@ -135,19 +135,95 @@ module L1UnitStubs
   end
 
   # Offline stub for the DLC settlement path used by Settlements::ExecuteService.
-  # The peg_pot math is asserted elsewhere; here we only keep settlement running
-  # without hitting the oracle/node.
+  # CET outputs follow FloorEUR; distribution echoes explicit holder targets.
   def stub_dlc_settlement!
-    allow(Dlc::SettlementService).to receive(:call) do |budget:, **|
+    allow(Dlc::SettlementService).to receive(:call) do |budget:, end_btc_eur_rate:, **|
+      @stub_settlement_end_rate = end_btc_eur_rate
+      payoff = stub_floor_payoff(budget, end_btc_eur_rate)
       Dlc::SettlementService::Result.new(
         dlc_settlement: nil,
         cet_txid: "cet#{"0" * 61}",
-        outcome: 0,
-        peg_pot_sats: 0,
-        investor_sats: 0
+        outcome: end_btc_eur_rate.to_i,
+        peg_pot_sats: payoff.total_holder_sats,
+        investor_sats: payoff.investor_remainder_sats
       )
     end
-    allow(Dlc::Distribution).to receive(:call).and_return([])
+
+    allow(Dlc::Distribution).to receive(:call) do |budget:, peg_pot_sats:, shares: nil, holder_targets: nil, **|
+      stub_dlc_distribution(budget:, holder_targets:, shares:, peg_pot_sats:)
+    end
+  end
+
+  def stub_floor_payoff(budget, end_btc_eur_rate)
+    token_accounts = budget.token_accounts.where("balance_cents > 0").order(:id).to_a
+    height = budget.maturity_block_height || ChainState.block_height
+    Payoffs::FloorEurCalculator.call(
+      notional_eur_cents: budget.notional_eur_cents,
+      notional_total_cents: budget.amount_eur_cents,
+      holder_shares_cents: token_accounts.map(&:balance_cents),
+      spot_eur_per_btc: end_btc_eur_rate,
+      rate_bps_monthly: budget.rate_bps_monthly,
+      months_elapsed: budget.months_elapsed(at_height: height),
+      escrow_total_sats: budget.pool_sats
+    )
+  end
+
+  def stub_dlc_distribution(budget:, holder_targets:, shares:, peg_pot_sats:)
+    targets = if holder_targets
+                holder_targets
+              else
+                stub_pro_rata_targets(peg_pot_sats, shares)
+              end
+    return [] if targets.empty?
+
+    end_rate = @stub_settlement_end_rate || MarketRate.current.btc_eur_per_btc
+    payoff = stub_floor_payoff(budget, end_rate)
+    holder_total = targets.sum { |t| t[:sats] }
+    dist_fee = Dlc::Distribution.fee_estimate(targets.size)
+    investor_payout_sats = [payoff.investor_remainder_sats - dist_fee, 0].max
+    txid = "dist#{"0" * 61}"
+
+    package = budget.recovery_package&.deep_dup || {}
+    package["dlc_distribution"] = {
+      "txid" => txid,
+      "peg_pot_sats" => holder_total,
+      "investor_payout_sats" => investor_payout_sats,
+      "investor_payout_address" => "bcrt1investor-stub",
+      "payouts" => targets.map do |target|
+        { "user_id" => target[:user].id, "sats" => target[:sats], "address" => "stub-#{target[:user].id}" }
+      end
+    }
+    budget.update!(recovery_package: package)
+
+    targets.map do |target|
+      Dlc::Distribution::Payout.new(
+        user: target[:user],
+        sats: target[:sats],
+        address: "stub-#{target[:user].id}",
+        txid: txid
+      )
+    end
+  end
+
+  def stub_pro_rata_targets(peg_pot_sats, shares)
+    return [] if shares.blank?
+
+    total_cents = shares.sum { |s| Integer(s[:cents]) }
+    return [] if total_cents.zero?
+
+    assigned = 0
+    shares[0..-2].filter_map do |share|
+      cents = Integer(share[:cents])
+      next if cents.zero?
+
+      sats = (peg_pot_sats * cents) / total_cents
+      assigned += sats
+      { user: share[:user], sats: sats }
+    end + begin
+      last = shares.last
+      cents = Integer(last[:cents])
+      cents.positive? ? [{ user: last[:user], sats: peg_pot_sats - assigned }] : []
+    end
   end
 end
 

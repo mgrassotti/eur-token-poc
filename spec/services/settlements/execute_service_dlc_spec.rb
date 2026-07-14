@@ -32,15 +32,25 @@ RSpec.describe Settlements::ExecuteService, "DLC settlement path" do
         peg_pot_sats: 10_600_000, investor_sats: 2
       )
     )
-    allow(Dlc::Distribution).to receive(:call).and_return([])
+    allow(Dlc::Distribution).to receive(:call) do |budget:, holder_targets:, **|
+      holder_targets.map do |target|
+        Dlc::Distribution::Payout.new(
+          user: target[:user], sats: target[:sats], address: "stub-#{target[:user].id}", txid: "dist#{"0" * 61}"
+        )
+      end
+    end
   end
 
-  it "executes the CET via Dlc::SettlementService and distributes the peg_pot" do
+  it "executes the CET via Dlc::SettlementService and distributes exact FloorEUR targets" do
     described_class.call(budget: budget, end_btc_eur_rate: peg)
 
     expect(Dlc::SettlementService).to have_received(:call).with(budget: budget, end_btc_eur_rate: peg)
-    expect(Dlc::Distribution).to have_received(:call)
-      .with(budget: budget, peg_pot_sats: 10_600_000, shares: kind_of(Array))
+    expect(Dlc::Distribution).to have_received(:call).with(
+      budget: budget,
+      peg_pot_sats: 10_600_000,
+      shares: kind_of(Array),
+      holder_targets: kind_of(Array)
+    )
     expect(budget.reload).to be_settled
     expect(budget.recovery_package["settlement_txid"]).to eq(cet_txid)
     expect(budget.recovery_package["dlc"]).to be_present

@@ -74,6 +74,8 @@ RSpec.describe "Demo end-to-end flow", :regtest, :demo_flow do
     payoff = expected_settlement_payoff(budget)
     expect(payoff.liability_eur_cents).to eq(101_000) # 1_000 € + 10 € interessi (1 mese @ 1%)
 
+    pre_settlement_accounts = budget.token_accounts.where("balance_cents > 0").order(:id).to_a
+
     # Riserve pre-settlement: gli holder (alice ha il resto del funding, claude e
     # david non hanno depositato) e l'investitore. In Fase 1 il settlement AGGIUNGE
     # alla riserva (collateral restituito), quindi si verifica il delta.
@@ -85,14 +87,22 @@ RSpec.describe "Demo end-to-end flow", :regtest, :demo_flow do
     expect(budget).to be_settled
     expect(budget.dlc_settlement).to be_executed
 
-    # Settlement DLC (Fase 1): la CET rilascia il peg_pot (reale) sul lato peg,
-    # distribuito pro-rata agli holder sulle loro riserve L1 (Dlc::Distribution).
-    # Ogni riserva holder cresce esattamente della distribuzione registrata.
+    # Settlement DLC (Fase 1): holders receive exact FloorEUR targets (principal +
+    # interest), funded from the combined CET outputs — not peg_pot pro-rata alone.
     distribution = dlc_distribution_payouts_sats(budget)
+    pre_settlement_accounts.each_with_index do |ta, index|
+      expected_sats = payoff.holder_allocations[index].btc_sats
+      expect(distribution.fetch(ta.user.id)).to eq(expected_sats),
+        "expected #{ta.user.name} to receive #{expected_sats} sats (FloorEUR), got #{distribution[ta.user.id]}"
+    end
     [alice, claude, david].each do |user|
       expect(reserve_sats(user)).to eq(reserve_before.fetch(user.id) + distribution.fetch(user.id))
     end
     expect(distribution.values.sum).to eq(dlc_peg_pot_sats(budget))
+
+    alice_share_sats = distribution.fetch(alice.id)
+    expect(BtcConversion.sats_to_eur(alice_share_sats, DemoFlowHelpers::SETTLEMENT_EUR_PER_BTC))
+      .to be_within(0.02).of(505.0) # 50% of €1_010 liability @ settlement spot
     expect(reserve_eur(alice, DemoFlowHelpers::SETTLEMENT_EUR_PER_BTC)).to be > 0
 
     # Investitore (Fase 1): la CET restituisce il collateral investitore

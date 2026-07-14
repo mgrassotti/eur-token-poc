@@ -1,11 +1,13 @@
 # frozen_string_literal: true
 
 module Dlc
-  # Distributes the peg_pot released by the CET to the individual holders,
-  # pro-rata on the current RGB/token allocation at maturity.
+  # Distributes CET outputs to holders at settlement.
   #
-  # The DLC CET pays the whole peg_pot to the peg/distributor side; this service
-  # fans it out to each holder. Baseline is a single on-chain payout via the ddk
+  # When +holder_targets+ is given, each holder is paid the exact FloorEUR sats
+  # (funded from the peg + investor CET outputs combined). Otherwise falls back
+  # to splitting +peg_pot_sats+ pro-rata on token balances at maturity.
+  #
+  # Baseline is a single on-chain payout via the ddk
   # node (addresses resolved from each holder's L1 reserve wallet). The atomic LN
   # variant would bind each receipt to the oracle secret (HODL invoice) so EURT
   # redemption and BTC receipt settle atomically — unavailable on the vendored
@@ -22,11 +24,20 @@ module Dlc
       L1::UserWallet.for(user).receive_address(label: "dlc_payout")
     end
 
-    def self.call(budget:, peg_pot_sats:, node: nil, address_resolver: DEFAULT_ADDRESS_RESOLVER, shares: nil)
-      new(budget:, peg_pot_sats:, node:, address_resolver:, shares:).call
+    def self.call(budget:, peg_pot_sats:, node: nil, address_resolver: DEFAULT_ADDRESS_RESOLVER, shares: nil,
+                  holder_targets: nil)
+      new(budget:, peg_pot_sats:, node:, address_resolver:, shares:, holder_targets:).call
     end
 
-    def initialize(budget:, peg_pot_sats:, node: nil, address_resolver: DEFAULT_ADDRESS_RESOLVER, shares: nil)
+    # Estimated fanout fee when the sidecar spends peg + investor CET outputs.
+    def self.fee_estimate(holder_count, fee_rate_sats_vb: 5)
+      input_count = 2
+      vsize = 11 + 68 * input_count + 31 * (holder_count + 1)
+      vsize * fee_rate_sats_vb
+    end
+
+    def initialize(budget:, peg_pot_sats:, node: nil, address_resolver: DEFAULT_ADDRESS_RESOLVER, shares: nil,
+                   holder_targets: nil)
       @budget = budget
       @peg_pot_sats = Integer(peg_pot_sats)
       @node = node || NodeClient.default
@@ -35,6 +46,10 @@ module Dlc
       # token balances during redemption, so the caller passes the maturity
       # allocation here; otherwise we read the live balances from the DB.
       @shares_snapshot = shares
+      # Optional explicit FloorEUR targets [{user:, sats:}]. When set, these
+      # replace the pro-rata peg_pot split (the sidecar funds them from both CET
+      # outputs and pushes the fanout fee onto the investor).
+      @holder_targets = holder_targets
     end
 
     def call
@@ -64,9 +79,16 @@ module Dlc
 
     attr_reader :budget, :peg_pot_sats, :node, :address_resolver
 
-    # Largest-remainder-free split: each holder floors their pro-rata share and
-    # the last holder absorbs the rounding remainder, so the sum equals peg_pot.
     def compute_shares
+      if @holder_targets
+        return @holder_targets.filter_map do |target|
+          sats = Integer(target[:sats])
+          { user: target[:user], sats: sats } if sats.positive?
+        end
+      end
+
+      # Largest-remainder-free split: each holder floors their pro-rata share and
+      # the last holder absorbs the rounding remainder, so the sum equals peg_pot.
       allocations = holder_allocations
       return [] if allocations.empty?
 

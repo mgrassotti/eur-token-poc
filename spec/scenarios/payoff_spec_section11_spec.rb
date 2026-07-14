@@ -74,14 +74,16 @@ RSpec.describe "PAYOFF-SPEC §11 integration" do
     expect(budget.loan_to_value_ratio(budget.peg_eur_per_btc)).to be_within(0.01).of(0.5)
   end
 
-  it "conserves escrow sats (holders + investor + mining fee)" do
+  it "conserves escrow sats (holders + investor + mining fee + distribution fee)" do
     budget = activate_deal!
     escrow = budget.pool_sats
     fee = Budget::ESTIMATED_SETTLEMENT_FEE_SATS
+    holder_count = budget.token_accounts.where("balance_cents > 0").count
+    dist_fee = Dlc::Distribution.fee_estimate(holder_count)
 
     result = Settlements::ExecuteService.call(budget: budget, end_btc_eur_rate: 50_000)
 
-    total = result.payoff.total_holder_sats + result.investor_btc_sats + result.payoff.mining_fee_sats
+    total = result.payouts.sum(&:btc_sats) + result.investor_btc_sats + result.payoff.mining_fee_sats + dist_fee
     expect(total).to eq(escrow)
   end
 end

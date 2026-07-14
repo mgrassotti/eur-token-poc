@@ -80,9 +80,8 @@ module DemoFlowHelpers
     budget.reload.recovery_package&.dig("dlc_distribution", "investor_payout_sats").to_i
   end
 
-  # Actual per-holder peg_pot payout recorded by Dlc::Distribution (sats), keyed
-  # by the holder user. Under DLC the FloorEUR liability is paid pro-rata from the
-  # peg_pot the CET released, so exact amounts follow the DLC payout curve.
+  # Actual per-holder payout recorded by Dlc::Distribution (sats), keyed by user.
+  # Settlement pays exact FloorEUR targets from the combined CET outputs.
   def dlc_distribution_payouts_sats(budget)
     payouts = budget.reload.recovery_package&.dig("dlc_distribution", "payouts") || []
     payouts.each_with_object({}) { |p, acc| acc[p["user_id"]] = p["sats"] }

@@ -33,7 +33,7 @@ module Settlements
         holder_shares_cents: token_accounts.map(&:balance_cents),
         spot_eur_per_btc: end_btc_eur_rate,
         rate_bps_monthly: budget.rate_bps_monthly,
-        months_elapsed: budget.months_elapsed,
+        months_elapsed: settlement_months_elapsed,
         escrow_total_sats: budget.pool_sats
       )
 
@@ -46,11 +46,14 @@ module Settlements
 
         raise Error, I18n.t("services.settlements.execute.collateral_insufficient") if payoff.investor_remainder_sats.negative?
 
+        holder_total = payouts.sum(&:btc_sats)
+        investor_sats = actual_investor_payout_sats
+
         settlement = Settlement.create!(
           budget: budget,
           end_btc_eur_rate: end_btc_eur_rate,
-          total_btc_to_holders_sats: payoff.total_holder_sats,
-          btc_to_investor_sats: payoff.investor_remainder_sats,
+          total_btc_to_holders_sats: holder_total,
+          btc_to_investor_sats: investor_sats,
           executed_at: Time.current
         )
 
@@ -65,8 +68,8 @@ module Settlements
           borrower: budget.borrower,
           borrower_btc_sats: 0,
           investor: budget.investor,
-          investor_btc_sats: payoff.investor_remainder_sats,
-          investor_eur_at_end: BtcConversion.sats_to_eur(payoff.investor_remainder_sats, end_btc_eur_rate),
+          investor_btc_sats: investor_sats,
+          investor_eur_at_end: BtcConversion.sats_to_eur(investor_sats, end_btc_eur_rate),
           peg_eur_per_btc: budget.peg_eur_per_btc,
           end_btc_eur_rate: end_btc_eur_rate,
           market_rate_updated: market_rate_updated
@@ -104,6 +107,11 @@ module Settlements
       raise Error, I18n.t("services.settlements.execute.available_from_block", maturity_block_height: budget.maturity_block_height)
     end
 
+    def settlement_months_elapsed
+      height = force_liquidation ? ChainState.block_height : budget.maturity_block_height
+      budget.months_elapsed(at_height: height)
+    end
+
     def update_market_rate!
       return false unless set_by
 
@@ -117,38 +125,69 @@ module Settlements
     def settle!(token_accounts, payoff)
       raise Error, I18n.t("services.settlements.execute.dlc_not_funded") unless budget.dlc_contract&.funded?
 
-      # Snapshot holder allocations before redemption zeroes the token balances;
-      # the DLC peg_pot distribution fans out on these maturity shares.
+      # Snapshot holder allocations before redemption zeroes the token balances.
       dlc_shares = token_accounts.map { |ta| { user: ta.user, cents: ta.balance_cents } }
 
-      holder_payouts = []
-      payouts = token_accounts.each_with_index.map do |token_account, index|
-        allocation = payoff.holder_allocations[index]
-        holder = token_account.user
-        holder_payouts << { user: holder, btc_sats: allocation.btc_sats }
-        payout_for(token_account, allocation, payoff).tap do
-          redeem_rgb!(holder)
-          Rgb::ProjectionService.apply_redeem!(budget: budget, holder: holder)
-        end
+      cet_result = Dlc::SettlementService.call(budget: budget, end_btc_eur_rate: end_btc_eur_rate)
+      holder_targets = holder_targets_for(payoff, cet_result, token_accounts)
+      distributions = Dlc::Distribution.call(
+        budget: budget,
+        peg_pot_sats: cet_result.peg_pot_sats,
+        shares: dlc_shares,
+        holder_targets: holder_targets
+      )
+      distribution_by_user = distributions.index_by(&:user)
+
+      persist_settlement_txid!(cet_result.cet_txid)
+      persist_dlc_recovery!
+
+      payouts = token_accounts.map do |token_account|
+        actual_sats = distribution_by_user.fetch(token_account.user).sats
+        payout = payout_for(token_account, actual_sats, payoff)
+        redeem_rgb!(token_account.user)
+        Rgb::ProjectionService.apply_redeem!(budget: budget, holder: token_account.user)
+        payout
       end
 
-      settlement_txid = settle_via_dlc!(dlc_shares)
-      persist_settlement_txid!(settlement_txid)
-
-      users_to_sync = holder_payouts.map { |p| p[:user] }.uniq
-      users_to_sync << budget.investor
+      users_to_sync = token_accounts.map(&:user) + [budget.investor]
       users_to_sync.uniq.each { |user| L1::SyncReserveBalanceService.call(user: user) }
 
       payouts
     end
 
-    # Settlement path: the oracle attestation executes the CET that pays
-    # peg_pot + investor; peg_pot is then distributed pro-rata to the holders.
-    def settle_via_dlc!(shares)
-      result = Dlc::SettlementService.call(budget: budget, end_btc_eur_rate: end_btc_eur_rate)
-      Dlc::Distribution.call(budget: budget, peg_pot_sats: result.peg_pot_sats, shares: shares)
-      persist_dlc_recovery!
-      result.cet_txid
+    def holder_targets_for(payoff, cet_result, token_accounts)
+      requested = payoff.holder_allocations.map(&:btc_sats)
+      total_requested = requested.sum
+      cet_total = cet_result.peg_pot_sats.to_i + cet_result.investor_sats.to_i
+      fee_buffer = Dlc::Distribution.fee_estimate(token_accounts.size)
+
+      scaled = if cet_total < total_requested + fee_buffer && total_requested.positive?
+                 scale_sats_proportionally(requested, [cet_total - fee_buffer, 0].max)
+               else
+                 requested
+               end
+
+      token_accounts.zip(scaled).map do |token_account, sats|
+        { user: token_account.user, sats: sats }
+      end
+    end
+
+    def scale_sats_proportionally(amounts, target_total)
+      total = amounts.sum
+      return amounts if total <= target_total
+
+      scaled = []
+      assigned = 0
+      amounts[0..-2].each do |amount|
+        sats = (target_total * amount) / total
+        scaled << sats
+        assigned += sats
+      end
+      scaled << target_total - assigned
+    end
+
+    def actual_investor_payout_sats
+      budget.reload.recovery_package&.dig("dlc_distribution", "investor_payout_sats").to_i
     end
 
     def persist_dlc_recovery!
@@ -174,12 +213,12 @@ module Settlements
       budget.update!(recovery_package: package)
     end
 
-    def payout_for(token_account, allocation, payoff)
+    def payout_for(token_account, btc_sats, payoff)
       token_cents = token_account.balance_cents
       Payout.new(
         user: token_account.user,
         token_cents: token_cents,
-        btc_sats: allocation.btc_sats,
+        btc_sats: btc_sats,
         liability_eur_cents: payoff.liability_eur_cents,
         eur_at_settlement: (payoff.liability_eur_cents * token_cents / budget.amount_eur_cents) / 100.0
       )

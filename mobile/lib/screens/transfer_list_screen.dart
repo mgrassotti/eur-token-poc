@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/models.dart';
 import '../services/relay_api_client.dart';
 
@@ -58,6 +59,7 @@ class _TransferListScreenState extends State<TransferListScreen> {
 
   Future<void> _send(RelayApiClient api) async {
     if (_recipient == null) return;
+    final l10n = AppLocalizations.of(context);
     setState(() => _submitting = true);
     try {
       final cents = (double.parse(_amount.text.replaceAll(',', '.')) * 100).round();
@@ -70,7 +72,7 @@ class _TransferListScreenState extends State<TransferListScreen> {
       await _load();
       if (mounted) {
         setState(() => _submitting = false);
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Transfer sent')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l10n.transferSent)));
       }
     } on RelayApiException catch (e) {
       if (mounted) {
@@ -82,10 +84,11 @@ class _TransferListScreenState extends State<TransferListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final api = context.read<RelayApiClient>();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Transfers')),
+      appBar: AppBar(title: Text(l10n.transfers)),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : Column(
@@ -96,9 +99,9 @@ class _TransferListScreenState extends State<TransferListScreen> {
                     children: [
                       DropdownButtonFormField<User>(
                         value: _recipient,
-                        decoration: const InputDecoration(
-                          labelText: 'Recipient',
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          labelText: l10n.recipient,
+                          border: const OutlineInputBorder(),
                         ),
                         items: _users
                             .map((u) => DropdownMenuItem(value: u, child: Text(u.name)))
@@ -108,9 +111,9 @@ class _TransferListScreenState extends State<TransferListScreen> {
                       const SizedBox(height: 12),
                       TextField(
                         controller: _amount,
-                        decoration: const InputDecoration(
-                          labelText: 'Amount (EUR)',
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          labelText: l10n.amountEur,
+                          border: const OutlineInputBorder(),
                           prefixText: '€ ',
                         ),
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -120,7 +123,7 @@ class _TransferListScreenState extends State<TransferListScreen> {
                         onPressed: _submitting ? null : () => _send(api),
                         child: _submitting
                             ? const CircularProgressIndicator()
-                            : const Text('Send EURT'),
+                            : Text(l10n.sendEurt),
                       ),
                     ],
                   ),
@@ -128,7 +131,7 @@ class _TransferListScreenState extends State<TransferListScreen> {
                 if (_error != null) Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
                 Expanded(
                   child: _transfers.isEmpty
-                      ? const Center(child: Text('No transfers yet'))
+                      ? Center(child: Text(l10n.noTransfersYet))
                       : ListView.builder(
                           itemCount: _transfers.length,
                           itemBuilder: (_, i) {

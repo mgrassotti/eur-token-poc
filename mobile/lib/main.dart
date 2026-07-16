@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import 'config/api_config.dart';
+import 'l10n/app_localizations.dart';
 import 'providers/app_state.dart';
 import 'screens/add_funds_screen.dart';
 import 'screens/create_deal_screen.dart';
@@ -47,6 +49,7 @@ class MatAppRouter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthState>();
+    final settings = context.watch<SettingsState>();
 
     final router = GoRouter(
       initialLocation: auth.isLoggedIn ? '/' : '/login',
@@ -81,7 +84,15 @@ class MatAppRouter extends StatelessWidget {
     );
 
     return MaterialApp.router(
-      title: 'MAT',
+      onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
+      locale: settings.locale,
+      supportedLocales: SettingsState.supportedLocales,
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1B4332)),
         useMaterial3: true,

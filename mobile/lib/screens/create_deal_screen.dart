@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../l10n/app_localizations.dart';
 import '../providers/app_state.dart';
 import '../services/relay_api_client.dart';
 
@@ -26,7 +27,6 @@ class _CreateDealScreenState extends State<CreateDealScreen> {
 
   late final DateTime _start;
   late final DateTime _expiration;
-  late final String _expirationLabel;
 
   @override
   void initState() {
@@ -34,7 +34,6 @@ class _CreateDealScreenState extends State<CreateDealScreen> {
     final now = DateTime.now();
     _start = DateTime(now.year, now.month, now.day);
     _expiration = now.add(CreateDealScreen.topUpDuration);
-    _expirationLabel = DateFormat.yMMMd().add_jm().format(_expiration);
     _loadLimits();
   }
 
@@ -78,13 +77,16 @@ class _CreateDealScreenState extends State<CreateDealScreen> {
   }
 
   Future<void> _submit(RelayApiClient api) async {
+    final l10n = AppLocalizations.of(context);
     final cents = _enteredCents();
     if (cents == null) {
-      setState(() => _error = 'Enter a valid amount');
+      setState(() => _error = l10n.enterValidAmount);
       return;
     }
     if (cents > _maxBorrowableEurCents) {
-      setState(() => _error = 'Amount cannot exceed your reserve (€${(_maxBorrowableEurCents / 100).toStringAsFixed(2)})');
+      setState(() {
+        _error = l10n.amountExceedsReserve((_maxBorrowableEurCents / 100).toStringAsFixed(2));
+      });
       return;
     }
 
@@ -103,7 +105,7 @@ class _CreateDealScreenState extends State<CreateDealScreen> {
         await context.read<DashboardState>().refresh();
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Top up submitted')),
+          SnackBar(content: Text(l10n.topUpSubmitted)),
         );
         context.go('/');
       }
@@ -119,12 +121,16 @@ class _CreateDealScreenState extends State<CreateDealScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final api = context.read<RelayApiClient>();
     final muted = Theme.of(context).colorScheme.onSurfaceVariant;
     final maxEur = _maxBorrowableEurCents / 100;
+    final expirationLabel = DateFormat.yMMMd(Localizations.localeOf(context).toString())
+        .add_jm()
+        .format(_expiration);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Top up spending/savings account')),
+      appBar: AppBar(title: Text(l10n.topUpTitle)),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : Padding(
@@ -134,17 +140,17 @@ class _CreateDealScreenState extends State<CreateDealScreen> {
                 children: [
                   if (_maxBorrowableEurCents == 0) ...[
                     Text(
-                      'No reserve balance available to top up.',
+                      l10n.noReserveToTopUp,
                       style: TextStyle(color: Theme.of(context).colorScheme.error),
                     ),
                   ] else ...[
                     TextField(
                       controller: _amount,
                       decoration: InputDecoration(
-                        labelText: 'Amount (EUR)',
+                        labelText: l10n.amountEur,
                         border: const OutlineInputBorder(),
                         prefixText: '€ ',
-                        helperText: 'Maximum from reserve: €${maxEur.toStringAsFixed(2)}',
+                        helperText: l10n.maxFromReserve(maxEur.toStringAsFixed(2)),
                       ),
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       inputFormatters: [
@@ -156,19 +162,19 @@ class _CreateDealScreenState extends State<CreateDealScreen> {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'Estimated expiration',
+                      l10n.estimatedExpiration,
                       style: Theme.of(context).textTheme.titleSmall,
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      _expirationLabel,
+                      expirationLabel,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.w600,
                           ),
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'At expiration your funds will return to the reserve account.',
+                      l10n.expirationNote,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(color: muted),
                     ),
                   ],
@@ -185,7 +191,7 @@ class _CreateDealScreenState extends State<CreateDealScreen> {
                             height: 22,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Text('Top up'),
+                        : Text(l10n.topUp),
                   ),
                 ],
               ),

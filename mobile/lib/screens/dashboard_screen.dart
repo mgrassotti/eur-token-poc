@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/models.dart';
 import '../providers/app_state.dart';
 
@@ -23,6 +24,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final dashboard = context.watch<DashboardState>();
     final auth = context.watch<AuthState>();
     final settings = context.watch<SettingsState>();
@@ -30,11 +32,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Hi, ${auth.user?.name ?? ''}'),
+        title: Text(l10n.hiUser(auth.user?.name ?? '')),
         actions: [
           IconButton(
             icon: const Icon(Icons.settings_outlined),
-            tooltip: 'Settings',
+            tooltip: l10n.settings,
             onPressed: () => context.push('/settings'),
           ),
           IconButton(
@@ -66,19 +68,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   FilledButton.tonalIcon(
                     onPressed: () => context.push('/reserve/add-funds'),
                     icon: const Icon(Icons.qr_code),
-                    label: const Text('Deposit funds'),
+                    label: Text(l10n.depositFunds),
                   ),
                   const SizedBox(height: 8),
                   OutlinedButton.icon(
                     onPressed: () => context.push('/send-money'),
                     icon: const Icon(Icons.send_outlined),
-                    label: const Text('Send money'),
+                    label: Text(l10n.sendMoney),
                   ),
                   const SizedBox(height: 8),
                   OutlinedButton.icon(
                     onPressed: () => context.push('/deals/new'),
                     icon: const Icon(Icons.account_balance_wallet_outlined),
-                    label: const Text('Top up spending'),
+                    label: Text(l10n.topUpSpending),
                   ),
                   const SizedBox(height: 16),
                   _FundPositionSection(
@@ -87,9 +89,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   if (settings.advancedFeatures) ...[
                     const SizedBox(height: 16),
                     _DealSection(
-                      title: 'Open to invest',
+                      title: l10n.openToInvest,
                       deals: data?.investableDeals ?? const [],
-                      empty: 'No pending offers from other borrowers.',
+                      empty: l10n.noPendingOffers,
                       showAccept: true,
                     ),
                   ],
@@ -127,28 +129,30 @@ class _SummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Overview', style: Theme.of(context).textTheme.titleMedium),
+            Text(l10n.overview, style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 12),
-            _row('Spending / Savings', '€${((data?.spendingEurCents ?? 0) / 100).toStringAsFixed(2)}'),
-            _reserveRow(context),
+            _row(l10n.spendingSavings, '€${((data?.spendingEurCents ?? 0) / 100).toStringAsFixed(2)}'),
+            _reserveRow(context, l10n),
           ],
         ),
       ),
     );
   }
 
-  Widget _reserveRow(BuildContext context) {
+  Widget _reserveRow(BuildContext context, AppLocalizations l10n) {
     final sats = data?.savingsSats ?? 0;
     final rateEur = data?.marketRateEur;
 
     if (rateEur == null || rateEur <= 0) {
-      return _row('Reserve', '—');
+      return _row(l10n.reserve, '—');
     }
 
     final btc = sats / 100000000.0;
@@ -162,7 +166,7 @@ class _SummaryCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Text('Reserve'),
+          Text(l10n.reserve),
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -242,13 +246,15 @@ class _FundPositionSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Interests', style: Theme.of(context).textTheme.titleMedium),
+        Text(l10n.interests, style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 8),
         if (positions.isEmpty)
-          Text('No interests yet.', style: TextStyle(color: Theme.of(context).colorScheme.outline))
+          Text(l10n.noInterestsYet, style: TextStyle(color: Theme.of(context).colorScheme.outline))
         else
           ...positions.map(
             (position) => Card(

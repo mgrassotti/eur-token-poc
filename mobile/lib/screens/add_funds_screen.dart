@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/models.dart';
 import '../providers/app_state.dart';
 import '../services/relay_api_client.dart';
@@ -55,6 +56,7 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
   }
 
   Future<void> _sync() async {
+    final l10n = AppLocalizations.of(context);
     setState(() => _syncing = true);
     await _load(syncFirst: true);
     if (!mounted) return;
@@ -67,23 +69,25 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
 
     final balance = _reserve?.balanceSats ?? 0;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Reserve updated: $balance sats')),
+      SnackBar(content: Text(l10n.reserveUpdated(balance))),
     );
   }
 
   void _copyAddress(String address) {
+    final l10n = AppLocalizations.of(context);
     Clipboard.setData(ClipboardData(text: address));
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Address copied')),
+      SnackBar(content: Text(l10n.addressCopied)),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final reserve = _reserve;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Add funds')),
+      appBar: AppBar(title: Text(l10n.addFunds)),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
@@ -95,7 +99,7 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
                       children: [
                         Text(_error!, textAlign: TextAlign.center),
                         const SizedBox(height: 16),
-                        FilledButton(onPressed: _load, child: const Text('Retry')),
+                        FilledButton(onPressed: _load, child: Text(l10n.retry)),
                       ],
                     ),
                   ),
@@ -106,12 +110,12 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
                     padding: const EdgeInsets.all(24),
                     children: [
                       Text(
-                        'Regtest reserve (${reserve!.network})',
+                        l10n.regtestReserve(reserve!.network),
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Balance: ${reserve.balanceSats} sats',
+                        l10n.balanceSats(reserve.balanceSats),
                         style: Theme.of(context).textTheme.headlineSmall,
                       ),
                       const SizedBox(height: 24),
@@ -139,12 +143,11 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
                       OutlinedButton.icon(
                         onPressed: () => _copyAddress(reserve.receiveAddress),
                         icon: const Icon(Icons.copy),
-                        label: const Text('Copy address'),
+                        label: Text(l10n.copyAddress),
                       ),
                       const SizedBox(height: 24),
                       Text(
-                        reserve.instructions ??
-                            'Ask admin to send BTC from Exchange wallet to this address, then tap Sync.',
+                        reserve.instructions ?? l10n.reserveInstructions,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: Theme.of(context).colorScheme.outline,
                             ),
@@ -159,7 +162,7 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
                                 child: CircularProgressIndicator(strokeWidth: 2),
                               )
                             : const Icon(Icons.sync),
-                        label: const Text('Sync balance'),
+                        label: Text(l10n.syncBalance),
                       ),
                     ],
                   ),

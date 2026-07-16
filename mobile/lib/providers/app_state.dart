@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/models.dart';
@@ -67,8 +67,15 @@ class DashboardState extends ChangeNotifier {
 
 class SettingsState extends ChangeNotifier {
   static const _advancedFeaturesKey = 'advanced_features';
+  static const _localeKey = 'locale_code';
+
+  static const supportedLocales = [
+    Locale('en'),
+    Locale('it'),
+  ];
 
   bool advancedFeatures = false;
+  Locale locale = const Locale('en');
 
   SettingsState() {
     _load();
@@ -78,9 +85,13 @@ class SettingsState extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       advancedFeatures = prefs.getBool(_advancedFeaturesKey) ?? false;
+      final code = prefs.getString(_localeKey);
+      if (code != null && supportedLocales.any((l) => l.languageCode == code)) {
+        locale = Locale(code);
+      }
       notifyListeners();
     } catch (_) {
-      // Keep default; prefs may be unavailable until a full rebuild after adding the plugin.
+      // Keep defaults; prefs may be unavailable until a full rebuild after adding the plugin.
     }
   }
 
@@ -93,6 +104,19 @@ class SettingsState extends ChangeNotifier {
       await prefs.setBool(_advancedFeaturesKey, enabled);
     } catch (_) {
       // Toggle still works for this session even if persistence fails.
+    }
+  }
+
+  Future<void> setLocale(Locale value) async {
+    if (!supportedLocales.any((l) => l.languageCode == value.languageCode)) return;
+    locale = value;
+    notifyListeners();
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_localeKey, value.languageCode);
+    } catch (_) {
+      // Locale still applies for this session even if persistence fails.
     }
   }
 }

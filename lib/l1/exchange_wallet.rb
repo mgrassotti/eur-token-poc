@@ -1,11 +1,11 @@
 # frozen_string_literal: true
 
 module L1
-  # Simulated external wallet ("Wallet esterno") — funds user reserve wallets via on-chain transfer.
+  # Simulated external wallet ("Exchange wallet") — funds user reserve wallets via on-chain transfer.
   # Il mining regtest (coinbase) avviene solo qui, mai sui wallet utente.
   class ExchangeWallet
     WALLET_NAME = "l1_external_wallet"
-    DISPLAY_NAME = "Wallet esterno"
+    DISPLAY_NAME = "Exchange wallet"
     INITIAL_BALANCE_SATS = 100_000_000 # 1 BTC demo float
     COINBASE_MATURITY_BLOCKS = 101
 

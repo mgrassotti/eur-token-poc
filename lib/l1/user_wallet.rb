@@ -53,7 +53,7 @@ module L1
       escrow_identity_key!.wif
     end
 
-    # Solo UTXO da transfer (es. Wallet esterno): esclude coinbase da mining di test legacy.
+    # Solo UTXO da transfer (es. Exchange wallet): esclude coinbase da mining di test legacy.
     def spendable_sats
       ensure_wallet!
       transfer_unspent.sum { |utxo| (utxo.fetch("amount").to_d * 100_000_000).to_i }

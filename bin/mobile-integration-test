@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+# Target: ios (default on Mac), android, web
+MOBILE_TARGET="${MOBILE_TARGET:-ios}"
+INTEGRATION_SECRET="${INTEGRATION_TEST_SECRET:-dev-integration-secret}"
+
+pick_flutter_device() {
+  local platform="$1"
+  flutter devices --machine 2>/dev/null | ruby -rjson -e "
+    devices = JSON.parse(STDIN.read)
+    match = devices.find do |d|
+      case '${platform}'
+      when 'ios' then d['targetPlatform'] == 'ios' && d['emulator']
+      when 'android' then d['targetPlatform'] == 'android'
+      when 'web' then d['targetPlatform'] == 'web-javascript'
+      else false
+      end
+    end
+    print match['id'] if match
+  "
+}
+
+resolve_device_and_api() {
+  case "${MOBILE_TARGET}" in
+    ios)
+      DEVICE="${MOBILE_DEVICE:-$(pick_flutter_device ios)}"
+      if [[ -z "${DEVICE}" ]]; then
+        echo "No iOS simulator found. Open Simulator or set MOBILE_DEVICE." >&2
+        exit 1
+      fi
+      API_URL="${MOBILE_API_URL:-http://127.0.0.1:3000/api/v1}"
+      ;;
+    android)
+      DEVICE="${MOBILE_DEVICE:-$(pick_flutter_device android)}"
+      if [[ -z "${DEVICE}" ]]; then
+        echo "No Android emulator found. Start one or set MOBILE_DEVICE." >&2
+        exit 1
+      fi
+      API_URL="${MOBILE_API_URL:-http://10.0.2.2:3000/api/v1}"
+      ;;
+    web)
+      DEVICE="${MOBILE_DEVICE:-$(pick_flutter_device web)}"
+      DEVICE="${DEVICE:-chrome}"
+      API_URL="${MOBILE_API_URL:-http://127.0.0.1:3000/api/v1}"
+      ;;
+    *)
+      echo "Unknown MOBILE_TARGET=${MOBILE_TARGET} (use ios, android, or web)" >&2
+      exit 1
+      ;;
+  esac
+}
+
+resolve_device_and_api
+
+echo "→ Target: ${MOBILE_TARGET} (device: ${DEVICE})"
+echo "→ API: ${API_URL}"
+echo "→ Checking Rails relay…"
+if ! curl -sf "${API_URL%/api/v1}/up" >/dev/null 2>&1; then
+  echo "Rails not reachable at ${API_URL%/api/v1}. Start with: bin/dev" >&2
+  exit 1
+fi
+
+echo "→ Ensuring regtest is up (required for admin fund flow)…"
+./bin/regtest up
+
+echo "→ Running Flutter integration tests…"
+cd mobile
+flutter pub get
+flutter test integration_test/mobile_flow_test.dart -d "${DEVICE}" \
+  --dart-define=API_BASE_URL="${API_URL}" \
+  --dart-define=INTEGRATION_TEST_SECRET="${INTEGRATION_SECRET}"

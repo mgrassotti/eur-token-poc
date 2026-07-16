@@ -139,6 +139,63 @@
         <p class="text-warning small mb-3"><%= @on_chain_wallets.error_message %></p>
       <% end %>
 
+      <h3 class="h6 mt-3"><%= t(".admin.reserve_funding.title") %></h3>
+      <p class="text-muted small mb-2"><%= t(".admin.reserve_funding.description_html", wallet_name: L1::ExchangeWallet::DISPLAY_NAME) %></p>
+      <%= form_with url: admin_reserve_deposit_path, method: :post, class: "mb-3", id: "admin-reserve-funding-form" do %>
+        <div class="row g-2 align-items-end mb-2">
+          <div class="col-md-3">
+            <%= label_tag :user_id, t(".admin.reserve_funding.user"), class: "form-label" %>
+            <%= select_tag :user_id,
+              options_from_collection_for_select(@fundable_users, :id, :name),
+              class: "form-select form-select-sm",
+              required: true,
+              id: "admin_reserve_user_id" %>
+          </div>
+          <div class="col-md-3">
+            <%= label_tag :amount_btc, t(".admin.reserve_funding.amount"), class: "form-label" %>
+            <%= number_field_tag :amount_btc, "0.2",
+              class: "form-control form-control-sm",
+              step: 0.00000001,
+              min: 0.00000001,
+              required: true %>
+          </div>
+          <div class="col-auto">
+            <%= submit_tag t(".admin.reserve_funding.submit"), class: "btn btn-sm btn-success" %>
+          </div>
+        </div>
+        <div class="row g-2">
+          <div class="col-12">
+            <%= label_tag :receive_address, t(".admin.reserve_funding.receive_address"), class: "form-label" %>
+            <%= text_field_tag :receive_address, nil,
+              class: "form-control form-control-sm font-monospace",
+              id: "admin_reserve_receive_address",
+              placeholder: t(".admin.reserve_funding.receive_address_placeholder"),
+              autocomplete: "off",
+              spellcheck: false %>
+            <div class="form-text"><%= t(".admin.reserve_funding.receive_address_help") %></div>
+          </div>
+        </div>
+      <% end %>
+      <script>
+        (() => {
+          const addresses = <%= raw @user_receive_addresses.to_json %>;
+          const userSelect = document.getElementById("admin_reserve_user_id");
+          const addressInput = document.getElementById("admin_reserve_receive_address");
+          if (!userSelect || !addressInput) return;
+
+          const fillAddress = () => {
+            addressInput.value = addresses[userSelect.value] || "";
+            addressInput.dataset.userEdited = "";
+          };
+
+          userSelect.addEventListener("change", fillAddress);
+          addressInput.addEventListener("input", () => {
+            addressInput.dataset.userEdited = "1";
+          });
+          fillAddress();
+        })();
+      </script>
+
       <hr>
       <%= button_to t(".admin.reset.button"),
         admin_demo_reset_path,

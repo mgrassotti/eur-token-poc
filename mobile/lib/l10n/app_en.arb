@@ -1,0 +1,150 @@
+{
+  "@@locale": "en",
+  "appTitle": "MAT",
+  "loginTagline": "EUR-nominal deals · Phase 1 shell",
+  "email": "Email",
+  "password": "Password",
+  "logIn": "Log in",
+  "hiUser": "Hi, {name}",
+  "@hiUser": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "settings": "Settings",
+  "language": "Language",
+  "languageEnglish": "English",
+  "languageItalian": "Italiano",
+  "advancedFeatures": "Advanced features",
+  "advancedFeaturesSubtitle": "Show open deals available to invest in",
+  "overview": "Overview",
+  "spendingSavings": "Spending / Savings",
+  "reserve": "Reserve",
+  "depositFunds": "Deposit funds",
+  "sendMoney": "Send money",
+  "topUpSpending": "Top up spending",
+  "interests": "Interests",
+  "noInterestsYet": "No interests yet.",
+  "openToInvest": "Open to invest",
+  "noPendingOffers": "No pending offers from other borrowers.",
+  "addFunds": "Add funds",
+  "regtestReserve": "Regtest reserve ({network})",
+  "@regtestReserve": {
+    "placeholders": {
+      "network": { "type": "String" }
+    }
+  },
+  "balanceSats": "Balance: {sats} sats",
+  "@balanceSats": {
+    "placeholders": {
+      "sats": { "type": "int" }
+    }
+  },
+  "copyAddress": "Copy address",
+  "addressCopied": "Address copied",
+  "syncBalance": "Sync balance",
+  "reserveUpdated": "Reserve updated: {sats} sats",
+  "@reserveUpdated": {
+    "placeholders": {
+      "sats": { "type": "int" }
+    }
+  },
+  "reserveInstructions": "Ask admin to send BTC from Exchange wallet to this address, then tap Sync.",
+  "retry": "Retry",
+  "sendMoneyTitle": "Send money",
+  "availableEur": "Available: €{amount}",
+  "@availableEur": {
+    "placeholders": {
+      "amount": { "type": "String" }
+    }
+  },
+  "noSpendingBalance": "No spending balance yet. Activate a deal or receive EURT first.",
+  "recipient": "Recipient",
+  "amountEur": "Amount (EUR)",
+  "send": "Send",
+  "sentTo": "Sent €{amount} to {name}",
+  "@sentTo": {
+    "placeholders": {
+      "amount": { "type": "String" },
+      "name": { "type": "String" }
+    }
+  },
+  "topUpTitle": "Top up spending/savings account",
+  "topUp": "Top up",
+  "topUpSubmitted": "Top up submitted",
+  "noReserveToTopUp": "No reserve balance available to top up.",
+  "maxFromReserve": "Maximum from reserve: €{amount}",
+  "@maxFromReserve": {
+    "placeholders": {
+      "amount": { "type": "String" }
+    }
+  },
+  "estimatedExpiration": "Estimated expiration",
+  "expirationNote": "At expiration your funds will return to the reserve account.",
+  "enterValidAmount": "Enter a valid amount",
+  "amountExceedsReserve": "Amount cannot exceed your reserve (€{amount})",
+  "@amountExceedsReserve": {
+    "placeholders": {
+      "amount": { "type": "String" }
+    }
+  },
+  "home": "Home",
+  "dealTitle": "Deal #{id}",
+  "@dealTitle": {
+    "placeholders": {
+      "id": { "type": "String" }
+    }
+  },
+  "amount": "Amount",
+  "rate": "Rate",
+  "ratePerMonth": "{rate}% / month",
+  "@ratePerMonth": {
+    "placeholders": {
+      "rate": { "type": "String" }
+    }
+  },
+  "period": "Period",
+  "borrower": "Borrower",
+  "investor": "Investor",
+  "peg": "Peg",
+  "pool": "Pool",
+  "poolSats": "{sats} sats",
+  "@poolSats": {
+    "placeholders": {
+      "sats": { "type": "int" }
+    }
+  },
+  "liabilityAtMaturity": "Liability at maturity",
+  "tokenHolders": "Token holders",
+  "interestAmount": "+€{amount} interest",
+  "@interestAmount": {
+    "placeholders": {
+      "amount": { "type": "String" }
+    }
+  },
+  "acceptAndActivate": "Accept & activate",
+  "dealActivated": "Deal activated",
+  "transfers": "Transfers",
+  "sendEurt": "Send EURT",
+  "transferSent": "Transfer sent",
+  "noTransfersYet": "No transfers yet",
+  "settlement": "Settlement",
+  "spotRate": "Spot rate",
+  "ready": "Ready",
+  "yes": "Yes",
+  "no": "No",
+  "floorEurPayoff": "FloorEUR payoff",
+  "totalLiability": "Total liability",
+  "holderSats": "Holder sats",
+  "investorRemainder": "Investor remainder",
+  "insolventNote": "Insolvent at this spot — capped by escrow",
+  "holderAllocations": "Holder allocations",
+  "shareAmount": "€{amount} share",
+  "@shareAmount": {
+    "placeholders": {
+      "amount": { "type": "String" }
+    }
+  },
+  "settlementPreviewNote": "Preview only — Phase 1 uses relay FloorEUR math. Production settles on-device via mat-core.",
+  "settlementExecutedNote": "Settlement executed on relay (PoC admin path)."
+}

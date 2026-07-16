@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/models.dart';
 import '../services/relay_api_client.dart';
 
@@ -46,10 +47,11 @@ class _SettlementSummaryScreenState extends State<SettlementSummaryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final preview = _preview;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Settlement')),
+      appBar: AppBar(title: Text(l10n.settlement)),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
@@ -67,30 +69,35 @@ class _SettlementSummaryScreenState extends State<SettlementSummaryScreen> {
                       ),
                       const SizedBox(height: 16),
                       if (preview.endBtcEurRate != null)
-                        _row('Spot rate', '€${preview.endBtcEurRate!.toStringAsFixed(0)}/BTC'),
-                      _row('Ready', preview.readyForSettlement ? 'Yes' : 'No'),
+                        _row(l10n.spotRate, '€${preview.endBtcEurRate!.toStringAsFixed(0)}/BTC'),
+                      _row(l10n.ready, preview.readyForSettlement ? l10n.yes : l10n.no),
                       if (preview.payoff != null) ...[
                         const Divider(height: 32),
-                        Text('FloorEUR payoff', style: Theme.of(context).textTheme.titleMedium),
+                        Text(l10n.floorEurPayoff, style: Theme.of(context).textTheme.titleMedium),
                         _row(
-                          'Total liability',
+                          l10n.totalLiability,
                           '€${(preview.payoff!.liabilityEurCents / 100).toStringAsFixed(2)}',
                         ),
-                        _row('Holder sats', '${preview.payoff!.totalHolderSats}'),
-                        _row('Investor remainder', '${preview.payoff!.investorRemainderSats} sats'),
+                        _row(l10n.holderSats, '${preview.payoff!.totalHolderSats}'),
+                        _row(
+                          l10n.investorRemainder,
+                          '${preview.payoff!.investorRemainderSats} sats',
+                        ),
                         if (preview.payoff!.insolvent)
                           Text(
-                            'Insolvent at this spot — capped by escrow',
+                            l10n.insolventNote,
                             style: TextStyle(color: Theme.of(context).colorScheme.error),
                           ),
                       ],
                       if (preview.holderAllocations.isNotEmpty) ...[
                         const Divider(height: 32),
-                        Text('Holder allocations', style: Theme.of(context).textTheme.titleMedium),
+                        Text(l10n.holderAllocations, style: Theme.of(context).textTheme.titleMedium),
                         ...preview.holderAllocations.map(
                           (a) => ListTile(
                             title: Text(a.user.name),
-                            subtitle: Text('€${(a.shareCents / 100).toStringAsFixed(2)} share'),
+                            subtitle: Text(
+                              l10n.shareAmount((a.shareCents / 100).toStringAsFixed(2)),
+                            ),
                             trailing: Text('${a.btcSats} sats'),
                           ),
                         ),
@@ -98,8 +105,8 @@ class _SettlementSummaryScreenState extends State<SettlementSummaryScreen> {
                       const SizedBox(height: 24),
                       Text(
                         preview.status == 'preview'
-                            ? 'Preview only — Phase 1 uses relay FloorEUR math. Production settles on-device via mat-core.'
-                            : 'Settlement executed on relay (PoC admin path).',
+                            ? l10n.settlementPreviewNote
+                            : l10n.settlementExecutedNote,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: Theme.of(context).colorScheme.outline,
                             ),

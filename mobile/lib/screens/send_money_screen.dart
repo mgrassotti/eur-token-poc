@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/models.dart';
 import '../providers/app_state.dart';
 import '../services/relay_api_client.dart';
@@ -62,6 +63,7 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
 
   Future<void> _send(RelayApiClient api) async {
     if (_recipient == null) return;
+    final l10n = AppLocalizations.of(context);
     setState(() => _submitting = true);
     try {
       final cents = (double.parse(_amount.text.replaceAll(',', '.')) * 100).round();
@@ -72,7 +74,9 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Sent €${(cents / 100).toStringAsFixed(2)} to ${_recipient!.name}')),
+        SnackBar(
+          content: Text(l10n.sentTo((cents / 100).toStringAsFixed(2), _recipient!.name)),
+        ),
       );
       context.pop();
     } on RelayApiException catch (e) {
@@ -85,11 +89,12 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final api = context.read<RelayApiClient>();
     final spendingEur = _spendingEurCents / 100;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Send money')),
+      appBar: AppBar(title: Text(l10n.sendMoneyTitle)),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
@@ -101,7 +106,7 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
                       children: [
                         Text(_error!, textAlign: TextAlign.center),
                         const SizedBox(height: 16),
-                        FilledButton(onPressed: _load, child: const Text('Retry')),
+                        FilledButton(onPressed: _load, child: Text(l10n.retry)),
                       ],
                     ),
                   ),
@@ -112,21 +117,21 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text(
-                        'Available: €${spendingEur.toStringAsFixed(2)}',
+                        l10n.availableEur(spendingEur.toStringAsFixed(2)),
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                       const SizedBox(height: 16),
                       if (_spendingEurCents == 0)
                         Text(
-                          'No spending balance yet. Activate a deal or receive EURT first.',
+                          l10n.noSpendingBalance,
                           style: TextStyle(color: Theme.of(context).colorScheme.outline),
                         )
                       else ...[
                         DropdownButtonFormField<User>(
                           value: _recipient,
-                          decoration: const InputDecoration(
-                            labelText: 'Recipient',
-                            border: OutlineInputBorder(),
+                          decoration: InputDecoration(
+                            labelText: l10n.recipient,
+                            border: const OutlineInputBorder(),
                           ),
                           items: _users
                               .map((u) => DropdownMenuItem(value: u, child: Text(u.name)))
@@ -136,9 +141,9 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
                         const SizedBox(height: 12),
                         TextField(
                           controller: _amount,
-                          decoration: const InputDecoration(
-                            labelText: 'Amount (EUR)',
-                            border: OutlineInputBorder(),
+                          decoration: InputDecoration(
+                            labelText: l10n.amountEur,
+                            border: const OutlineInputBorder(),
                             prefixText: '€ ',
                           ),
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -152,7 +157,7 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
                                   height: 22,
                                   child: CircularProgressIndicator(strokeWidth: 2),
                                 )
-                              : const Text('Send'),
+                              : Text(l10n.send),
                         ),
                       ],
                     ],

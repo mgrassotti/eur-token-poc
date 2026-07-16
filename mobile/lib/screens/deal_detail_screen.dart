@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../l10n/app_localizations.dart';
 import '../models/models.dart';
 import '../providers/app_state.dart';
 import '../services/relay_api_client.dart';
@@ -52,6 +53,7 @@ class _DealDetailScreenState extends State<DealDetailScreen> {
   }
 
   Future<void> _accept(RelayApiClient api) async {
+    final l10n = AppLocalizations.of(context);
     setState(() => _accepting = true);
     try {
       final deal = await api.acceptDeal(widget.dealId);
@@ -62,7 +64,7 @@ class _DealDetailScreenState extends State<DealDetailScreen> {
           _accepting = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Deal activated')),
+          SnackBar(content: Text(l10n.dealActivated)),
         );
       }
     } on RelayApiException catch (e) {
@@ -75,6 +77,7 @@ class _DealDetailScreenState extends State<DealDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final auth = context.watch<AuthState>();
     final deal = _deal;
     final canAccept = deal != null &&
@@ -85,10 +88,10 @@ class _DealDetailScreenState extends State<DealDetailScreen> {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.home_outlined),
-          tooltip: 'Home',
+          tooltip: l10n.home,
           onPressed: () => context.go('/'),
         ),
-        title: Text('Deal #${widget.dealId}'),
+        title: Text(l10n.dealTitle(widget.dealId)),
         actions: [
           if (deal?.isActive == true)
             IconButton(
@@ -112,28 +115,32 @@ class _DealDetailScreenState extends State<DealDetailScreen> {
                     children: [
                       _StatusChip(status: deal!.status),
                       const SizedBox(height: 16),
-                      _info('Amount', '€${deal.amountEur.toStringAsFixed(2)}'),
-                      _info('Rate', '${deal.rateBpsMonthly / 100}% / month'),
-                      _info('Period', '${deal.period.start} → ${deal.period.end}'),
-                      _info('Borrower', deal.borrower?.name ?? '—'),
-                      _info('Investor', deal.investor?.name ?? '—'),
+                      _info(l10n.amount, '€${deal.amountEur.toStringAsFixed(2)}'),
+                      _info(l10n.rate, l10n.ratePerMonth((deal.rateBpsMonthly / 100).toString())),
+                      _info(l10n.period, '${deal.period.start} → ${deal.period.end}'),
+                      _info(l10n.borrower, deal.borrower?.name ?? '—'),
+                      _info(l10n.investor, deal.investor?.name ?? '—'),
                       if (deal.pegEurPerBtc != null)
-                        _info('Peg', '€${deal.pegEurPerBtc!.toStringAsFixed(0)}/BTC'),
-                      if (deal.poolSats > 0) _info('Pool', '${deal.poolSats} sats'),
+                        _info(l10n.peg, '€${deal.pegEurPerBtc!.toStringAsFixed(0)}/BTC'),
+                      if (deal.poolSats > 0) _info(l10n.pool, l10n.poolSats(deal.poolSats)),
                       if (deal.liabilityEurCents != null)
                         _info(
-                          'Liability at maturity',
+                          l10n.liabilityAtMaturity,
                           '€${(deal.liabilityEurCents! / 100).toStringAsFixed(2)}',
                         ),
                       if (deal.tokenHolders.isNotEmpty) ...[
                         const SizedBox(height: 24),
-                        Text('Token holders', style: Theme.of(context).textTheme.titleMedium),
+                        Text(l10n.tokenHolders, style: Theme.of(context).textTheme.titleMedium),
                         ...deal.tokenHolders.map(
                           (h) => ListTile(
                             title: Text(h.user.name),
                             trailing: Text('€${(h.balanceCents / 100).toStringAsFixed(2)}'),
                             subtitle: h.interestCents != null
-                                ? Text('+€${(h.interestCents! / 100).toStringAsFixed(2)} interest')
+                                ? Text(
+                                    l10n.interestAmount(
+                                      (h.interestCents! / 100).toStringAsFixed(2),
+                                    ),
+                                  )
                                 : null,
                           ),
                         ),
@@ -146,7 +153,7 @@ class _DealDetailScreenState extends State<DealDetailScreen> {
                               : () => _accept(context.read<RelayApiClient>()),
                           child: _accepting
                               ? const CircularProgressIndicator()
-                              : const Text('Accept & activate'),
+                              : Text(l10n.acceptAndActivate),
                         ),
                       ],
                     ],

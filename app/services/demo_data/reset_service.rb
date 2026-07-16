@@ -78,6 +78,7 @@ module DemoData
         account.update!(
           balance_sats: 0,
           bitcoind_wallet_name: fresh_wallet_name_for(account.user_id),
+          reserve_receive_address: nil,
           escrow_identity_wif: nil,
           escrow_identity_pubkey: nil,
           rgb_wallet_id: nil,

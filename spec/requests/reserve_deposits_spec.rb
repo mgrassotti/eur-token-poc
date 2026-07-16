@@ -11,12 +11,13 @@ RSpec.describe ReserveDepositsController, type: :request do
 
   it "shows the deposit form with Alice default" do
     log_in(alice)
+    allow(L1::ReserveReceiveAddressService).to receive(:ensure!).and_return("bcrt1qtest")
 
     get new_reserve_deposit_path
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include("0.02")
-    expect(response.body).to include("Wallet esterno")
+    expect(response.body).to include("Exchange wallet")
   end
 
   it "creates a reserve deposit with custom amount" do
@@ -27,6 +28,6 @@ RSpec.describe ReserveDepositsController, type: :request do
 
     expect(L1::DepositReserveService).to have_received(:call).with(user: alice, amount_sats: 20_000_000)
     expect(response).to redirect_to(root_path)
-    expect(flash[:notice]).to include("Wallet esterno")
+    expect(flash[:notice]).to include("Exchange wallet")
   end
 end

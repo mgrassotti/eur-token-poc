@@ -31,7 +31,7 @@ module L1
       validate_bitcoind!
 
       user_wallet = UserWallet.for(user)
-      address = user_wallet.receive_address(label: "external_deposit")
+      address = ReserveReceiveAddressService.ensure!(user: user)
 
       ExchangeWallet.new.transfer_to!(address: address, amount_sats: @amount_sats)
       advance_simulated_chain!

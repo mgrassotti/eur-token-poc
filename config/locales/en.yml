@@ -45,6 +45,10 @@ en:
         liquidations: "Automatic liquidation (LTV >= %{threshold}%): deal #%{ids} closed at %{rate} EUR/BTC."
         updated: "BTC/EUR rate updated to %{rate} EUR/BTC."
         margin_calls: "LTV warning (>=%{threshold}%): deal #%{ids} entered the risk zone."
+      reserve_deposits:
+        created: "Sent %{amount} from %{wallet_name} to %{name} (%{address}). Reserve balance: %{balance}."
+        user_not_found: "User not found."
+        address_mismatch: "Receive address does not match the selected user's reserve wallet."
       demo_reset:
         done: "Demo reset."
         unavailable_in_production: "Demo reset is not available in production."
@@ -161,6 +165,15 @@ en:
             balance: "Balance"
             eur: "EUR equivalent"
             total: "Total"
+        reserve_funding:
+          title: "Fund user reserve (regtest)"
+          description_html: "Send BTC from <strong>%{wallet_name}</strong> to the user's stable receive address (same QR shown in the mobile app)."
+          user: "User"
+          amount: "Amount (BTC)"
+          receive_address: "Receive address"
+          receive_address_placeholder: "bcrt1q…"
+          receive_address_help: "Auto-filled when you pick a user. Paste from the mobile app to verify, or edit before sending."
+          submit: "Send to receive address"
         reset:
           button: "Reset demo DB"
           confirm: "Confirm reset? All budgets and tokens will be deleted."
@@ -172,6 +185,7 @@ en:
           budget_link: "Budget #%{id}"
         actions:
           deposit: "Deposit to reserve account"
+          add_funds: "Add funds"
           new_budget: "Top up spending account"
           send_money: "Send Money"
         cards:
@@ -356,6 +370,9 @@ en:
   reserve_deposits:
     new:
       title: "Deposit to reserve account"
+      receive_address:
+        title: "Your regtest receive address"
+        note_html: "Same address as the mobile app QR. Admin can fund it from <strong>%{wallet_name}</strong>, or use the form below to simulate a deposit."
       description_html: "Simulate a BTC transfer from <strong>%{wallet_name}</strong> (<code>%{wallet_code}</code>, demo float %{float_balance}) to your personal regtest wallet. On confirmation the <strong>simulated chain</strong> advances by %{blocks} blocks."
       form:
         amount: "Amount (BTC)"

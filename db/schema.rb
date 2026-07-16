@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_28_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_15_100000) do
   create_table "btc_accounts", force: :cascade do |t|
     t.bigint "balance_sats", default: 0, null: false
     t.string "bitcoind_wallet_name"
@@ -18,6 +18,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_28_130000) do
     t.string "escrow_identity_pubkey"
     t.string "escrow_identity_wif"
     t.string "node_pubkey"
+    t.string "reserve_receive_address"
     t.string "rgb_mnemonic"
     t.string "rgb_wallet_id"
     t.string "rln_node_url"
@@ -25,6 +26,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_28_130000) do
     t.datetime "updated_at", null: false
     t.integer "user_id", null: false
     t.index ["bitcoind_wallet_name"], name: "index_btc_accounts_on_bitcoind_wallet_name", unique: true, where: "bitcoind_wallet_name IS NOT NULL"
+    t.index ["reserve_receive_address"], name: "index_btc_accounts_on_reserve_receive_address", unique: true, where: "reserve_receive_address IS NOT NULL"
     t.index ["user_id"], name: "index_btc_accounts_on_user_id", unique: true
   end
 

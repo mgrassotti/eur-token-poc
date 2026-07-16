@@ -17,4 +17,4 @@ DemoData::ResetService.call
 
 puts "Seeded #{User.count} users."
 puts "Admin: admin@example.com / password"
-puts "Conti di riserva a zero — con bin/dev: deposita dal Wallet esterno prima di creare ricariche."
+puts "Conti di riserva a zero — con bin/dev: deposita dall'Exchange wallet prima di creare ricariche."

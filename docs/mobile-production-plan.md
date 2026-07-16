@@ -140,6 +140,12 @@ Phases 3 and 4 can overlap once BDK + DLC FFI is stable.
 
 **Exit criteria:** demo flow walkable on phone/emulator with mocked settlement; API contract frozen.
 
+**Delivered in repo:**
+
+- Relay API — `config/routes.rb` → `/api/v1/*` ([relay-api-v1.md](relay-api-v1.md))
+- Flutter shell — [mobile/README.md](../mobile/README.md)
+- Request specs — `spec/requests/api/v1/relay_spec.rb`
+
 ---
 
 ## Phase 2 — L1 wallet on phone (BDK)
@@ -379,6 +385,8 @@ Replacing the DLC funding transaction with a **plain Lightning channel open** do
 
 ## Related documents
 
+- [relay-api-v1.md](relay-api-v1.md) — Phase 1 REST API contract
+- [mobile/README.md](../mobile/README.md) — Flutter shell
 - [mat-core/README.md](../mat-core/README.md) — Phase 0 Rust kernel (FloorEUR, wire schemas, test vectors)
 - [README.md](../README.md) — current PoC architecture and LN roadmap
 - [README-ita.md](../README-ita.md) — Italian overview

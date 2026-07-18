@@ -100,6 +100,21 @@ it:
         budget_not_active: "Budget non attivo."
         invalid_amount: "Importo non positivo."
         insufficient_balance: "Saldo RGB insufficiente."
+      ln_transfer:
+        missing_asset_id: "rgb_asset_id mancante sul deal."
+        budget_not_active: "Budget non attivo."
+        invalid_amount: "Importo non positivo."
+        insufficient_balance: "Saldo RGB insufficiente (incluso saldo canale Lightning)."
+        payment_timeout: "Pagamento Lightning scaduto."
+        payment_failed: "Pagamento Lightning fallito (%{status})."
+      hub_channel:
+        missing_asset_id: "rgb_asset_id mancante sul deal."
+        invalid_amount: "Importo non positivo."
+        hub_insufficient_liquidity: "Liquidità EURT hub insufficiente per inbound destinatario (%{have} < %{need})."
+        sender_insufficient_for_channel: "EURT off-channel insufficiente per aprire canale hub (%{have} < %{need})."
+        sender_insufficient_for_hub_seed: "EURT off-channel insufficiente per liquidità hub (%{have} < %{need})."
+        open_timeout: "Timeout in attesa del funding del canale."
+        ready_timeout: "Timeout in attesa che il canale sia ready."
       wallet_setup:
         node_not_configured: "Nodo RGB non configurato per l'utente %{user_id}."
     dlc:

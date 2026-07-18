@@ -104,6 +104,21 @@ en:
         budget_not_active: "Budget is not active."
         invalid_amount: "Amount must be positive."
         insufficient_balance: "Insufficient RGB balance."
+      ln_transfer:
+        missing_asset_id: "Missing rgb_asset_id on deal."
+        budget_not_active: "Budget is not active."
+        invalid_amount: "Amount must be positive."
+        insufficient_balance: "Insufficient RGB balance (including Lightning channel balance)."
+        payment_timeout: "Lightning payment timed out."
+        payment_failed: "Lightning payment failed (%{status})."
+      hub_channel:
+        missing_asset_id: "Missing rgb_asset_id on deal."
+        invalid_amount: "Amount must be positive."
+        hub_insufficient_liquidity: "Hub has insufficient EURT for recipient inbound (%{have} < %{need})."
+        sender_insufficient_for_channel: "Insufficient off-channel EURT to open hub channel (%{have} < %{need})."
+        sender_insufficient_for_hub_seed: "Insufficient off-channel EURT to seed hub liquidity (%{have} < %{need})."
+        open_timeout: "Timed out waiting for channel funding."
+        ready_timeout: "Timed out waiting for channel to become ready."
       wallet_setup:
         node_not_configured: "RGB node is not configured for user %{user_id}."
     dlc:

@@ -18,6 +18,7 @@ RSpec.describe Rgb::TransferService do
   before do
     allow(Rgb::TransferService).to receive(:call).and_call_original
     allow(Rgb::Config).to receive(:ensure_node!)
+    allow(Rgb::Config).to receive(:transfer_via_ln?).and_return(false)
     allow(Rgb::LibTransferService).to receive(:call).and_return(rgb_result)
   end
 
@@ -35,6 +36,27 @@ RSpec.describe Rgb::TransferService do
       to_user: claude,
       amount_cents: 400_000
     )
+    expect(result).to eq(rgb_result)
+  end
+
+  it "delegates to LnTransferService when RGB_TRANSFER_VIA_LN is enabled" do
+    allow(Rgb::Config).to receive(:transfer_via_ln?).and_return(true)
+    allow(Rgb::LnTransferService).to receive(:call).and_return(rgb_result)
+
+    result = described_class.call(
+      budget: budget,
+      from_user: alice,
+      to_user: claude,
+      amount_cents: 400_000
+    )
+
+    expect(Rgb::LnTransferService).to have_received(:call).with(
+      budget: budget,
+      from_user: alice,
+      to_user: claude,
+      amount_cents: 400_000
+    )
+    expect(Rgb::LibTransferService).not_to have_received(:call)
     expect(result).to eq(rgb_result)
   end
 end

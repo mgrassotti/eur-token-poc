@@ -25,6 +25,11 @@ module Rgb
       LightningClient.new(base_url: Config.rln_issuer_url, token: Config.rln_token)
     end
 
+    # MAT liquidity hub for RGB-LN transfers (PoC: same as issuer unless overridden).
+    def hub
+      LightningClient.new(base_url: Config.rln_hub_url, token: Config.rln_token)
+    end
+
     # True when the user's node is up AND unlocked (read paths: balances/assets).
     def available_for?(user)
       for_user?(user) && for_user(user).available?

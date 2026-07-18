@@ -172,10 +172,25 @@ module Rgb
       post("/connectpeer", { peer_pubkey_and_addr: peer_pubkey_and_addr })
     end
 
-    def open_channel(peer_pubkey_and_opt_addr:, capacity_sat:, asset_id: nil, asset_amount: nil)
-      body = { peer_pubkey_and_opt_addr: peer_pubkey_and_opt_addr, capacity_sat: capacity_sat }
+    # Opens a LN channel. When asset_id + asset_amount are set, locks that much
+    # off-channel RGB into the channel (L1→LN). push_msat moves BTC to the peer
+    # so they can receive HTLCs; fee_* default to 0 for PoC zero-fee routing.
+    def open_channel(peer_pubkey_and_opt_addr:, capacity_sat:, push_msat: 0,
+                     asset_id: nil, asset_amount: nil, push_asset_amount: nil,
+                     public: true, with_anchors: true,
+                     fee_base_msat: 0, fee_proportional_millionths: 0)
+      body = {
+        peer_pubkey_and_opt_addr: peer_pubkey_and_opt_addr,
+        capacity_sat: capacity_sat,
+        push_msat: push_msat,
+        public: public,
+        with_anchors: with_anchors,
+        fee_base_msat: fee_base_msat,
+        fee_proportional_millionths: fee_proportional_millionths
+      }
       body[:asset_id] = asset_id if asset_id
       body[:asset_amount] = asset_amount if asset_amount
+      body[:push_asset_amount] = push_asset_amount if push_asset_amount
       post("/openchannel", body)
     end
 
@@ -183,9 +198,26 @@ module Rgb
       get("/listchannels")
     end
 
+    def channels
+      list_channels.fetch("channels", [])
+    end
+
+    def list_payments
+      get("/listpayments")
+    end
+
+    def payments
+      list_payments.fetch("payments", [])
+    end
+
+    # Default BTC HTLC amount for asset invoices (RLN tests use 3_000_000 msat).
+    DEFAULT_ASSET_INVOICE_MSAT = 3_000_000
+
     def ln_invoice(amt_msat: nil, asset_id: nil, asset_amount: nil, expiry_sec: 420)
       body = { expiry_sec: expiry_sec }
-      body[:amt_msat] = amt_msat if amt_msat
+      effective_msat = amt_msat
+      effective_msat = DEFAULT_ASSET_INVOICE_MSAT if effective_msat.nil? && asset_id.present?
+      body[:amt_msat] = effective_msat if effective_msat
       body[:asset_id] = asset_id if asset_id
       body[:asset_amount] = asset_amount if asset_amount
       post("/lninvoice", body)

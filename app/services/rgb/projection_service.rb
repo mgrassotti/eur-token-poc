@@ -19,6 +19,10 @@ module Rgb
       ).apply_transfer!
     end
 
+    def self.apply_hub_seed!(budget:, from_user:, amount_cents:)
+      new(budget:, from_user:, amount_cents:).apply_hub_seed!
+    end
+
     def self.apply_redeem!(budget:, holder:)
       new(budget:, from_user: holder).apply_redeem!
     end
@@ -86,6 +90,30 @@ module Rgb
       end
     end
 
+    # Alice→hub L1 seed for recipient inbound liquidity: deduct sender projection
+    # only (hub is not a TokenAccount holder in the PoC).
+    def apply_hub_seed!
+      return if amount_cents <= 0
+
+      ActiveRecord::Base.transaction do
+        from_account = budget.token_accounts.lock.find_by!(user: from_user)
+        if from_account.balance_cents < amount_cents
+          raise Error, I18n.t("services.rgb.projection.insufficient_balance",
+            from_balance: from_account.balance_cents,
+            amount: amount_cents)
+        end
+
+        from_account.update!(balance_cents: from_account.balance_cents - amount_cents)
+        sender = budget.rgb_assignments.lock.find_by!(user: from_user)
+        sender.update!(notional_share_cents: sender.notional_share_cents - amount_cents)
+
+        package = (budget.recovery_package || {}).deep_dup
+        history = Array(package["hub_liquidity_seeds"])
+        history << { from_user_id: from_user.id, amount: amount_cents, at: Time.current.iso8601 }
+        package["hub_liquidity_seeds"] = history
+        budget.update!(recovery_package: package)
+      end
+    end
     # Cache-only: dopo la redemption RGB on-chain azzera la proiezione DB del holder
     # (token account + rgb_assignment) per allinearla alla verità RGB del nodo.
     def apply_redeem!

@@ -19,8 +19,8 @@ module Tokens
       validate!
       ensure_rgb_ready!
 
-      settled = Rgb::BalanceService.settled(user: from_user, budget: budget)
-      raise Error, I18n.t("services.tokens.transfer.insufficient_balance") if settled < amount_cents
+      spendable = Rgb::BalanceService.spendable(user: from_user, budget: budget)
+      raise Error, I18n.t("services.tokens.transfer.insufficient_balance") if spendable < amount_cents
 
       rgb_result = Rgb::TransferService.call(
         budget: budget,
@@ -36,7 +36,7 @@ module Tokens
         amount_cents: amount_cents,
         rgb_result: rgb_result
       )
-    rescue Rgb::TransferService::Error, Rgb::LibTransferService::Error,
+    rescue Rgb::TransferService::Error, Rgb::LibTransferService::Error, Rgb::LnTransferService::Error,
            Rgb::LightningClient::Error, Rgb::Nodes::Error, Rgb::ProjectionService::Error => e
       raise Error, e.message
     end

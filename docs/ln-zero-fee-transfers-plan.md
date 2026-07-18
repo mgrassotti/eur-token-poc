@@ -36,21 +36,19 @@ Lightning APIs exist on `Rgb::LightningClient` (`open_channel`, `ln_invoice`, `s
 
 ## Design options (spike order)
 
-### Option A — RGB over Lightning (RLN asset channel) *(preferred PoC direction)*
+### Option A — Direct RGB-LN channel Alice↔Claude
 
-Use **RGB Lightning Nodes** already in Docker: open (or reuse) an **RGB-capable LN channel** between sender and recipient (or via a liquidity hub), then pay an **LN invoice with asset_id / asset_amount**.
+Open (or reuse) an RGB-capable LN channel between the two users, then pay LN invoices with `asset_id` / `asset_amount`.
 
-**Pros:** Stays inside existing RLN fleet; matches “tokens move without L1”.  
-**Cons:** Channel open still costs L1 once; capacity / asset liquidity management; peer discovery.
+**Pros:** P2P; no hub trust.  
+**Cons:** N² channels; peer discovery.
 
-**Open once, transfer many:** channel open fee amortized; subsequent sends ≈ LN fees only (aim for zero with private/direct channel or sponsored routing).
+### Option B — Hub-mediated RGB-LN *(chosen for this branch)*
 
-### Option B — Hub-mediated LN (no direct Alice↔Claude channel)
+Alice and Claude each open an **RGB asset channel** to a **MAT liquidity hub** (PoC: Rails-orchestrated RLN, e.g. issuer node or dedicated `rln-hub`). Transfers are **multi-hop RGB-LN payments** through the hub — not DB-only bookkeeping and not “RGB updated off LN”.
 
-Alice and Claude each have a channel to a **MAT liquidity node**; transfers are LN payments through the hub, with RGB state updated off RGB-LN or via hub custody of EURT (worse trust model).
-
-**Pros:** No N² channels.  
-**Cons:** Trust / custody; not pure P2P.
+**Pros:** Linear channel topology; Rails can open Alice→hub (and Claude→hub) for the PoC.  
+**Cons:** Hub must stay online and hold BTC + EURT channel liquidity; hub is a trust/availability dependency for transfers.
 
 ### Option C — Accounting on relay + LN BTC only
 
@@ -60,53 +58,73 @@ Relay moves EURT balances in DB; LN only settles BTC. **Rejected** for productio
 
 Align with mobile-production Phase 4–5 once rgb-lib is on device. Out of scope for this PoC branch except as exit criteria.
 
-**Decision for this branch:** spike **Option A** on regtest RLN; document hub (B) as scale-out.
+**Decision for this branch:** implement **Option B** on regtest RLN (hub path).
+
+## Moving Alice’s EURT from L1 RGB into LN
+
+Yes — that is what an **RGB channel open** does in RLN.
+
+Alice’s post-activation EURT sits as **on-chain RGB assignments** on her RLN (colorable UTXOs). Calling `/openchannel` with `asset_id` + `asset_amount`:
+
+1. Spends/locks that much of her **off-channel (L1) RGB** into the channel funding commitment (still one **L1** funding tx).
+2. Decreases her **spendable** off-channel asset balance by `asset_amount` (RLN tests assert this, e.g. 1000 → 400 after putting 600 into the channel).
+3. Makes that amount available as **in-channel RGB-LN liquidity** toward the peer (the hub).
+
+So: **L1 → LN for RGB is exactly “open (or push into) an RGB channel”**, not a separate custom migrate API. Subsequent Alice→Claude sends use `/lninvoice` + `/sendpayment` with the asset (multi-hop via hub) and should **not** call `/sendrgb`.
+
+Closing the channel returns assets to off-channel / L1 RGB again (as in RLN’s `vanilla_payment_on_rgb_channel` test).
+
+**PoC orchestration:** Rails can `connect_peer` + `open_channel` from Alice’s RLN to the hub (and likewise Claude→hub) when she first needs LN spend capacity — e.g. after deal activation or before first Send money. Who pays the open fee (Alice vs sponsored Exchange wallet) is a product choice; the open itself is unavoidable once per edge.
 
 ## Prerequisites before transfer (product rules)
 
-1. Alice has **spendable EURT** on an active deal (unchanged).
-2. Both users have RLN wallets (unchanged).
-3. **New:** an LN path exists:
-   - direct RGB channel Alice↔Claude, **or**
-   - path via MAT hub with enough asset capacity.
-4. If no path: UI explains “Open channel” / “Wait for peer online” — **do not silently fall back to L1** unless user opts in (advanced).
+1. Alice has **spendable EURT** on an active deal (off-channel RGB initially).
+2. Both users have RLN wallets.
+3. **New:** RGB-LN path via hub:
+   - Alice↔hub channel with enough **outbound** EURT (and BTC for LN fees if required by stack),
+   - Claude↔hub channel with enough **inbound** EURT capacity,
+   - hub online and able to route.
+4. If no path: Rails opens missing hub edges (PoC) or UI explains wait — **do not silently fall back to L1 `/sendrgb`** unless user opts in (advanced).
 
 ## Work packages
 
 ### WP0 — Spike (1–2 days)
 
-- [ ] From Alice RLN: `connect_peer` + `open_channel` to Claude (BTC-only, then with `asset_id` if supported).
-- [ ] Claude: `ln_invoice` with `asset_id` + `asset_amount`; Alice: `send_payment`.
-- [ ] Confirm balances via `asset_balance` / `Rgb::BalanceService` without `/sendrgb`.
-- [ ] Record fee: channel open (L1) vs payment (LN).
-- [ ] Write spike notes under `docs/spikes/rgb-ln-transfer.md`.
+- [x] Treat **issuer** as MAT liquidity node; fund BTC + ensure UTXOs (`HubSetupService`).
+- [x] After Alice holds EURT: `connect_peer` + `open_channel(..., asset_id, asset_amount)` Alice→hub; assert off-channel balance drops and channel lists asset liquidity.
+- [x] Same for hub→Claude (hub opens with seeded EURT).
+- [x] Claude: `ln_invoice` with `asset_id` + `asset_amount`; Alice: `send_payment`; assert multi-hop via hub.
+- [x] Confirm balances via `asset_balance` / `Rgb::BalanceService` without `/sendrgb` for the payment.
+- [x] Record fees: channel open (L1, once per edge) vs payment (LN).
+- [x] Write spike notes under `docs/spikes/rgb-ln-hub-transfer.md`.
 
-**Exit:** one Alice→Claude EURT payment on regtest with **no `/sendrgb`**.
+**Exit:** one Alice→hub→Claude EURT payment on regtest with **no `/sendrgb`** for the payment (`spec/integration/rgb_ln_hub_transfer_spec.rb`).
 
-### WP1 — Channel lifecycle service
+### WP1 — Channel lifecycle service (hub-centric)
 
-- [ ] `Rgb::ChannelService` (name TBD): ensure path between two users (open/reuse).
+- [x] `Rgb::HubChannelService`: ensure Alice↔hub and recipient↔hub capacity for amount.
+- [x] Rails-driven open for PoC (no mobile LN peer management yet).
+- [x] Idempotent “ensure capacity for amount”.
 - [ ] Persist channel metadata if needed (or rely on `list_channels`).
-- [ ] Idempotent “ensure capacity for amount”.
-- [ ] Request specs with stubs; one `:regtest` integration example.
+- [x] Request specs with stubs; one `:regtest` integration example.
 
 ### WP2 — Transfer path switch
 
-- [ ] `Rgb::LibTransferService` (or new `Rgb::LnTransferService`): prefer LN; feature flag `RGB_TRANSFER_VIA_LN=1`.
-- [ ] Keep L1 `/sendrgb` behind `RGB_TRANSFER_VIA_LN=0` or advanced fallback.
-- [ ] `Tokens::TransferService` / wallet transfer unchanged at API shape.
-- [ ] Update relay + mobile docs: Send money is LN when flag on.
+- [x] `Rgb::LnTransferService` (hub route): prefer LN; feature flag `RGB_TRANSFER_VIA_LN=1`.
+- [x] Keep L1 `/sendrgb` behind `RGB_TRANSFER_VIA_LN=0` or advanced fallback.
+- [x] `Tokens::TransferService` / wallet transfer unchanged at API shape.
+- [ ] Update relay + mobile docs: Send money is LN-via-hub when flag on.
 
 ### WP3 — Mobile / relay UX (minimal)
 
-- [ ] Surface errors: peer offline, insufficient channel capacity, channel opening in progress.
-- [ ] Optional: show “Opening channel…” only if WP1 opens synchronously (prefer async + push later).
-- [ ] No address-book/QR in this branch.
+- [ ] Surface errors: hub offline, insufficient channel capacity, channel opening in progress.
+- [ ] Optional: “Opening channel to MAT…” when Rails opens Alice→hub synchronously.
+- [ ] No address-book/QR in this branch (`feature/send-money-recipient-ux` depends on this).
 
 ### WP4 — Fees product policy
 
-- [ ] Document: **first interaction** may require channel open (L1 fee, once); **subsequent sends** zero L1.
-- [ ] Decide who pays channel open (Alice, Claude, or sponsored by Exchange wallet on regtest).
+- [ ] Document: **first LN setup** requires channel open(s) (L1 fee, once per hub edge); **subsequent sends** no L1.
+- [ ] Decide who pays Alice→hub open (Alice vs sponsored Exchange on regtest).
 - [ ] Integration test: second transfer does not call `/sendrgb`.
 
 ## Non-goals (this branch)
@@ -128,20 +146,22 @@ Merge back to `feature/mobile-relay-phase1` or `main` independently of the recip
 
 ## Test plan
 
-1. Demo reset; fund Alice/Bob; activate deal; Alice has EURT.
-2. Spike: LN transfer Alice→Claude; assert Claude settled balance; assert no `sendrgb` in logs.
+1. Demo reset; fund Alice/Bob; activate deal; Alice has EURT off-channel.
+2. Spike: open Alice→hub RGB channel (balance moves L1→LN); open Claude→hub; Alice→Claude via hub LN; no `sendrgb`.
 3. Second transfer: no new L1 funding tx for the payment itself.
 4. Flag off: existing L1 RGB path still works (regression).
 5. Mobile Send money E2E with flag on (optional once WP2+WP3 land).
 
 ## Open questions
 
-1. Does current RLN build support **asset channels** for this NIA EURT, or only BTC LN + separate RGB?
-2. Minimum channel capacity vs typical top-up sizes (€100–€1000).
-3. Who initiates channel open if Claude has never been online?
-4. Should multi-deal wallet transfers open one channel per asset/deal or one shared EURT asset channel?
+1. ~~Hub identity for PoC: reuse **issuer RLN (3005)** vs dedicated `rln-hub` container?~~ **Decided:** issuer as hub (`RLN_HUB_URL` overrideable).
+2. Minimum BTC + EURT capacities on hub edges vs typical top-ups (€100–€1000).
+3. Who initiates Claude→hub open if Claude has never sent/received (Rails auto-open on first inbound)?
+4. One RGB channel per deal asset_id vs one hub channel that can carry the deal’s NIA (issue model today is per-deal)?
+5. Exact LN fee policy: truly zero, or allow tiny BTC routing fees while forbidding L1?
+6. Pre-fund hub treasury so first send does not require ~2× Alice off-channel liquidity?
 
 ## Success criteria
 
-- Product can claim: **repeat user↔user EURT sends incur no L1 fee** when an LN path exists.
-- PoC implements it on regtest RLN with a feature flag and clear fallback policy.
+- Product can claim: **repeat user↔user EURT sends incur no L1 fee** when hub RGB-LN paths exist.
+- PoC implements hub path on regtest RLN with a feature flag and clear fallback policy.

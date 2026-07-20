@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../l10n/app_localizations.dart';
@@ -16,6 +17,16 @@ class SettingsScreen extends StatelessWidget {
       appBar: AppBar(title: Text(l10n.settings)),
       body: ListView(
         children: [
+          ListTile(
+            leading: const Icon(Icons.qr_code),
+            title: Text(l10n.depositFunds),
+            onTap: () => context.push('/reserve/add-funds'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.account_balance_wallet_outlined),
+            title: Text(l10n.topUpSpending),
+            onTap: () => context.push('/deals/new'),
+          ),
           ListTile(
             title: Text(l10n.language),
             subtitle: Text(

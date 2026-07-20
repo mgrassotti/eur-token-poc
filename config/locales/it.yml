@@ -41,6 +41,7 @@ it:
         invalid_height: "Altezza blocco non valida"
         updated: "Altezza blocco aggiornata a %{height}."
         auto_settled: "Settlement automatico eseguito per %{count} deal."
+        settlement_blocked: "Deal #%{ids} a scadenza ma non liquidabili (DLC non finanziato — riattiva il deal su regtest con ./bin/regtest up)."
       market_rate:
         liquidations: "Liquidazione automatica (LTV >= %{threshold}%): deal #%{ids} chiusi al cambio %{rate} EUR/BTC."
         updated: "Cambio BTC/EUR aggiornato a %{rate} EUR/BTC."
@@ -62,6 +63,9 @@ it:
       activate:
         not_pending: "Il budget non e' in attesa."
         investor_is_borrower: "L'investitore non puo' essere il richiedente."
+      auto_settle:
+        missing_market_rate: "Cambio BTC/EUR non impostato: impossibile eseguire il settlement automatico."
+        failed: "Settlement automatico fallito per il deal #%{budget_id}: %{detail}"
       reserve_requirement:
         borrower_label: "il richiedente"
         investor_label: "l'investitore"
@@ -89,6 +93,10 @@ it:
         escrow_not_provisioned: "Escrow non provisionato."
         rgb_asset_missing: "Asset RGB mancante sul deal."
         rgb_genesis_missing: "Genesis RGB mancante."
+        invoice_requires_single_budget: "Questa richiesta di pagamento deve essere pagata da un singolo saldo deal."
+        receive_request_expired: "Questa richiesta di pagamento è scaduta."
+        receive_request_paid: "Questa richiesta di pagamento è già stata pagata."
+        amount_mismatch: "L'importo non corrisponde alla richiesta di pagamento."
     rgb:
       lib_issue:
         budget_not_active: "Budget non attivo."
@@ -100,6 +108,8 @@ it:
         budget_not_active: "Budget non attivo."
         invalid_amount: "Importo non positivo."
         insufficient_balance: "Saldo RGB insufficiente."
+      receive_request:
+        invalid_amount: "Importo non positivo."
       wallet_setup:
         node_not_configured: "Nodo RGB non configurato per l'utente %{user_id}."
     dlc:

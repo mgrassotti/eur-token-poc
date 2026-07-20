@@ -2,7 +2,8 @@
 
 module Rgb
   # Settled RGB balance per user/deal. Primary source: the user's RLN node;
-  # fallback: the DB projection (rgb_assignments) when the node is unavailable.
+  # fallback: the DB projection (rgb_assignments) when the node is unreachable.
+  # When the node is up but no longer knows the contract, returns 0 (projection may be stale).
   class BalanceService
     def self.settled(user:, budget:)
       new(user:, budget:).settled
@@ -32,6 +33,11 @@ module Rgb
     def read_from_node
       balance = Nodes.for_user(user).asset_balance(asset_id: budget.rgb_asset_id)
       balance["settled"].to_i
+    rescue LightningClient::Error => e
+      # DB projection can outlive the node's contract store (e.g. after regtest reset).
+      return 0 if e.message.include?("Unknown RGB contract ID")
+
+      raise
     end
 
     def projection_balance

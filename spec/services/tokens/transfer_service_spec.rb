@@ -35,6 +35,6 @@ RSpec.describe Tokens::TransferService do
   it "rejects insufficient balance" do
     expect do
       described_class.call(budget: budget, from_user: alice, to_user: claude, amount_cents: 200_000)
-    end.to raise_error(Tokens::TransferService::Error, "Insufficient token balance")
+    end.to raise_error(Tokens::TransferService::Error, I18n.t("services.tokens.transfer.insufficient_balance"))
   end
 end

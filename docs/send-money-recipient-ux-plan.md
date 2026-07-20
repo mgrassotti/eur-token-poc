@@ -1,10 +1,13 @@
-# Plan: Send Money recipient selection UX
+## Status — Phase 1 implemented (local)
 
-**Branch:** `feature/send-money-recipient-ux`  
-**Depends on:** `feature/mobile-relay-phase1` (relay API + mobile Send money shell)  
-**Sibling plan (fees / rail):** [ln-zero-fee-transfers-plan.md](./ln-zero-fee-transfers-plan.md) — *how* money moves (LN zero-fee). This plan is only **who to pay**.
-
-> **Branch discipline:** implement recipient UX only on `feature/send-money-recipient-ux`. Do **not** mix commits with `feature/ln-zero-fee-transfers`. Merge both into `feature/mobile-relay-phase1` (or main) independently when ready.
+| Piece | Status |
+|-------|--------|
+| `POST /api/v1/receive_requests` | Done — RGB invoice on caller’s RLN, QR `mat:pay/1?...` |
+| `GET /api/v1/receive_requests/:id` | Done |
+| `POST /api/v1/transfers` + `receive_request_id` | Done — pays stored `recipient_id` (L1) |
+| Mobile Receive money | Done — dashboard button, QR + copy link |
+| Mobile Scan / paste pay | Done — Send money → Scan QR |
+| Contacts / phone directory | Not started (Phase 2) |
 
 ---
 

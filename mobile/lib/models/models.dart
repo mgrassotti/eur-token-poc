@@ -277,6 +277,7 @@ class DashboardData {
     required this.spendingEurCents,
     required this.savingsSats,
     required this.maxBorrowableEurCents,
+    required this.borrowedDeals,
     required this.fundPositions,
     required this.investableDeals,
   });
@@ -286,6 +287,7 @@ class DashboardData {
   final int spendingEurCents;
   final int savingsSats;
   final int maxBorrowableEurCents;
+  final List<Deal> borrowedDeals;
   final List<FundPosition> fundPositions;
   final List<Deal> investableDeals;
 
@@ -299,12 +301,81 @@ class DashboardData {
       spendingEurCents: json['spending_eur_cents'] as int? ?? 0,
       savingsSats: (json['savings'] as Map<String, dynamic>?)?['sats'] as int? ?? 0,
       maxBorrowableEurCents: json['max_borrowable_eur_cents'] as int? ?? 0,
+      borrowedDeals: (json['borrowed_deals'] as List<dynamic>? ?? const [])
+          .map((e) => Deal.fromJson(e as Map<String, dynamic>))
+          .toList(),
       fundPositions: (json['fund_positions'] as List<dynamic>? ?? const [])
           .map((e) => FundPosition.fromJson(e as Map<String, dynamic>))
           .toList(),
       investableDeals: (json['investable_deals'] as List<dynamic>)
           .map((e) => Deal.fromJson(e as Map<String, dynamic>))
           .toList(),
+    );
+  }
+}
+
+class ReceiveRequestInfo {
+  const ReceiveRequestInfo({
+    required this.id,
+    required this.user,
+    this.amountEurCents,
+    required this.qrPayload,
+    required this.expiresAt,
+    required this.paid,
+    required this.expired,
+  });
+
+  final String id;
+  final User user;
+  final int? amountEurCents;
+  final String qrPayload;
+  final DateTime expiresAt;
+  final bool paid;
+  final bool expired;
+
+  factory ReceiveRequestInfo.fromJson(Map<String, dynamic> json) {
+    return ReceiveRequestInfo(
+      id: json['id'] as String,
+      user: User.fromJson(json['user'] as Map<String, dynamic>),
+      amountEurCents: json['amount_eur_cents'] as int?,
+      qrPayload: json['qr_payload'] as String,
+      expiresAt: DateTime.parse(json['expires_at'] as String),
+      paid: json['paid'] as bool? ?? false,
+      expired: json['expired'] as bool? ?? false,
+    );
+  }
+}
+
+/// Parsed `mat:pay/1?...` deep link from a Receive QR.
+class MatPayLink {
+  const MatPayLink({
+    required this.userId,
+    required this.requestId,
+    this.amountEurCents,
+  });
+
+  final int userId;
+  final String requestId;
+  final int? amountEurCents;
+
+  static MatPayLink? tryParse(String raw) {
+    final trimmed = raw.trim();
+    final match = RegExp(
+      r'^mat:pay/1\?(.+)$',
+      caseSensitive: false,
+    ).firstMatch(trimmed);
+    if (match == null) return null;
+
+    final params = Uri.splitQueryString(match.group(1)!);
+    final userId = int.tryParse(params['u'] ?? '');
+    final rid = params['rid'];
+    if (userId == null || rid == null || rid.isEmpty) return null;
+
+    final amount = params['a'];
+    return MatPayLink(
+      userId: userId,
+      requestId: rid,
+      amountEurCents: amount != null ? int.tryParse(amount) : null,
     );
   }
 }

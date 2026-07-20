@@ -9,13 +9,32 @@ module Budgets
       BtcConversion.eur_cents_to_sats(amount_eur_cents, eur_per_btc)
     end
 
+    # Headroom for DLC funding fee share (see Dlc::ContractSetupService).
+    def funding_fee_buffer_sats
+      Dlc::ContractSetupService::FUNDING_FEE_BUFFER_SATS
+    end
+
+    alias borrower_fee_buffer_sats funding_fee_buffer_sats
+
+    def borrower_required_sats_for(amount_eur_cents, eur_per_btc)
+      borrower_sats_for(amount_eur_cents, eur_per_btc) + funding_fee_buffer_sats
+    end
+
+    def borrower_funding_required_sats_for(budget)
+      budget.borrower_locked_sats + funding_fee_buffer_sats
+    end
+
     def investor_collateral_sats_for(budget, eur_per_btc)
       budget.collateral_sats_at_peg(eur_per_btc)
     end
 
     def investor_sats_for(budget, eur_per_btc, include_l1_fee: true)
       sats = investor_collateral_sats_for(budget, eur_per_btc)
-      include_l1_fee ? sats + L1::FundingPsbtService::ESTIMATED_FEE_SATS : sats
+      include_l1_fee ? sats + funding_fee_buffer_sats : sats
+    end
+
+    def investor_required_sats_for(budget, eur_per_btc)
+      investor_sats_for(budget, eur_per_btc)
     end
 
     def available_sats_for(user)
@@ -25,7 +44,7 @@ module Budgets
     def max_eur_cents_for(user)
       return 0 unless MarketRate.current.set?
 
-      sats = available_sats_for(user)
+      sats = available_sats_for(user) - funding_fee_buffer_sats
       return 0 unless sats.positive?
 
       BtcConversion.max_eur_cents_for_sats(sats, MarketRate.current.btc_eur_per_btc)

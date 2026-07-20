@@ -109,6 +109,28 @@ class RelayApiClient {
     });
   }
 
+  Future<ReceiveRequestInfo> createReceiveRequest({int? amountEurCents}) async {
+    final body = await _post('/receive_requests', {
+      if (amountEurCents != null) 'amount_eur_cents': amountEurCents,
+    });
+    return ReceiveRequestInfo.fromJson(body);
+  }
+
+  Future<ReceiveRequestInfo> fetchReceiveRequest(String id) async {
+    final body = await _get('/receive_requests/$id');
+    return ReceiveRequestInfo.fromJson(body);
+  }
+
+  Future<void> payReceiveRequest({
+    required String receiveRequestId,
+    int? amountEurCents,
+  }) async {
+    await _post('/transfers', {
+      'receive_request_id': receiveRequestId,
+      if (amountEurCents != null) 'amount_eur_cents': amountEurCents,
+    });
+  }
+
   Future<SettlementPreview> fetchSettlement(String dealId) async {
     final body = await _get('/deals/$dealId/settlement');
     return SettlementPreview.fromJson(body);

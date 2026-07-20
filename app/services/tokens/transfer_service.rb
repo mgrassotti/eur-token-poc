@@ -4,15 +4,16 @@ module Tokens
   class TransferService
     class Error < StandardError; end
 
-    def self.call(budget:, from_user:, to_user:, amount_cents:)
-      new(budget:, from_user:, to_user:, amount_cents:).call
+    def self.call(budget:, from_user:, to_user:, amount_cents:, rgb_recipient_id: nil)
+      new(budget:, from_user:, to_user:, amount_cents:, rgb_recipient_id:).call
     end
 
-    def initialize(budget:, from_user:, to_user:, amount_cents:)
+    def initialize(budget:, from_user:, to_user:, amount_cents:, rgb_recipient_id: nil)
       @budget = budget
       @from_user = from_user
       @to_user = to_user
       @amount_cents = amount_cents.to_i
+      @rgb_recipient_id = rgb_recipient_id
     end
 
     def call
@@ -26,7 +27,8 @@ module Tokens
         budget: budget,
         from_user: from_user,
         to_user: to_user,
-        amount_cents: amount_cents
+        amount_cents: amount_cents,
+        rgb_recipient_id: rgb_recipient_id
       )
 
       Rgb::ProjectionService.apply_transfer!(
@@ -43,7 +45,7 @@ module Tokens
 
     private
 
-    attr_reader :budget, :from_user, :to_user, :amount_cents
+    attr_reader :budget, :from_user, :to_user, :amount_cents, :rgb_recipient_id
 
     def validate!
       raise Error, I18n.t("services.tokens.transfer.budget_not_active") unless budget.active?

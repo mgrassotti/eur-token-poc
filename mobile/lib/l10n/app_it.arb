@@ -102,6 +102,19 @@
   "insolventNote": "Insolvente a questo spot — limitato dall'escrow",
   "holderAllocations": "Allocazioni detentori",
   "shareAmount": "quota €{amount}",
-  "settlementPreviewNote": "Solo anteprima — la Fase 1 usa la matematica FloorEUR del relay. In produzione il settlement avviene on-device via mat-core.",
-  "settlementExecutedNote": "Settlement eseguito sul relay (percorso admin PoC)."
+  "settlementPreviewNote": "Anteprima — gli importi sono ricalcolati sul dispositivo via mat_sdk; le cifre del relay sono confrontate per incongruenze.",
+  "settlementExecutedNote": "Settlement eseguito sul relay (percorso admin PoC). Input inclusi per audit FloorEUR offline.",
+  "onDeviceFloorEur": "Ricalcolato sul dispositivo (mat_sdk)",
+  "settlementMismatchWarning": "Il FloorEUR sul dispositivo non coincide con l'anteprima del relay. Non fidarti delle cifre del server.",
+  "localWalletDebug": "Wallet locale (spike BDK)",
+  "localWalletDebugSubtitle": "Fase 2: crea/carica mnemonic e mostra un indirizzo di ricezione",
+  "localWalletCreate": "Crea wallet",
+  "localWalletReceiveAddress": "Indirizzo di ricezione",
+  "localWalletMnemonicSaved": "Mnemonic salvato sul dispositivo (solo debug — non sicuro in produzione)",
+  "localWalletError": "Errore wallet: {detail}",
+  "@localWalletError": {
+    "placeholders": {
+      "detail": { "type": "String" }
+    }
+  }
 }

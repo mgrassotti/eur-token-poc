@@ -123,6 +123,14 @@ Phases 3 and 4 can overlap once BDK + DLC FFI is stable.
 
 **Exit criteria:** Rust tests green; offer/accept schema versioned.
 
+**Progress (in repo):**
+
+- [mat-core](../mat-core/) — FloorEUR, payout curve, deal FSM, schemas, trust boundaries
+- [mat-ffi](../mat-ffi/) — C ABI scaffold (`mat_floor_eur_json` / `mat_string_free`) for Flutter FFI
+- [mobile/packages/mat_sdk](../mobile/packages/mat_sdk/) — Dart FloorEUR mirror + tests (parity with mat-core vectors)
+- Settlement UI recomputes FloorEUR on-device from relay `calculation_inputs` and warns on mismatch
+- Native dylib not yet loaded from Dart (mat_sdk is the active path)
+
 ---
 
 ## Phase 1 — Flutter shell + coordination API
@@ -163,6 +171,13 @@ Phases 3 and 4 can overlap once BDK + DLC FFI is stable.
 **PoC mapping:** `L1::DepositReserveService`, `L1::UserWallet`, `L1::SyncReserveBalanceService`.
 
 **Exit criteria:** on testnet: deposit → balance on phone; sign a test PSBT.
+
+**Progress (spike in repo):**
+
+- `bdk_flutter` dependency in [mobile/pubspec.yaml](../mobile/pubspec.yaml)
+- [LocalWalletService](../mobile/lib/services/local_wallet_service.dart) — create/load mnemonic, BIP84 receive address (testnet, memory DB)
+- Settings → Advanced → **Local wallet (BDK spike)** debug screen
+- Still missing: Esplora sync, encrypted backup, PSBT signing, replacing relay deposit address
 
 ---
 

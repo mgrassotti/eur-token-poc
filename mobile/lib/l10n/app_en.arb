@@ -189,6 +189,19 @@
       "amount": { "type": "String" }
     }
   },
-  "settlementPreviewNote": "Preview only — Phase 1 uses relay FloorEUR math. Production settles on-device via mat-core.",
-  "settlementExecutedNote": "Settlement executed on relay (PoC admin path)."
+  "settlementPreviewNote": "Preview — amounts shown are recomputed on-device via mat_sdk; relay figures are compared for mismatch.",
+  "settlementExecutedNote": "Settlement executed on relay (PoC admin path). Inputs included for offline FloorEUR audit.",
+  "onDeviceFloorEur": "Recomputed on-device (mat_sdk)",
+  "settlementMismatchWarning": "On-device FloorEUR does not match the relay preview. Do not trust the server figures.",
+  "localWalletDebug": "Local wallet (BDK spike)",
+  "localWalletDebugSubtitle": "Phase 2: create/load mnemonic and show a receive address",
+  "localWalletCreate": "Create wallet",
+  "localWalletReceiveAddress": "Receive address",
+  "localWalletMnemonicSaved": "Mnemonic stored on device (debug only — not production-safe)",
+  "localWalletError": "Wallet error: {detail}",
+  "@localWalletError": {
+    "placeholders": {
+      "detail": { "type": "String" }
+    }
+  }
 }

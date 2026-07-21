@@ -76,6 +76,7 @@ class SettingsState extends ChangeNotifier {
 
   bool advancedFeatures = false;
   Locale locale = const Locale('en');
+  bool _hydrated = false;
 
   SettingsState() {
     _load();
@@ -84,18 +85,23 @@ class SettingsState extends ChangeNotifier {
   Future<void> _load() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      // Avoid clobbering in-session toggles if hydration loses the race.
+      if (_hydrated) return;
       advancedFeatures = prefs.getBool(_advancedFeaturesKey) ?? false;
       final code = prefs.getString(_localeKey);
       if (code != null && supportedLocales.any((l) => l.languageCode == code)) {
         locale = Locale(code);
       }
+      _hydrated = true;
       notifyListeners();
     } catch (_) {
+      _hydrated = true;
       // Keep defaults; prefs may be unavailable until a full rebuild after adding the plugin.
     }
   }
 
   Future<void> setAdvancedFeatures(bool enabled) async {
+    _hydrated = true;
     advancedFeatures = enabled;
     notifyListeners();
 
@@ -109,6 +115,7 @@ class SettingsState extends ChangeNotifier {
 
   Future<void> setLocale(Locale value) async {
     if (!supportedLocales.any((l) => l.languageCode == value.languageCode)) return;
+    _hydrated = true;
     locale = value;
     notifyListeners();
 

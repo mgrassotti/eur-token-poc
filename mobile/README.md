@@ -29,6 +29,10 @@ The suite includes:
 
 - **Alice add-funds E2E**: copy address → admin funds **0.01 BTC** on regtest → sync balance
 - **Deal + transfer E2E**: Alice creates €1000 deal → Bob accepts (DLC/RGB on regtest) → Alice sends **€500 EURT** to Claude
+- **Settlement FloorEUR E2E**: after Bob accepts, settlement screen shows on-device `mat_sdk` recompute (via API `calculation_inputs`)
+- **Local wallet debug smoke**: Settings → Advanced → Local wallet (BDK spike) screen loads; does **not** create a wallet (native BDK)
+
+Widget / unit coverage (no Rails): `flutter test` — settlement on-device recompute + mismatch, local wallet UI with a fake `LocalWalletApi` (BDK cannot run under plain `flutter test`).
 
 Regtest starts automatically; deal tests reset demo data and fund Alice/Bob reserves via the integration bridge.
 

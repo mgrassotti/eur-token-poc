@@ -147,6 +147,8 @@ Token transfer history for a deal.
 - **`preview`** — FloorEUR payoff projection via `Payoffs::FloorEurCalculator` (Phase 1 mock path).
 - **`executed`** — after admin settlement.
 
+Both statuses include **`calculation_inputs`** so clients can recompute FloorEUR on-device (`mat_sdk` / mat-core) and audit after execution.
+
 Preview example:
 
 ```json
@@ -156,6 +158,16 @@ Preview example:
   "status": "preview",
   "end_btc_eur_rate": 50000.0,
   "ready_for_settlement": false,
+  "calculation_inputs": {
+    "notional_eur_cents": 100000,
+    "notional_total_cents": 100000,
+    "holder_shares_cents": [100000],
+    "spot_eur_per_btc": 50000,
+    "rate_bps_monthly": 100,
+    "months_elapsed": 1,
+    "escrow_total_sats": 3975000,
+    "mining_fee_sats": 5000
+  },
   "payoff": {
     "liability_eur_cents": 101000,
     "total_holder_sats": 2020000,

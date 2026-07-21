@@ -18,6 +18,10 @@ dependencies:
   qr_flutter: ^4.1.0
   shared_preferences: ^2.3.3
   share_plus: ^13.2.1
+  mat_sdk:
+    path: packages/mat_sdk
+  # Phase 2 spike — L1 wallet on device (mnemonic + receive address).
+  bdk_flutter: ^0.31.3
 
 dev_dependencies:
   flutter_test:

@@ -107,6 +107,16 @@ RSpec.describe "Relay API v1", type: :request do
       expect(body["status"]).to eq("preview")
       expect(body.dig("payoff", "liability_eur_cents")).to eq(101_000)
       expect(body.dig("payoff", "total_holder_sats")).to eq(2_020_000)
+
+      inputs = body.fetch("calculation_inputs")
+      expect(inputs["notional_eur_cents"]).to eq(budget.notional_eur_cents)
+      expect(inputs["notional_total_cents"]).to eq(budget.amount_eur_cents)
+      expect(inputs["holder_shares_cents"]).to eq([100_000])
+      expect(inputs["spot_eur_per_btc"]).to eq(50_000)
+      expect(inputs["rate_bps_monthly"]).to eq(budget.rate_bps_monthly)
+      expect(inputs["months_elapsed"]).to eq(budget.symbolic_months_duration)
+      expect(inputs["escrow_total_sats"]).to eq(budget.pool_sats)
+      expect(inputs["mining_fee_sats"]).to eq(Budget::ESTIMATED_SETTLEMENT_FEE_SATS)
     end
   end
 

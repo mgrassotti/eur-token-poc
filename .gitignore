@@ -35,3 +35,6 @@
 
 /dlc-shim/node_modules
 .DS_Store
+
+# Rust workspace (mat-core / mat-ffi)
+/target/

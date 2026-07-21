@@ -155,6 +155,7 @@ class SettlementPreview {
     required this.readyForSettlement,
     this.payoff,
     this.holderAllocations = const [],
+    this.calculationInputs,
   });
 
   final String status;
@@ -162,6 +163,7 @@ class SettlementPreview {
   final bool readyForSettlement;
   final PayoffSummary? payoff;
   final List<HolderAllocation> holderAllocations;
+  final SettlementCalculationInputs? calculationInputs;
 
   factory SettlementPreview.fromJson(Map<String, dynamic> json) {
     return SettlementPreview(
@@ -175,6 +177,49 @@ class SettlementPreview {
               ?.map((e) => HolderAllocation.fromJson(e as Map<String, dynamic>))
               .toList() ??
           const [],
+      calculationInputs: json['calculation_inputs'] != null
+          ? SettlementCalculationInputs.fromJson(
+              json['calculation_inputs'] as Map<String, dynamic>,
+            )
+          : null,
+    );
+  }
+}
+
+/// Inputs for on-device FloorEUR recompute (mirrors relay `calculation_inputs`).
+class SettlementCalculationInputs {
+  const SettlementCalculationInputs({
+    required this.notionalEurCents,
+    required this.notionalTotalCents,
+    required this.holderSharesCents,
+    required this.spotEurPerBtc,
+    required this.rateBpsMonthly,
+    required this.monthsElapsed,
+    required this.escrowTotalSats,
+    required this.miningFeeSats,
+  });
+
+  final int notionalEurCents;
+  final int notionalTotalCents;
+  final List<int> holderSharesCents;
+  final int spotEurPerBtc;
+  final int rateBpsMonthly;
+  final int monthsElapsed;
+  final int escrowTotalSats;
+  final int miningFeeSats;
+
+  factory SettlementCalculationInputs.fromJson(Map<String, dynamic> json) {
+    return SettlementCalculationInputs(
+      notionalEurCents: json['notional_eur_cents'] as int? ?? 0,
+      notionalTotalCents: json['notional_total_cents'] as int? ?? 0,
+      holderSharesCents: (json['holder_shares_cents'] as List<dynamic>? ?? const [])
+          .map((e) => e as int)
+          .toList(),
+      spotEurPerBtc: json['spot_eur_per_btc'] as int? ?? 0,
+      rateBpsMonthly: json['rate_bps_monthly'] as int? ?? 0,
+      monthsElapsed: json['months_elapsed'] as int? ?? 0,
+      escrowTotalSats: json['escrow_total_sats'] as int? ?? 0,
+      miningFeeSats: json['mining_fee_sats'] as int? ?? 5000,
     );
   }
 }

@@ -48,3 +48,5 @@ Exported `SettlementPackage` + funding outpoint + oracle material must be suffic
 ## PoC gap (intentional)
 
 The Rails PoC still runs settlement server-side. Phase 0 extracts the **math and schemas** so mobile can enforce the same rules without trusting Rails.
+
+**Mobile progress:** the Flutter settlement screen recomputes FloorEUR via `mat_sdk` (Dart mirror of mat-core) using relay `calculation_inputs`, and surfaces a mismatch warning if server figures disagree. Authoritative on-device Rust (`mat-ffi`) remains a follow-up.

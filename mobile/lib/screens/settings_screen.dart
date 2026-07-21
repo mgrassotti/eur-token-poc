@@ -56,6 +56,13 @@ class SettingsScreen extends StatelessWidget {
             value: settings.advancedFeatures,
             onChanged: settings.setAdvancedFeatures,
           ),
+          if (settings.advancedFeatures)
+            ListTile(
+              leading: const Icon(Icons.developer_mode),
+              title: Text(l10n.localWalletDebug),
+              subtitle: Text(l10n.localWalletDebugSubtitle),
+              onTap: () => context.push('/settings/local-wallet'),
+            ),
         ],
       ),
     );

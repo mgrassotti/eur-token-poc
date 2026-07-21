@@ -1,8 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'integration_config.dart';
+
+/// Clears persisted prefs and seeds a stable English locale for assertions.
+Future<void> resetMobilePrefs({bool advancedFeatures = false}) async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.clear();
+  await prefs.setString('locale_code', 'en');
+  if (advancedFeatures) {
+    await prefs.setBool('advanced_features', true);
+  }
+}
 
 Future<void> loginAs(
   WidgetTester tester, {
@@ -19,7 +30,12 @@ Future<void> loginAs(
   expect(find.text('Overview'), findsOneWidget);
 }
 
+/// Opens Add funds via Settings (dashboard CTA is hidden once reserve > 0).
 Future<void> openAddFunds(WidgetTester tester) async {
+  if (find.text('Deposit funds').evaluate().isEmpty) {
+    await tester.tap(find.byIcon(Icons.settings_outlined));
+    await tester.pumpAndSettle(const Duration(seconds: 3));
+  }
   await tester.tap(find.text('Deposit funds'));
   await tester.pumpAndSettle(const Duration(seconds: 5));
   expect(find.text('Add funds'), findsOneWidget);
@@ -58,7 +74,13 @@ Future<void> goHome(WidgetTester tester) async {
 }
 
 Future<void> createAndPublishDeal(WidgetTester tester) async {
-  await tester.tap(find.text('Top up spending'));
+  if (find.text('Top up spending').evaluate().isEmpty) {
+    await tester.tap(find.byIcon(Icons.settings_outlined));
+    await tester.pumpAndSettle(const Duration(seconds: 3));
+    await tester.tap(find.text('Top up spending'));
+  } else {
+    await tester.tap(find.text('Top up spending'));
+  }
   await tester.pumpAndSettle(const Duration(seconds: 3));
   expect(find.text('Top up spending/savings account'), findsOneWidget);
 
@@ -79,19 +101,47 @@ Future<void> acceptCurrentDeal(WidgetTester tester) async {
   expect(find.text('ACTIVE'), findsOneWidget);
 }
 
+Future<void> leaveSettings(WidgetTester tester) async {
+  // Prefer explicit pop — pageBack() expects Cupertino back control which Material AppBar may not use.
+  final settingsTitle = find.text('Settings');
+  expect(settingsTitle, findsOneWidget);
+  Navigator.of(tester.element(settingsTitle)).pop();
+  await tester.pumpAndSettle(const Duration(seconds: 3));
+}
+
+/// Relies on [resetMobilePrefs] having seeded `advanced_features` before bootstrap.
 Future<void> enableAdvancedFeatures(WidgetTester tester) async {
   await tester.tap(find.byIcon(Icons.settings_outlined));
   await tester.pumpAndSettle(const Duration(seconds: 3));
-  final toggle = find.byType(Switch);
-  if (toggle.evaluate().isNotEmpty) {
-    final switchWidget = tester.widget<Switch>(toggle);
-    if (!switchWidget.value) {
-      await tester.tap(toggle);
-      await tester.pumpAndSettle(const Duration(seconds: 2));
-    }
+  expect(find.text('Settings'), findsOneWidget);
+
+  // SettingsState loads prefs asynchronously after construction.
+  final localWallet = find.text('Local wallet (BDK spike)');
+  for (var i = 0; i < 20 && localWallet.evaluate().isEmpty; i++) {
+    await tester.pump(const Duration(milliseconds: 250));
   }
-  await tester.pageBack();
+  expect(localWallet, findsOneWidget);
+  await leaveSettings(tester);
+}
+
+Future<void> openSettlementFromCurrentDeal(WidgetTester tester) async {
+  await tester.tap(find.byIcon(Icons.payments_outlined));
+  await tester.pumpAndSettle(const Duration(seconds: 10));
+  expect(find.text('Settlement'), findsOneWidget);
+}
+
+/// Opens Settings → Advanced → Local wallet debug (does not create a BDK wallet).
+Future<void> openLocalWalletDebug(WidgetTester tester) async {
+  await tester.tap(find.byIcon(Icons.settings_outlined));
   await tester.pumpAndSettle(const Duration(seconds: 3));
+  final localWallet = find.text('Local wallet (BDK spike)');
+  for (var i = 0; i < 20 && localWallet.evaluate().isEmpty; i++) {
+    await tester.pump(const Duration(milliseconds: 250));
+  }
+  expect(localWallet, findsOneWidget);
+  await tester.tap(localWallet);
+  await tester.pumpAndSettle(const Duration(seconds: 5));
+  expect(find.text('Local wallet (BDK spike)'), findsWidgets);
 }
 
 Future<void> openSendMoney(WidgetTester tester) async {

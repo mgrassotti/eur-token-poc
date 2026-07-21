@@ -358,9 +358,38 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get settlementPreviewNote =>
-      'Solo anteprima — la Fase 1 usa la matematica FloorEUR del relay. In produzione il settlement avviene on-device via mat-core.';
+      'Anteprima — gli importi sono ricalcolati sul dispositivo via mat_sdk; le cifre del relay sono confrontate per incongruenze.';
 
   @override
   String get settlementExecutedNote =>
-      'Settlement eseguito sul relay (percorso admin PoC).';
+      'Settlement eseguito sul relay (percorso admin PoC). Input inclusi per audit FloorEUR offline.';
+
+  @override
+  String get onDeviceFloorEur => 'Ricalcolato sul dispositivo (mat_sdk)';
+
+  @override
+  String get settlementMismatchWarning =>
+      'Il FloorEUR sul dispositivo non coincide con l\'anteprima del relay. Non fidarti delle cifre del server.';
+
+  @override
+  String get localWalletDebug => 'Wallet locale (spike BDK)';
+
+  @override
+  String get localWalletDebugSubtitle =>
+      'Fase 2: crea/carica mnemonic e mostra un indirizzo di ricezione';
+
+  @override
+  String get localWalletCreate => 'Crea wallet';
+
+  @override
+  String get localWalletReceiveAddress => 'Indirizzo di ricezione';
+
+  @override
+  String get localWalletMnemonicSaved =>
+      'Mnemonic salvato sul dispositivo (solo debug — non sicuro in produzione)';
+
+  @override
+  String localWalletError(String detail) {
+    return 'Errore wallet: $detail';
+  }
 }

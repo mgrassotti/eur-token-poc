@@ -713,14 +713,62 @@ abstract class AppLocalizations {
   /// No description provided for @settlementPreviewNote.
   ///
   /// In en, this message translates to:
-  /// **'Preview only — Phase 1 uses relay FloorEUR math. Production settles on-device via mat-core.'**
+  /// **'Preview — amounts shown are recomputed on-device via mat_sdk; relay figures are compared for mismatch.'**
   String get settlementPreviewNote;
 
   /// No description provided for @settlementExecutedNote.
   ///
   /// In en, this message translates to:
-  /// **'Settlement executed on relay (PoC admin path).'**
+  /// **'Settlement executed on relay (PoC admin path). Inputs included for offline FloorEUR audit.'**
   String get settlementExecutedNote;
+
+  /// No description provided for @onDeviceFloorEur.
+  ///
+  /// In en, this message translates to:
+  /// **'Recomputed on-device (mat_sdk)'**
+  String get onDeviceFloorEur;
+
+  /// No description provided for @settlementMismatchWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'On-device FloorEUR does not match the relay preview. Do not trust the server figures.'**
+  String get settlementMismatchWarning;
+
+  /// No description provided for @localWalletDebug.
+  ///
+  /// In en, this message translates to:
+  /// **'Local wallet (BDK spike)'**
+  String get localWalletDebug;
+
+  /// No description provided for @localWalletDebugSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Phase 2: create/load mnemonic and show a receive address'**
+  String get localWalletDebugSubtitle;
+
+  /// No description provided for @localWalletCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'Create wallet'**
+  String get localWalletCreate;
+
+  /// No description provided for @localWalletReceiveAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'Receive address'**
+  String get localWalletReceiveAddress;
+
+  /// No description provided for @localWalletMnemonicSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Mnemonic stored on device (debug only — not production-safe)'**
+  String get localWalletMnemonicSaved;
+
+  /// No description provided for @localWalletError.
+  ///
+  /// In en, this message translates to:
+  /// **'Wallet error: {detail}'**
+  String localWalletError(String detail);
 }
 
 class _AppLocalizationsDelegate

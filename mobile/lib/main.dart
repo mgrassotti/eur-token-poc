@@ -11,6 +11,7 @@ import 'screens/create_deal_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/deal_detail_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/local_wallet_debug_screen.dart';
 import 'screens/receive_money_screen.dart';
 import 'screens/scan_pay_screen.dart';
 import 'screens/send_money_screen.dart';
@@ -71,6 +72,10 @@ class MatAppRouter extends StatelessWidget {
         GoRoute(path: '/receive-money', builder: (_, __) => const ReceiveMoneyScreen()),
         GoRoute(path: '/scan-pay', builder: (_, __) => const ScanPayScreen()),
         GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
+        GoRoute(
+          path: '/settings/local-wallet',
+          builder: (_, __) => const LocalWalletDebugScreen(),
+        ),
         GoRoute(path: '/deals/new', builder: (_, __) => const CreateDealScreen()),
         GoRoute(
           path: '/deals/:id',

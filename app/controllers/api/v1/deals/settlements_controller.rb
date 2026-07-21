@@ -42,14 +42,17 @@ module Api
 
         def executed_settlement(deal, market_rate, result: nil)
           settlement = deal.settlement
+          spot = settlement.end_btc_eur_rate
           payload = {
             schema_version: 1,
             deal_id: deal.id.to_s,
             status: "executed",
-            end_btc_eur_rate: settlement.end_btc_eur_rate.to_f,
+            end_btc_eur_rate: spot.to_f,
             total_btc_to_holders_sats: settlement.total_btc_to_holders_sats,
             btc_to_investor_sats: settlement.btc_to_investor_sats,
-            executed_at: settlement.executed_at.iso8601
+            executed_at: settlement.executed_at.iso8601,
+            # Audit inputs so clients can recompute FloorEUR offline after execution.
+            calculation_inputs: calculation_inputs(deal, spot)
           }
 
           if result
@@ -70,7 +73,6 @@ module Api
 
         def settlement_preview(deal, market_rate)
           spot = market_rate.set? ? market_rate.btc_eur_per_btc.to_d : deal.peg_eur_per_btc
-          months = deal.symbolic_months_duration
           holders = deal.token_accounts.includes(:user).where("balance_cents > 0").order(:id)
 
           payoff = if spot.present? && spot.positive? && deal.pool_sats.positive?
@@ -80,7 +82,7 @@ module Api
                        holder_shares_cents: holders.map(&:balance_cents),
                        spot_eur_per_btc: spot,
                        rate_bps_monthly: deal.rate_bps_monthly,
-                       months_elapsed: months,
+                       months_elapsed: deal.symbolic_months_duration,
                        escrow_total_sats: deal.pool_sats
                      )
                    end
@@ -91,6 +93,8 @@ module Api
             status: "preview",
             end_btc_eur_rate: spot&.to_f,
             ready_for_settlement: deal.ready_for_settlement?,
+            # Inputs for on-device FloorEUR recompute (mat-core / mat_sdk).
+            calculation_inputs: calculation_inputs(deal, spot),
             payoff: payoff ? payoff_json(payoff) : nil,
             holder_allocations: payoff&.holder_allocations&.each_with_index&.map do |alloc, idx|
               {
@@ -99,6 +103,21 @@ module Api
                 btc_sats: alloc.btc_sats
               }
             end
+          }
+        end
+
+        # Shared FloorEUR inputs for preview (live spot) and executed (settlement rate).
+        def calculation_inputs(deal, spot)
+          holders = deal.token_accounts.where("balance_cents > 0").order(:id)
+          {
+            notional_eur_cents: deal.notional_eur_cents,
+            notional_total_cents: deal.amount_eur_cents,
+            holder_shares_cents: holders.map(&:balance_cents),
+            spot_eur_per_btc: spot&.to_i,
+            rate_bps_monthly: deal.rate_bps_monthly,
+            months_elapsed: deal.symbolic_months_duration,
+            escrow_total_sats: deal.pool_sats,
+            mining_fee_sats: Budget::ESTIMATED_SETTLEMENT_FEE_SATS
           }
         end
 

@@ -1,0 +1,13 @@
+[package]
+name = "mat-ffi"
+version = "0.1.0"
+edition = "2021"
+description = "C ABI bridge to mat-core for Flutter (Phase 0+). Build as cdylib for host/device."
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[dependencies]
+mat-core = { path = "../mat-core" }
+serde_json = "1"

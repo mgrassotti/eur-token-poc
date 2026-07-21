@@ -98,15 +98,26 @@ class AppLocalizationsIt extends AppLocalizations {
   String get showThisQr => 'Mostra questo QR al mittente';
 
   @override
-  String requestExpires(String time) {
-    return 'Scade $time';
+  String requestExpiresCountdown(String countdown, String time) {
+    return 'Scade tra $countdown (alle $time)';
   }
+
+  @override
+  String get requestExpiredMessage => 'Questa richiesta di pagamento è scaduta';
 
   @override
   String get copyPaymentLink => 'Copia link di pagamento';
 
   @override
   String get paymentLinkCopied => 'Link copiato';
+
+  @override
+  String get sharePaymentLink => 'Invia';
+
+  @override
+  String sharePaymentLinkMessage(String link) {
+    return 'Pagami con MAT: $link';
+  }
 
   @override
   String get scanQr => 'Scansiona QR';

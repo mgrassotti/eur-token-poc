@@ -38,14 +38,23 @@
   "optionalAmountEur": "Amount (EUR, optional)",
   "generateRequest": "Generate request",
   "showThisQr": "Show this QR to the sender",
-  "requestExpires": "Expires {time}",
-  "@requestExpires": {
+  "requestExpiresCountdown": "Expires in {countdown} (at {time})",
+  "@requestExpiresCountdown": {
     "placeholders": {
+      "countdown": { "type": "String" },
       "time": { "type": "String" }
     }
   },
+  "requestExpiredMessage": "This payment request has expired",
   "copyPaymentLink": "Copy payment link",
   "paymentLinkCopied": "Payment link copied",
+  "sharePaymentLink": "Share",
+  "sharePaymentLinkMessage": "Pay me via MAT: {link}",
+  "@sharePaymentLinkMessage": {
+    "placeholders": {
+      "link": { "type": "String" }
+    }
+  },
   "scanQr": "Scan QR",
   "pastePaymentLink": "Paste payment link",
   "payRequest": "Pay request",

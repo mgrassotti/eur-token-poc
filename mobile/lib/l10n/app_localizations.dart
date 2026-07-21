@@ -266,11 +266,17 @@ abstract class AppLocalizations {
   /// **'Show this QR to the sender'**
   String get showThisQr;
 
-  /// No description provided for @requestExpires.
+  /// No description provided for @requestExpiresCountdown.
   ///
   /// In en, this message translates to:
-  /// **'Expires {time}'**
-  String requestExpires(String time);
+  /// **'Expires in {countdown} (at {time})'**
+  String requestExpiresCountdown(String countdown, String time);
+
+  /// No description provided for @requestExpiredMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This payment request has expired'**
+  String get requestExpiredMessage;
 
   /// No description provided for @copyPaymentLink.
   ///
@@ -283,6 +289,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Payment link copied'**
   String get paymentLinkCopied;
+
+  /// No description provided for @sharePaymentLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Share'**
+  String get sharePaymentLink;
+
+  /// No description provided for @sharePaymentLinkMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay me via MAT: {link}'**
+  String sharePaymentLinkMessage(String link);
 
   /// No description provided for @scanQr.
   ///

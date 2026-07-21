@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_15_100000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_18_104321) do
   create_table "btc_accounts", force: :cascade do |t|
     t.bigint "balance_sats", default: 0, null: false
     t.string "bitcoind_wallet_name"
@@ -122,6 +122,22 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_15_100000) do
     t.index ["set_by_id"], name: "index_market_rates_on_set_by_id"
   end
 
+  create_table "receive_requests", force: :cascade do |t|
+    t.integer "amount_eur_cents"
+    t.datetime "created_at", null: false
+    t.datetime "expires_at", null: false
+    t.text "invoice"
+    t.datetime "paid_at"
+    t.integer "paid_by_user_id"
+    t.string "public_id", null: false
+    t.string "recipient_id", null: false
+    t.datetime "updated_at", null: false
+    t.integer "user_id", null: false
+    t.index ["expires_at"], name: "index_receive_requests_on_expires_at"
+    t.index ["public_id"], name: "index_receive_requests_on_public_id", unique: true
+    t.index ["user_id"], name: "index_receive_requests_on_user_id"
+  end
+
   create_table "rgb_assignments", force: :cascade do |t|
     t.string "assignment_id", null: false
     t.integer "budget_id", null: false
@@ -195,6 +211,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_15_100000) do
   add_foreign_key "investor_yield_payouts", "budgets"
   add_foreign_key "investor_yield_payouts", "users"
   add_foreign_key "market_rates", "users", column: "set_by_id"
+  add_foreign_key "receive_requests", "users"
   add_foreign_key "rgb_assignments", "budgets"
   add_foreign_key "rgb_assignments", "users"
   add_foreign_key "settlements", "budgets"

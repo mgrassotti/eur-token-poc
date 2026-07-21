@@ -88,6 +88,10 @@ class Budget < ApplicationRecord
   end
 
   def ready_for_settlement?
+    maturity_reached? && l1_multisig_provisioned? && dlc_contract&.funded?
+  end
+
+  def maturity_reached?
     maturity_block_height.present? && ChainState.block_height >= maturity_block_height
   end
 

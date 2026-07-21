@@ -54,7 +54,7 @@ RSpec.describe Budgets::ActivateService do
 
     expect do
       described_class.call(budget: budget, investor: bob)
-    end.to raise_error(Budgets::ActivateService::Error, "L'admin deve impostare il cambio BTC/€ corrente")
+    end.to raise_error(Budgets::ActivateService::Error, /cambio BTC/)
   end
 
   it "rejects insufficient collateral" do
@@ -63,6 +63,45 @@ RSpec.describe Budgets::ActivateService do
     expect do
       described_class.call(budget: budget, investor: bob)
     end.to raise_error(Budgets::ActivateService::Error, /Saldo insufficiente sul conto di riserva/)
+  end
+
+  it "rejects activation when on-chain balance lacks the funding fee buffer" do
+    peg = 60_000
+    bob_collateral = budget.collateral_sats_at_peg(peg)
+    allow(L1::UserWallet).to receive(:for).with(alice).and_return(
+      instance_double(
+        L1::UserWallet,
+        wallet_name: "user_#{alice.id}",
+        spendable_sats: budget.borrower_locked_sats
+      )
+    )
+    allow(L1::UserWallet).to receive(:for).with(bob).and_return(
+      instance_double(
+        L1::UserWallet,
+        wallet_name: "user_#{bob.id}",
+        spendable_sats: bob_collateral + Dlc::ContractSetupService::FUNDING_FEE_BUFFER_SATS
+      )
+    )
+
+    expect do
+      described_class.call(budget: budget, investor: bob)
+    end.to raise_error(Budgets::ActivateService::Error, /on-chain/)
+  end
+
+  it "reverts activation when escrow provisioning fails" do
+    allow(L1::ProvisionEscrowService).to receive(:call)
+      .and_raise(Dlc::ContractSetupService::Error, "Insufficient on-chain balance for user_2 (1 < 2 sats). Deposit into the reserve account.")
+
+    expect do
+      described_class.call(budget: budget, investor: bob)
+    end.to raise_error(Dlc::ContractSetupService::Error, /Insufficient on-chain balance/)
+
+    budget.reload
+    expect(budget).to be_pending
+    expect(budget.investor_id).to be_nil
+    expect(budget.collateral_lock).to be_nil
+    expect(budget.token_accounts).to be_empty
+    expect(bob.invested_budgets.active.sum(:investor_locked_sats)).to eq(0)
   end
 
   it "rejects activation when bitcoind is down" do

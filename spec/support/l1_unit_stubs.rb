@@ -100,10 +100,10 @@ module L1UnitStubs
       Rgb::ProjectionService.apply_issue!(budget:, rgb_result:)
     end
 
-    allow(Rgb::TransferService).to receive(:call) do |budget:, from_user:, to_user:, amount_cents:|
+    allow(Rgb::TransferService).to receive(:call) do |budget:, from_user:, to_user:, amount_cents:, rgb_recipient_id: nil|
       Rgb::TransferResult.new(
         txid: "stub",
-        recipient_id: "rcp_stub",
+        recipient_id: rgb_recipient_id.presence || "rcp_stub",
         asset_id: budget.rgb_asset_id,
         amount: amount_cents
       )

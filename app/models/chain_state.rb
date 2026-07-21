@@ -20,6 +20,8 @@ module ChainState
 
   def update_block_height!(height, auto_settle: true)
     MarketRate.current.update!(bitcoin_block_height: height)
-    Budgets::AutoSettleService.call if auto_settle
+    return Budgets::AutoSettleService::Result.new(settlements: [], blocked_budget_ids: []) unless auto_settle
+
+    Budgets::AutoSettleService.call
   end
 end

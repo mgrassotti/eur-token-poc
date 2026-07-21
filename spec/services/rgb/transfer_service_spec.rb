@@ -33,7 +33,8 @@ RSpec.describe Rgb::TransferService do
       budget: budget,
       from_user: alice,
       to_user: claude,
-      amount_cents: 400_000
+      amount_cents: 400_000,
+      rgb_recipient_id: nil
     )
     expect(result).to eq(rgb_result)
   end

@@ -38,4 +38,21 @@ RSpec.describe Budgets::CreateService do
       )
     end.to raise_error(Budgets::CreateService::Error, /Saldo insufficiente sul conto di riserva/)
   end
+
+  it "rejects when reserve covers collateral but not the funding fee buffer" do
+    locked_sats = BtcConversion.eur_cents_to_sats(100_000, 60_000)
+    alice.btc_account.update!(balance_sats: locked_sats)
+    allow(L1::UserWallet).to receive(:for).with(alice).and_return(
+      instance_double(L1::UserWallet, spendable_sats: locked_sats)
+    )
+
+    expect do
+      described_class.call(
+        borrower: alice,
+        amount_eur_cents: 100_000,
+        period_start: Date.current,
+        period_end: Date.current + 1.month
+      )
+    end.to raise_error(Budgets::CreateService::Error, /Saldo insufficiente sul conto di riserva/)
+  end
 end

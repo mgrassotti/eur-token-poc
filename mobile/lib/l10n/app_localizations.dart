@@ -188,6 +188,36 @@ abstract class AppLocalizations {
   /// **'Reserve'**
   String get reserve;
 
+  /// No description provided for @availableReserve.
+  ///
+  /// In en, this message translates to:
+  /// **'Available reserve'**
+  String get availableReserve;
+
+  /// No description provided for @pending.
+  ///
+  /// In en, this message translates to:
+  /// **'pending'**
+  String get pending;
+
+  /// No description provided for @pendingTopUps.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending top ups'**
+  String get pendingTopUps;
+
+  /// No description provided for @pendingTopUpAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'€{amount} requested'**
+  String pendingTopUpAmount(String amount);
+
+  /// No description provided for @awaitingInvestor.
+  ///
+  /// In en, this message translates to:
+  /// **'Awaiting investor'**
+  String get awaitingInvestor;
+
   /// No description provided for @depositFunds.
   ///
   /// In en, this message translates to:
@@ -199,6 +229,114 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Send money'**
   String get sendMoney;
+
+  /// No description provided for @receiveMoney.
+  ///
+  /// In en, this message translates to:
+  /// **'Receive money'**
+  String get receiveMoney;
+
+  /// No description provided for @receiveMoneyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Receive money'**
+  String get receiveMoneyTitle;
+
+  /// No description provided for @paymentRequest.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment request'**
+  String get paymentRequest;
+
+  /// No description provided for @optionalAmountEur.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount (EUR, optional)'**
+  String get optionalAmountEur;
+
+  /// No description provided for @generateRequest.
+  ///
+  /// In en, this message translates to:
+  /// **'Generate request'**
+  String get generateRequest;
+
+  /// No description provided for @showThisQr.
+  ///
+  /// In en, this message translates to:
+  /// **'Show this QR to the sender'**
+  String get showThisQr;
+
+  /// No description provided for @requestExpiresCountdown.
+  ///
+  /// In en, this message translates to:
+  /// **'Expires in {countdown} (at {time})'**
+  String requestExpiresCountdown(String countdown, String time);
+
+  /// No description provided for @requestExpiredMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This payment request has expired'**
+  String get requestExpiredMessage;
+
+  /// No description provided for @copyPaymentLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy payment link'**
+  String get copyPaymentLink;
+
+  /// No description provided for @paymentLinkCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment link copied'**
+  String get paymentLinkCopied;
+
+  /// No description provided for @sharePaymentLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Share'**
+  String get sharePaymentLink;
+
+  /// No description provided for @sharePaymentLinkMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay me via MAT: {link}'**
+  String sharePaymentLinkMessage(String link);
+
+  /// No description provided for @scanQr.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan QR'**
+  String get scanQr;
+
+  /// No description provided for @pastePaymentLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste payment link'**
+  String get pastePaymentLink;
+
+  /// No description provided for @payRequest.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay request'**
+  String get payRequest;
+
+  /// No description provided for @pay.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay'**
+  String get pay;
+
+  /// No description provided for @invalidPaymentLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid or unsupported payment link'**
+  String get invalidPaymentLink;
+
+  /// No description provided for @payingTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Paying {name}'**
+  String payingTo(String name);
 
   /// No description provided for @topUpSpending.
   ///

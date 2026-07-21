@@ -57,10 +57,87 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reserve => 'Reserve';
 
   @override
+  String get availableReserve => 'Available reserve';
+
+  @override
+  String get pending => 'pending';
+
+  @override
+  String get pendingTopUps => 'Pending top ups';
+
+  @override
+  String pendingTopUpAmount(String amount) {
+    return '€$amount requested';
+  }
+
+  @override
+  String get awaitingInvestor => 'Awaiting investor';
+
+  @override
   String get depositFunds => 'Deposit funds';
 
   @override
   String get sendMoney => 'Send money';
+
+  @override
+  String get receiveMoney => 'Receive money';
+
+  @override
+  String get receiveMoneyTitle => 'Receive money';
+
+  @override
+  String get paymentRequest => 'Payment request';
+
+  @override
+  String get optionalAmountEur => 'Amount (EUR, optional)';
+
+  @override
+  String get generateRequest => 'Generate request';
+
+  @override
+  String get showThisQr => 'Show this QR to the sender';
+
+  @override
+  String requestExpiresCountdown(String countdown, String time) {
+    return 'Expires in $countdown (at $time)';
+  }
+
+  @override
+  String get requestExpiredMessage => 'This payment request has expired';
+
+  @override
+  String get copyPaymentLink => 'Copy payment link';
+
+  @override
+  String get paymentLinkCopied => 'Payment link copied';
+
+  @override
+  String get sharePaymentLink => 'Share';
+
+  @override
+  String sharePaymentLinkMessage(String link) {
+    return 'Pay me via MAT: $link';
+  }
+
+  @override
+  String get scanQr => 'Scan QR';
+
+  @override
+  String get pastePaymentLink => 'Paste payment link';
+
+  @override
+  String get payRequest => 'Pay request';
+
+  @override
+  String get pay => 'Pay';
+
+  @override
+  String get invalidPaymentLink => 'Invalid or unsupported payment link';
+
+  @override
+  String payingTo(String name) {
+    return 'Paying $name';
+  }
 
   @override
   String get topUpSpending => 'Top up spending';

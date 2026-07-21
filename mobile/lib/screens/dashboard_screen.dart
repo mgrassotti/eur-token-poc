@@ -65,22 +65,56 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   _SummaryCard(data: data),
                   const SizedBox(height: 12),
-                  FilledButton.tonalIcon(
-                    onPressed: () => context.push('/reserve/add-funds'),
-                    icon: const Icon(Icons.qr_code),
-                    label: Text(l10n.depositFunds),
-                  ),
-                  const SizedBox(height: 8),
-                  OutlinedButton.icon(
-                    onPressed: () => context.push('/send-money'),
-                    icon: const Icon(Icons.send_outlined),
-                    label: Text(l10n.sendMoney),
-                  ),
-                  const SizedBox(height: 8),
-                  OutlinedButton.icon(
-                    onPressed: () => context.push('/deals/new'),
-                    icon: const Icon(Icons.account_balance_wallet_outlined),
-                    label: Text(l10n.topUpSpending),
+                  _PendingTopUpSection(deals: data?.borrowedDeals ?? const []),
+                  const SizedBox(height: 12),
+                  if ((data?.spendingEurCents ?? 0) <= 0) ...[
+                    OutlinedButton.icon(
+                      onPressed: () => context.push('/deals/new'),
+                      icon: const Icon(Icons.account_balance_wallet_outlined),
+                      label: Text(l10n.topUpSpending),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  if ((data?.savingsSats ?? 0) <= 0) ...[
+                    FilledButton.tonalIcon(
+                      onPressed: () => context.push('/reserve/add-funds'),
+                      icon: const Icon(Icons.qr_code),
+                      label: Text(l10n.depositFunds),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => context.push('/send-money'),
+                          icon: const Icon(Icons.send_outlined, size: 18),
+                          label: Text(
+                            l10n.sendMoney,
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => context.push('/receive-money'),
+                          icon: const Icon(Icons.qr_code_2_outlined, size: 18),
+                          label: Text(
+                            l10n.receiveMoney,
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 16),
                   _FundPositionSection(
@@ -150,35 +184,57 @@ class _SummaryCard extends StatelessWidget {
   Widget _reserveRow(BuildContext context, AppLocalizations l10n) {
     final sats = data?.savingsSats ?? 0;
     final rateEur = data?.marketRateEur;
+    final pendingAmountEurCents = (data?.borrowedDeals ?? const <Deal>[])
+        .where((deal) => deal.isPending)
+        .fold<int>(0, (sum, deal) => sum + deal.amountEurCents);
 
     if (rateEur == null || rateEur <= 0) {
-      return _row(l10n.reserve, '—');
+      return _row(l10n.availableReserve, '—');
     }
 
     final btc = sats / 100000000.0;
     final eur = btc * rateEur;
-    final subtitle = '(${_formatBtc(btc)} BTC - ${_formatShortMarketRate(rateEur)})';
+    final availableEur = (eur - (pendingAmountEurCents / 100.0)).clamp(0, double.infinity);
     final muted = Theme.of(context).colorScheme.onSurfaceVariant;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(l10n.reserve),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '${eur.toStringAsFixed(2)}€',
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
-              Text(
-                subtitle,
-                style: TextStyle(fontSize: 12, color: muted),
-              ),
-            ],
+          Expanded(
+            flex: 2,
+            child: Text(l10n.availableReserve),
+          ),
+          Expanded(
+            flex: 3,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  '€${availableEur.toStringAsFixed(2)}',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                  textAlign: TextAlign.right,
+                ),
+                Text(
+                  '${_formatBtc(btc)} BTC',
+                  style: TextStyle(fontSize: 12, color: muted),
+                  textAlign: TextAlign.right,
+                ),
+                if (pendingAmountEurCents > 0)
+                  Text(
+                    '€${(pendingAmountEurCents / 100.0).toStringAsFixed(2)} ${l10n.pending}',
+                    style: TextStyle(fontSize: 12, color: muted),
+                    textAlign: TextAlign.right,
+                  )
+                else
+                  Text(
+                    _formatShortMarketRate(rateEur),
+                    style: TextStyle(fontSize: 12, color: muted),
+                    textAlign: TextAlign.right,
+                  ),
+              ],
+            ),
           ),
         ],
       ),
@@ -192,6 +248,39 @@ class _SummaryCard extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [Text(label), Text(value, style: const TextStyle(fontWeight: FontWeight.w600))],
       ),
+    );
+  }
+}
+
+class _PendingTopUpSection extends StatelessWidget {
+  const _PendingTopUpSection({required this.deals});
+
+  final List<Deal> deals;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final pendingDeals = deals.where((deal) => deal.isPending).toList();
+    if (pendingDeals.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(l10n.pendingTopUps, style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 8),
+        ...pendingDeals.map(
+          (deal) => Card(
+            color: Theme.of(context).colorScheme.secondaryContainer,
+            child: ListTile(
+              leading: const Icon(Icons.hourglass_top_outlined),
+              title: Text(l10n.pendingTopUpAmount(deal.amountEur.toStringAsFixed(2))),
+              subtitle: Text(l10n.awaitingInvestor),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push('/deals/${deal.id}'),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

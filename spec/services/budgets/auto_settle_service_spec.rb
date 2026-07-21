@@ -24,4 +24,14 @@ RSpec.describe Budgets::AutoSettleService do
     expect(@budget.reload).to be_active
     expect(Settlement.count).to eq(0)
   end
+
+  it "does not crash when a mature deal lacks a funded DLC" do
+    @budget.dlc_contract.destroy!
+
+    result = ChainState.update_block_height!(@budget.maturity_block_height)
+
+    expect(@budget.reload).to be_active
+    expect(Settlement.count).to eq(0)
+    expect(result.blocked_budget_ids).to eq([@budget.id])
+  end
 end

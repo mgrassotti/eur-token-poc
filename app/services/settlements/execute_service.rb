@@ -102,6 +102,7 @@ module Settlements
       raise Error, I18n.t("services.settlements.execute.invalid_end_rate") unless end_btc_eur_rate.positive?
       raise Error, I18n.t("services.settlements.execute.missing_peg") unless budget.peg_set?
       raise Error, I18n.t("services.settlements.execute.already_settled") if budget.settlement.present?
+      raise Error, I18n.t("services.settlements.execute.dlc_not_funded") unless budget.dlc_contract&.funded?
       return if force_liquidation || budget.ready_for_settlement?
 
       raise Error, I18n.t("services.settlements.execute.available_from_block", maturity_block_height: budget.maturity_block_height)

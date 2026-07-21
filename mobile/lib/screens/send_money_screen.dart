@@ -120,6 +120,12 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
                         l10n.availableEur(spendingEur.toStringAsFixed(2)),
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
+                      const SizedBox(height: 12),
+                      OutlinedButton.icon(
+                        onPressed: () => context.push('/scan-pay'),
+                        icon: const Icon(Icons.link),
+                        label: Text(l10n.pastePaymentLink),
+                      ),
                       const SizedBox(height: 16),
                       if (_spendingEurCents == 0)
                         Text(

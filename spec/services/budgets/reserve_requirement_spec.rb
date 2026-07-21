@@ -11,8 +11,8 @@ RSpec.describe Budgets::ReserveRequirement do
   end
 
   describe ".max_eur_cents_for" do
-    it "returns the floor EUR cents coverable by available sats" do
-      expect(described_class.max_eur_cents_for(alice)).to eq(50_499) # €504.99
+    it "returns the floor EUR cents coverable by available sats minus the funding fee buffer" do
+      expect(described_class.max_eur_cents_for(alice)).to eq(49_949) # €499.49
     end
 
     it "uses on-chain spendable sats via UserWallet" do
@@ -20,7 +20,7 @@ RSpec.describe Budgets::ReserveRequirement do
         instance_double(L1::UserWallet, spendable_sats: 918_181)
       )
 
-      expect(described_class.max_eur_cents_for(alice)).to eq(50_499)
+      expect(described_class.max_eur_cents_for(alice)).to eq(49_949)
     end
   end
 end

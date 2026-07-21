@@ -57,10 +57,88 @@ class AppLocalizationsIt extends AppLocalizations {
   String get reserve => 'Riserva';
 
   @override
+  String get availableReserve => 'Riserva disponibile';
+
+  @override
+  String get pending => 'in sospeso';
+
+  @override
+  String get pendingTopUps => 'Ricariche in sospeso';
+
+  @override
+  String pendingTopUpAmount(String amount) {
+    return '€$amount richiesti';
+  }
+
+  @override
+  String get awaitingInvestor => 'In attesa di un investitore';
+
+  @override
   String get depositFunds => 'Deposita fondi';
 
   @override
   String get sendMoney => 'Invia denaro';
+
+  @override
+  String get receiveMoney => 'Ricevi denaro';
+
+  @override
+  String get receiveMoneyTitle => 'Ricevi denaro';
+
+  @override
+  String get paymentRequest => 'Richiesta di pagamento';
+
+  @override
+  String get optionalAmountEur => 'Importo (EUR, opzionale)';
+
+  @override
+  String get generateRequest => 'Genera richiesta';
+
+  @override
+  String get showThisQr => 'Mostra questo QR al mittente';
+
+  @override
+  String requestExpiresCountdown(String countdown, String time) {
+    return 'Scade tra $countdown (alle $time)';
+  }
+
+  @override
+  String get requestExpiredMessage => 'Questa richiesta di pagamento è scaduta';
+
+  @override
+  String get copyPaymentLink => 'Copia link di pagamento';
+
+  @override
+  String get paymentLinkCopied => 'Link copiato';
+
+  @override
+  String get sharePaymentLink => 'Invia';
+
+  @override
+  String sharePaymentLinkMessage(String link) {
+    return 'Pagami con MAT: $link';
+  }
+
+  @override
+  String get scanQr => 'Scansiona QR';
+
+  @override
+  String get pastePaymentLink => 'Incolla link di pagamento';
+
+  @override
+  String get payRequest => 'Paga richiesta';
+
+  @override
+  String get pay => 'Paga';
+
+  @override
+  String get invalidPaymentLink =>
+      'Link di pagamento non valido o non supportato';
+
+  @override
+  String payingTo(String name) {
+    return 'Pagamento a $name';
+  }
 
   @override
   String get topUpSpending => 'Ricarica spesa';

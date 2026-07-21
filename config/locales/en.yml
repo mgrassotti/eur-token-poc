@@ -41,6 +41,7 @@ en:
         invalid_height: "Invalid block height"
         updated: "Block height updated to %{height}."
         auto_settled: "Automatic settlement executed for %{count} deal(s)."
+        settlement_blocked: "Deal(s) #%{ids} reached maturity but cannot settle (DLC not funded — activate the deal on regtest with ./bin/regtest up)."
       market_rate:
         liquidations: "Automatic liquidation (LTV >= %{threshold}%): deal #%{ids} closed at %{rate} EUR/BTC."
         updated: "BTC/EUR rate updated to %{rate} EUR/BTC."
@@ -66,6 +67,9 @@ en:
       activate:
         not_pending: "Budget is not pending."
         investor_is_borrower: "The investor cannot be the borrower."
+      auto_settle:
+        missing_market_rate: "BTC/EUR rate is not set: automatic settlement cannot run."
+        failed: "Automatic settlement failed for deal #%{budget_id}: %{detail}"
       reserve_requirement:
         borrower_label: "the borrower"
         investor_label: "the investor"
@@ -93,6 +97,10 @@ en:
         escrow_not_provisioned: "Escrow not provisioned."
         rgb_asset_missing: "RGB asset missing on deal."
         rgb_genesis_missing: "RGB genesis missing."
+        invoice_requires_single_budget: "This payment request must be paid from a single deal balance."
+        receive_request_expired: "This payment request has expired."
+        receive_request_paid: "This payment request was already paid."
+        amount_mismatch: "Amount does not match the payment request."
     rgb:
       lib_issue:
         budget_not_active: "Budget is not active."
@@ -104,6 +112,8 @@ en:
         budget_not_active: "Budget is not active."
         invalid_amount: "Amount must be positive."
         insufficient_balance: "Insufficient RGB balance."
+      receive_request:
+        invalid_amount: "Amount must be positive."
       wallet_setup:
         node_not_configured: "RGB node is not configured for user %{user_id}."
     dlc:

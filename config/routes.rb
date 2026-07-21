@@ -12,6 +12,7 @@ Rails.application.routes.draw do
       end
       resources :users, only: :index
       resources :transfers, only: :create
+      resources :receive_requests, only: %i[create show], param: :id
       resources :deals, only: %i[index show create] do
         member do
           post :accept

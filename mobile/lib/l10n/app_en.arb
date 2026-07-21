@@ -20,8 +20,52 @@
   "overview": "Overview",
   "spendingSavings": "Spending / Savings",
   "reserve": "Reserve",
+  "availableReserve": "Available reserve",
+  "pending": "pending",
+  "pendingTopUps": "Pending top ups",
+  "pendingTopUpAmount": "€{amount} requested",
+  "@pendingTopUpAmount": {
+    "placeholders": {
+      "amount": { "type": "String" }
+    }
+  },
+  "awaitingInvestor": "Awaiting investor",
   "depositFunds": "Deposit funds",
   "sendMoney": "Send money",
+  "receiveMoney": "Receive money",
+  "receiveMoneyTitle": "Receive money",
+  "paymentRequest": "Payment request",
+  "optionalAmountEur": "Amount (EUR, optional)",
+  "generateRequest": "Generate request",
+  "showThisQr": "Show this QR to the sender",
+  "requestExpiresCountdown": "Expires in {countdown} (at {time})",
+  "@requestExpiresCountdown": {
+    "placeholders": {
+      "countdown": { "type": "String" },
+      "time": { "type": "String" }
+    }
+  },
+  "requestExpiredMessage": "This payment request has expired",
+  "copyPaymentLink": "Copy payment link",
+  "paymentLinkCopied": "Payment link copied",
+  "sharePaymentLink": "Share",
+  "sharePaymentLinkMessage": "Pay me via MAT: {link}",
+  "@sharePaymentLinkMessage": {
+    "placeholders": {
+      "link": { "type": "String" }
+    }
+  },
+  "scanQr": "Scan QR",
+  "pastePaymentLink": "Paste payment link",
+  "payRequest": "Pay request",
+  "pay": "Pay",
+  "invalidPaymentLink": "Invalid or unsupported payment link",
+  "payingTo": "Paying {name}",
+  "@payingTo": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
   "topUpSpending": "Top up spending",
   "interests": "Interests",
   "noInterestsYet": "No interests yet.",

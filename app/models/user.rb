@@ -10,6 +10,7 @@ class User < ApplicationRecord
   has_many :sent_token_transfers, class_name: "TokenTransfer", foreign_key: :from_user_id, inverse_of: :from_user, dependent: :destroy
   has_many :received_token_transfers, class_name: "TokenTransfer", foreign_key: :to_user_id, inverse_of: :to_user, dependent: :destroy
   has_many :rgb_assignments, dependent: :destroy
+  has_many :receive_requests, dependent: :destroy
 
   validates :name, presence: true
   validates :email, presence: true, uniqueness: { case_sensitive: false }, format: { with: URI::MailTo::EMAIL_REGEXP }

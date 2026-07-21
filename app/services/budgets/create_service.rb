@@ -25,6 +25,7 @@ module Budgets
 
       peg_eur_per_btc = MarketRate.current.btc_eur_per_btc
       locked_sats = ReserveRequirement.borrower_sats_for(amount_eur_cents, peg_eur_per_btc)
+      required_sats = ReserveRequirement.borrower_required_sats_for(amount_eur_cents, peg_eur_per_btc)
 
       ActiveRecord::Base.transaction do
         borrower.btc_account.lock!
@@ -32,11 +33,11 @@ module Budgets
 
         available_sats = ReserveRequirement.available_sats_for(borrower)
 
-        if available_sats < locked_sats
+        if available_sats < required_sats
           raise Error,
                 ReserveRequirement.insufficient_message(
                   label: I18n.t("services.budgets.reserve_requirement.borrower_label"),
-                  required_sats: locked_sats,
+                  required_sats: required_sats,
                   available_sats: available_sats,
                   eur_per_btc: peg_eur_per_btc
                 )

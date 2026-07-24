@@ -142,6 +142,42 @@ View outputs: `tmux attach -t mobile-user-1` (or `-2`, `-3`, etc.)
 
 [docs/relay-api-v1.md](../docs/relay-api-v1.md)
 
+## Troubleshooting
+
+### macOS: CocoaPods deployment target error
+
+If you see an error like:
+```
+The plugin "bdk_flutter" requires a higher minimum macOS deployment version
+```
+
+**Solution:**
+
+1. Ensure `macos/Podfile` exists with `platform :osx, '10.15'` (should be created automatically)
+2. Clean and reinstall:
+
+```bash
+cd mobile/macos
+rm -rf Pods Podfile.lock
+cd ..
+flutter clean
+flutter pub get
+flutter run -d macos
+```
+
+3. If the issue persists, check your Xcode version: `xcodebuild -version`
+   - Minimum required: Xcode 13+ for macOS 10.15 target
+
+### Android: 10.0.2.2 connection refused
+
+The Android emulator uses `10.0.2.2` to reach the host machine's `127.0.0.1`. Ensure:
+- Rails is running: `bin/dev`
+- Rails is bound to all interfaces (default with Puma)
+
+### iOS Simulator: Connection refused
+
+Ensure Rails is running on `127.0.0.1:3000` (not a different interface).
+
 ## Related
 
 - [docs/mobile-production-plan.md](../docs/mobile-production-plan.md)

@@ -93,6 +93,35 @@ Use seeded demo users (`password`):
 - `bob@example.com` — hodler
 - `claude@example.com` / `david@example.com` — holders
 
+## Multi-user testing
+
+Run multiple simulators simultaneously to test multi-user interactions:
+
+```bash
+# Launch 2 simulators (default)
+../bin/mobile-multi-user
+
+# Launch 3 or 4 simulators
+../bin/mobile-multi-user 3
+../bin/mobile-multi-user 4
+```
+
+**Prerequisites:**
+- Multiple iOS simulators running (macOS) or Android emulators
+- `bin/dev` running (Rails + regtest backend)
+
+**iOS:** Open Simulator.app → File → Open Simulator → Choose different devices
+
+**Android:** Start multiple emulators: `emulator -avd <NAME> &`
+
+Each simulator connects to the same Rails backend. Test scenarios:
+- Alice creates deal → Bob accepts on different device
+- Alice transfers EURT to Claude → observe real-time balance updates
+- Multiple users deposit simultaneously
+- Multi-holder settlement distribution
+
+View outputs: `tmux attach -t mobile-user-1` (or `-2`, `-3`, etc.)
+
 ## Screens
 
 | Screen | Route | API |

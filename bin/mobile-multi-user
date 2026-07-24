@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+# Run multiple mobile simulators for multi-user testing
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+API_URL="${MOBILE_API_URL:-http://127.0.0.1:3000/api/v1}"
+PLATFORM="${MOBILE_TARGET:-ios}"
+
+echo "→ Multi-user mobile simulator launcher"
+echo "→ Platform: ${PLATFORM}"
+echo "→ API: ${API_URL}"
+echo ""
+
+# Check Rails is running
+if ! curl -sf "${API_URL%/api/v1}/up" >/dev/null 2>&1; then
+  echo "⚠️  Rails not reachable at ${API_URL%/api/v1}"
+  echo "   Start with: bin/dev"
+  exit 1
+fi
+
+get_devices() {
+  flutter devices --machine 2>/dev/null | ruby -rjson -e "
+    devices = JSON.parse(STDIN.read)
+    filtered = devices.select do |d|
+      case '${PLATFORM}'
+      when 'ios' then d['targetPlatform'] == 'ios' && d['emulator']
+      when 'android' then d['targetPlatform'] == 'android'
+      else false
+      end
+    end
+    filtered.each { |d| puts d['id'] }
+  "
+}
+
+# Get available devices
+echo "→ Scanning for ${PLATFORM} devices..."
+cd mobile
+flutter pub get >/dev/null 2>&1
+
+DEVICES=($(get_devices))
+DEVICE_COUNT=${#DEVICES[@]}
+
+if [ "$DEVICE_COUNT" -eq 0 ]; then
+  echo "❌ No ${PLATFORM} devices found"
+  echo ""
+  if [ "$PLATFORM" = "ios" ]; then
+    echo "To start iOS simulators:"
+    echo "  open -a Simulator"
+    echo "  Then: File → Open Simulator → Choose devices"
+    echo ""
+    echo "Or via command line:"
+    echo "  xcrun simctl boot \"iPhone 16 Pro\""
+    echo "  xcrun simctl boot \"iPhone 15\""
+  else
+    echo "To start Android emulators:"
+    echo "  emulator -list-avds"
+    echo "  emulator -avd <NAME> &"
+  fi
+  exit 1
+fi
+
+echo "✓ Found $DEVICE_COUNT device(s):"
+for i in "${!DEVICES[@]}"; do
+  echo "  [$((i+1))] ${DEVICES[$i]}"
+done
+echo ""
+
+# Determine how many instances to launch
+USERS=("alice@example.com" "bob@example.com" "claude@example.com" "david@example.com")
+NUM_INSTANCES=${1:-2}
+
+if [ "$NUM_INSTANCES" -gt "$DEVICE_COUNT" ]; then
+  echo "⚠️  Requested $NUM_INSTANCES instances but only $DEVICE_COUNT devices available"
+  NUM_INSTANCES=$DEVICE_COUNT
+fi
+
+if [ "$NUM_INSTANCES" -gt "${#USERS[@]}" ]; then
+  NUM_INSTANCES=${#USERS[@]}
+fi
+
+echo "→ Launching $NUM_INSTANCES instances..."
+echo ""
+
+# Adjust API URL for Android
+if [ "$PLATFORM" = "android" ]; then
+  API_URL="${MOBILE_API_URL:-http://10.0.2.2:3000/api/v1}"
+fi
+
+# Launch Flutter on each device
+for i in $(seq 0 $((NUM_INSTANCES - 1))); do
+  DEVICE="${DEVICES[$i]}"
+  USER="${USERS[$i]}"
+  
+  echo "[$((i+1))] Starting on ${DEVICE} (suggested user: ${USER})"
+  
+  # Use tmux for persistent sessions
+  SESSION_NAME="mobile-user-$((i+1))"
+  tmux -f /exec-daemon/tmux.portal.conf new-session -d -s "$SESSION_NAME" -c "$PWD" 2>/dev/null || \
+    tmux -f /exec-daemon/tmux.portal.conf kill-session -t "$SESSION_NAME" 2>/dev/null && \
+    tmux -f /exec-daemon/tmux.portal.conf new-session -d -s "$SESSION_NAME" -c "$PWD"
+  
+  tmux -f /exec-daemon/tmux.portal.conf send-keys -t "$SESSION_NAME" \
+    "flutter run -d \"${DEVICE}\" --dart-define=API_BASE_URL=${API_URL}" C-m
+  
+  sleep 2
+done
+
+echo ""
+echo "✓ All instances launched!"
+echo ""
+echo "Suggested test users (password: 'password' for all):"
+for i in $(seq 0 $((NUM_INSTANCES - 1))); do
+  echo "  Device $((i+1)): ${USERS[$i]}"
+done
+echo ""
+echo "To view device outputs:"
+for i in $(seq 0 $((NUM_INSTANCES - 1))); do
+  echo "  tmux -f /exec-daemon/tmux.portal.conf attach -t mobile-user-$((i+1))"
+done
+echo ""
+echo "To stop all instances:"
+for i in $(seq 0 $((NUM_INSTANCES - 1))); do
+  echo "  tmux -f /exec-daemon/tmux.portal.conf kill-session -t mobile-user-$((i+1))"
+done
+echo ""
+echo "Multi-user testing scenarios:"
+echo "  1. Alice creates a deal → Bob accepts it"
+echo "  2. Alice transfers EURT to Claude"
+echo "  3. Test concurrent reserve deposits"
+echo "  4. Observe settlement across multiple holders"

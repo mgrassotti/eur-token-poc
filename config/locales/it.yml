@@ -73,6 +73,8 @@ it:
     l1:
       deposit_reserve:
         invalid_amount: "Importo non valido."
+      fund_receive_address:
+        address_required: "L'indirizzo di ricezione e' obbligatorio."
       provision_escrow:
         not_provisioned: "Escrow L1 non provisionato: %{message}"
     settlements:

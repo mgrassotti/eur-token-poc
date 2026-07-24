@@ -58,4 +58,22 @@ class RailsTestBridge {
   }) {
     return adminFundReserve(userEmail: userEmail, receiveAddress: '', amountBtc: amountBtc);
   }
+
+  /// Sends regtest BTC to any address (on-device BDK receive address).
+  Future<void> fundRegtestAddress({
+    required String address,
+    required String amountBtc,
+  }) async {
+    final response = await _client.post(
+      Uri.parse('$_integrationBase/fund_regtest_address'),
+      headers: _headers,
+      body: jsonEncode({
+        'address': address,
+        'amount_btc': amountBtc,
+      }),
+    );
+    if (response.statusCode != 200) {
+      throw StateError('fund_regtest_address failed (${response.statusCode}): ${response.body}');
+    }
+  }
 }

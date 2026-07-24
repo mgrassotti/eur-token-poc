@@ -25,6 +25,7 @@ Rails.application.routes.draw do
         namespace :integration do
           post "demo_reset", to: "demo_resets#create"
           post "admin_fund_reserve", to: "admin_fund_reserves#create"
+          post "fund_regtest_address", to: "fund_regtest_addresses#create"
         end
       end
     end

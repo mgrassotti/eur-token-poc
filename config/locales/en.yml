@@ -77,6 +77,8 @@ en:
     l1:
       deposit_reserve:
         invalid_amount: "Invalid amount."
+      fund_receive_address:
+        address_required: "Receive address is required."
       provision_escrow:
         not_provisioned: "L1 escrow not provisioned: %{message}"
     settlements:

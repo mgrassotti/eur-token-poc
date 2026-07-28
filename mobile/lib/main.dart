@@ -39,6 +39,7 @@ class MatApp extends StatelessWidget {
         Provider<RelayApiClient>.value(value: api),
         ChangeNotifierProvider(create: (_) => AuthState(api)),
         ChangeNotifierProvider(create: (_) => DashboardState(api)),
+        ChangeNotifierProvider(create: (_) => WalletState()),
         ChangeNotifierProvider(create: (_) => SettingsState()),
       ],
       child: const MatAppRouter(),

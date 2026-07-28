@@ -19,44 +19,8 @@ class AddFundsScreen extends StatefulWidget {
 }
 
 class _AddFundsScreenState extends State<AddFundsScreen> {
-  @override
-  void initState() {
-    super.initState();
-    _ensureWalletInitialized();
-  }
-
-  Future<void> _ensureWalletInitialized() async {
-    final wallet = context.read<WalletState>();
-    if (!wallet.isInitialized && !wallet.loading) {
-      // No wallet exists - prompt user to create one
-      _showCreateWalletDialog();
-    }
-  }
-
-  void _showCreateWalletDialog() {
-    final l10n = AppLocalizations.of(context);
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text('Create wallet'),
-        content: Text(l10n.localWalletDebugSubtitle),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              await _createWallet();
-            },
-            child: Text(l10n.localWalletCreate),
-          ),
-        ],
-      ),
-    );
-  }
+  // Note: Wallet initialization is handled by WalletState provider.
+  // The build method shows appropriate UI based on wallet state.
 
   Future<void> _createWallet() async {
     final wallet = context.read<WalletState>();

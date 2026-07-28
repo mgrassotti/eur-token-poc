@@ -145,18 +145,20 @@ class BdkWalletService implements WalletApi {
       // Parse PSBT
       final psbt = await PartiallySignedTransaction.fromString(psbtBase64);
 
-      // Sign with wallet keys
+      // Sign with wallet keys (returns bool indicating if finalized)
       final signOptions = const SignOptions(
         trustWitnessUtxo: true,
         allowAllSighashes: false,
         removePartialSigs: false,
         tryFinalize: false,
+        signWithTapInternalKey: true,
+        allowGrinding: true,
       );
 
-      final signed = await wallet.sign(psbt: psbt, signOptions: signOptions);
+      await wallet.sign(psbt: psbt, signOptions: signOptions);
 
-      // Return signed PSBT (still partial for 2-of-2)
-      return signed.asString();
+      // Return signed PSBT (modified in place, still partial for 2-of-2)
+      return psbt.toString();
     } catch (e) {
       throw WalletException('Failed to sign PSBT', e);
     }
@@ -168,9 +170,11 @@ class BdkWalletService implements WalletApi {
     if (blockchain == null) throw WalletNotInitializedException();
 
     try {
-      final tx = await Transaction.fromString(txHex, network);
+      // Parse PSBT and extract finalized transaction
+      final psbt = await PartiallySignedTransaction.fromString(txHex);
+      final tx = await psbt.extractTx();
       await blockchain.broadcast(transaction: tx);
-      return tx.txid();
+      return await tx.txid();
     } catch (e) {
       throw WalletException('Failed to broadcast transaction', e);
     }
@@ -236,7 +240,8 @@ class BdkWalletService implements WalletApi {
             socks5: null,
             retry: 3,
             timeout: WalletConfig.electrumTimeoutSec,
-            stopGap: 10,
+            stopGap: BigInt.from(10),
+            validateDomain: true,
           ),
         ),
       );

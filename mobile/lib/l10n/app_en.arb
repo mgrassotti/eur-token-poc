@@ -190,5 +190,7 @@
     }
   },
   "settlementPreviewNote": "Preview only — Phase 1 uses relay FloorEUR math. Production settles on-device via mat-core.",
-  "settlementExecutedNote": "Settlement executed on relay (PoC admin path)."
+  "settlementExecutedNote": "Settlement executed on relay (PoC admin path).",
+  "connectionTimeout": "Connection timeout. Please check your network and try again.",
+  "connectionError": "Connection error. Please check if the server is running."
 }

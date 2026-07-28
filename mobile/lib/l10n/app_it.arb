@@ -103,5 +103,7 @@
   "holderAllocations": "Allocazioni detentori",
   "shareAmount": "quota €{amount}",
   "settlementPreviewNote": "Solo anteprima — la Fase 1 usa la matematica FloorEUR del relay. In produzione il settlement avviene on-device via mat-core.",
-  "settlementExecutedNote": "Settlement eseguito sul relay (percorso admin PoC)."
+  "settlementExecutedNote": "Settlement eseguito sul relay (percorso admin PoC).",
+  "connectionTimeout": "Timeout di connessione. Controlla la rete e riprova.",
+  "connectionError": "Errore di connessione. Verifica che il server sia in esecuzione."
 }

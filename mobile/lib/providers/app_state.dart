@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -14,19 +16,42 @@ class AuthState extends ChangeNotifier {
 
   bool get isLoggedIn => user != null;
 
+  /// Login timeout duration (15 seconds).
+  /// Adjust this value if your network or server typically takes longer to respond.
+  /// After timeout, the login button will be re-enabled and an error shown.
+  static const _loginTimeout = Duration(seconds: 15);
+
   Future<bool> login(String email, String password) async {
     loading = true;
     error = null;
     notifyListeners();
 
     try {
-      final body = await _api.login(email, password);
+      final body = await _api.login(email, password).timeout(
+        _loginTimeout,
+        onTimeout: () {
+          throw TimeoutException(
+            'Connection timeout. Please check your network and try again.',
+            _loginTimeout,
+          );
+        },
+      );
       user = User.fromJson(body['user'] as Map<String, dynamic>);
       loading = false;
       notifyListeners();
       return true;
+    } on TimeoutException catch (e) {
+      error = e.message ?? 'Connection timeout. Please try again.';
+      loading = false;
+      notifyListeners();
+      return false;
     } on RelayApiException catch (e) {
       error = e.message;
+      loading = false;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      error = 'Connection error. Please check if the server is running.';
       loading = false;
       notifyListeners();
       return false;

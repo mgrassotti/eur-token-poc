@@ -40,10 +40,29 @@ class BdkWalletService implements WalletApi {
     try {
       await _initializeWallet(mnemonic);
       await _initializeBlockchain();
-      await sync(); // Initial sync
+      
+      // Try initial sync with timeout, but don't fail wallet creation if it fails
+      try {
+        await sync().timeout(
+          Duration(seconds: WalletConfig.electrumTimeoutSec),
+          onTimeout: () {
+            // Sync timeout is not fatal - wallet is still created
+            throw NetworkException('Initial sync timeout - wallet created but not synced');
+          },
+        );
+      } on NetworkException {
+        // Wallet is created successfully, sync can be retried later
+        // Don't rethrow - just log and continue
+      }
 
       return await getReceiveAddress();
     } catch (e) {
+      if (e is NetworkException) {
+        // If only sync failed, wallet is still usable
+        if (_wallet != null) {
+          return await getReceiveAddress();
+        }
+      }
       throw WalletException('Failed to create wallet', e);
     }
   }
@@ -57,10 +76,27 @@ class BdkWalletService implements WalletApi {
     try {
       await _initializeWallet(mnemonic);
       await _initializeBlockchain();
-      await sync(); // Full sync (may take minutes)
+      
+      // Try full sync with timeout
+      try {
+        await sync().timeout(
+          Duration(seconds: WalletConfig.electrumTimeoutSec * 3), // 3x timeout for restore
+          onTimeout: () {
+            throw NetworkException('Restore sync timeout - wallet restored but not fully synced');
+          },
+        );
+      } on NetworkException {
+        // Wallet is restored, sync can be retried later
+      }
 
       return await getReceiveAddress();
     } catch (e) {
+      if (e is NetworkException) {
+        // If only sync failed, wallet is still usable
+        if (_wallet != null) {
+          return await getReceiveAddress();
+        }
+      }
       throw WalletException('Failed to restore wallet', e);
     }
   }

@@ -37,10 +37,16 @@ class MatApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         Provider<RelayApiClient>.value(value: api),
+        ChangeNotifierProvider(create: (_) => SettingsState()),
         ChangeNotifierProvider(create: (_) => AuthState(api)),
         ChangeNotifierProvider(create: (_) => DashboardState(api)),
-        ChangeNotifierProvider(create: (_) => WalletState()),
-        ChangeNotifierProvider(create: (_) => SettingsState()),
+        ChangeNotifierProxyProvider<SettingsState, WalletState>(
+          create: (context) {
+            final settings = context.read<SettingsState>();
+            return WalletState(electrumUrl: settings.electrumUrl);
+          },
+          update: (context, settings, previous) => previous ?? WalletState(electrumUrl: settings.electrumUrl),
+        ),
       ],
       child: const MatAppRouter(),
     );

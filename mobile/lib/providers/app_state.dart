@@ -96,9 +96,10 @@ class DashboardState extends ChangeNotifier {
 
 /// Phase 2: On-device BDK wallet state (replaces relay reserve).
 class WalletState extends ChangeNotifier {
-  WalletState({WalletApi? wallet})
-      : _wallet = wallet ?? BdkWalletService(network: Network.regtest),
-        _lifecycle = WalletLifecycleManager(wallet ?? BdkWalletService(network: Network.regtest)) {
+  WalletState({WalletApi? wallet, String? electrumUrl})
+      : _wallet = wallet ?? BdkWalletService(network: Network.regtest, electrumUrl: electrumUrl),
+        _lifecycle = WalletLifecycleManager(
+            wallet ?? BdkWalletService(network: Network.regtest, electrumUrl: electrumUrl)) {
     _initialize();
   }
 
@@ -110,6 +111,7 @@ class WalletState extends ChangeNotifier {
   bool loading = false;
   bool syncing = false;
   String? error;
+  String? lastSyncError; // Separate field for sync-specific errors
 
   bool get isInitialized => _wallet.isInitialized;
   String? get mnemonicPhrase => _wallet.mnemonicPhrase;
@@ -187,12 +189,17 @@ class WalletState extends ChangeNotifier {
 
     syncing = true;
     error = null;
+    lastSyncError = null;
     notifyListeners();
 
     try {
       await _wallet.sync();
       await _refreshWalletData();
+    } on NetworkException catch (e) {
+      lastSyncError = e.message;
+      error = 'Sync failed: ${e.message}';
     } catch (e) {
+      lastSyncError = e.toString();
       error = 'Sync failed: $e';
     } finally {
       syncing = false;
@@ -244,6 +251,7 @@ class WalletState extends ChangeNotifier {
 class SettingsState extends ChangeNotifier {
   static const _advancedFeaturesKey = 'advanced_features';
   static const _localeKey = 'locale_code';
+  static const _electrumUrlKey = 'electrum_url';
 
   static const supportedLocales = [
     Locale('en'),
@@ -252,6 +260,7 @@ class SettingsState extends ChangeNotifier {
 
   bool advancedFeatures = false;
   Locale locale = const Locale('en');
+  String? electrumUrl; // null = use default from WalletConfig
   bool _hydrated = false;
 
   SettingsState() {
@@ -263,6 +272,7 @@ class SettingsState extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       if (_hydrated) return;
       advancedFeatures = prefs.getBool(_advancedFeaturesKey) ?? false;
+      electrumUrl = prefs.getString(_electrumUrlKey); // null = default
       final code = prefs.getString(_localeKey);
       if (code != null && supportedLocales.any((l) => l.languageCode == code)) {
         locale = Locale(code);
@@ -297,5 +307,29 @@ class SettingsState extends ChangeNotifier {
       await prefs.setString(_localeKey, value.languageCode);
     } catch (_) {
     }
+  }
+
+  Future<void> setElectrumUrl(String? url) async {
+    _hydrated = true;
+    electrumUrl = url;
+    notifyListeners();
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (url == null || url.isEmpty) {
+        await prefs.remove(_electrumUrlKey);
+      } else {
+        await prefs.setString(_electrumUrlKey, url);
+      }
+    } catch (_) {
+    }
+  }
+
+  String getElectrumUrlOrDefault() {
+    if (electrumUrl != null && electrumUrl!.isNotEmpty) {
+      return electrumUrl!;
+    }
+    // Default: local regtest
+    return 'tcp://127.0.0.1:50001';
   }
 }

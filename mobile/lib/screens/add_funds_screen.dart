@@ -117,9 +117,36 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
     if (!mounted) return;
 
     final l10n = AppLocalizations.of(context);
-    if (wallet.error != null) {
+    
+    if (wallet.lastSyncError != null) {
+      // Show error as a persistent banner, not just a snackbar
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(wallet.error!)),
+        SnackBar(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Sync Failed',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 4),
+              Text(wallet.lastSyncError!),
+              const SizedBox(height: 8),
+              const Text(
+                'Check your Electrum server configuration in Settings.',
+                style: TextStyle(fontSize: 12),
+              ),
+            ],
+          ),
+          backgroundColor: Colors.red.shade800,
+          duration: const Duration(seconds: 8),
+          action: SnackBarAction(
+            label: 'Settings',
+            textColor: Colors.white,
+            onPressed: () => context.push('/settings'),
+          ),
+        ),
       );
       return;
     }

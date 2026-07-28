@@ -17,9 +17,11 @@ import 'wallet_api.dart';
 /// - Fee estimation (uses default)
 /// - Coin control / manual UTXO selection
 class BdkWalletService implements WalletApi {
-  BdkWalletService({this.network = Network.regtest});
+  BdkWalletService({this.network = Network.regtest, String? electrumUrl})
+      : _customElectrumUrl = electrumUrl;
 
   final Network network;
+  final String? _customElectrumUrl;
 
   Wallet? _wallet;
   Blockchain? _blockchain;
@@ -287,6 +289,11 @@ class BdkWalletService implements WalletApi {
   }
 
   String _getElectrumUrl() {
+    // Use custom URL if provided, otherwise use config default
+    if (_customElectrumUrl != null && _customElectrumUrl!.isNotEmpty) {
+      return _customElectrumUrl!;
+    }
+
     switch (network) {
       case Network.regtest:
         return WalletConfig.regtestElectrumUrl;

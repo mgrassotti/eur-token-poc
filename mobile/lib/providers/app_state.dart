@@ -155,9 +155,12 @@ class WalletState extends ChangeNotifier {
     try {
       print('[WalletState.createWallet] Generating mnemonic...');
       final mnemonic = await Mnemonic.create(WordCount.words12);
-      print('[WalletState.createWallet] Mnemonic generated, creating wallet...');
+      final mnemonicString = mnemonic.asString();
+      print('[WalletState.createWallet] Mnemonic generated: ${mnemonicString.split(' ').take(3).join(' ')}...');
+      print('[WalletState.createWallet] Creating wallet directly with Mnemonic object...');
       
-      final address = await _lifecycle.createWallet(mnemonic.asString());
+      // Pass Mnemonic object directly to avoid string conversion issues
+      final address = await _lifecycle.createWalletWithMnemonic(mnemonic);
       print('[WalletState.createWallet] Wallet created with address: $address');
 
       receiveAddress = address;
@@ -166,7 +169,7 @@ class WalletState extends ChangeNotifier {
       print('[WalletState.createWallet] Complete. Loading: $loading');
       notifyListeners();
 
-      return mnemonic.asString();
+      return mnemonicString;
     } catch (e) {
       print('[WalletState.createWallet] Error: $e');
       error = 'Failed to create wallet: $e';

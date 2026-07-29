@@ -34,6 +34,40 @@ class BdkWalletService implements WalletApi {
   String? get mnemonicPhrase => _mnemonicPhrase;
 
   @override
+  Future<String> createWalletWithMnemonic(dynamic mnemonic) async {
+    if (_wallet != null) {
+      throw WalletException('Wallet already initialized');
+    }
+
+    try {
+      // Use Mnemonic object directly to avoid string conversion issues
+      await _initializeWalletWithMnemonic(mnemonic as Mnemonic);
+      await _initializeBlockchain();
+      
+      // Try initial sync with timeout, but don't fail wallet creation if it fails
+      try {
+        await sync().timeout(
+          Duration(seconds: WalletConfig.electrumTimeoutSec),
+          onTimeout: () {
+            throw NetworkException('Initial sync timeout - wallet created but not synced');
+          },
+        );
+      } on NetworkException {
+        // Wallet is created successfully, sync can be retried later
+      }
+
+      return await getReceiveAddress();
+    } catch (e) {
+      if (e is NetworkException) {
+        if (_wallet != null) {
+          return await getReceiveAddress();
+        }
+      }
+      throw WalletException('Failed to create wallet', e);
+    }
+  }
+
+  @override
   Future<String> createWallet(String mnemonic) async {
     if (_wallet != null) {
       throw WalletException('Wallet already initialized');
@@ -227,6 +261,46 @@ class BdkWalletService implements WalletApi {
   }
 
   // Private helpers
+
+  Future<void> _initializeWalletWithMnemonic(Mnemonic mnemonic) async {
+    try {
+      _mnemonicPhrase = mnemonic.asString();
+
+      final secretKey = await DescriptorSecretKey.create(
+        network: network,
+        mnemonic: mnemonic,
+      );
+
+      // BIP84 descriptors (native segwit)
+      final external = await Descriptor.newBip84(
+        secretKey: secretKey,
+        keychain: KeychainKind.externalChain,
+        network: network,
+      );
+      final internal = await Descriptor.newBip84(
+        secretKey: secretKey,
+        keychain: KeychainKind.internalChain,
+        network: network,
+      );
+
+      // Persistent SQLite database
+      final dbPath = await _getDbPath();
+
+      _wallet = await Wallet.create(
+        descriptor: external,
+        changeDescriptor: internal,
+        network: network,
+        databaseConfig: DatabaseConfig.sqlite(
+          config: SqliteDbConfiguration(path: dbPath),
+        ),
+      );
+    } catch (e) {
+      if (e.toString().contains('mnemonic')) {
+        throw InvalidMnemonicException('Invalid recovery phrase');
+      }
+      rethrow;
+    }
+  }
 
   Future<void> _initializeWallet(String mnemonicPhrase) async {
     try {

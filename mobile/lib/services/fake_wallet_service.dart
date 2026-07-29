@@ -27,6 +27,22 @@ class FakeWalletService implements WalletApi {
   String? get mnemonicPhrase => _mnemonicPhrase;
 
   @override
+  Future<String> createWalletWithMnemonic(dynamic mnemonic) async {
+    if (_initialized) {
+      throw WalletException('Wallet already initialized');
+    }
+
+    await Future.delayed(const Duration(milliseconds: 100)); // Simulate work
+
+    // For FakeWalletService, convert mnemonic to string
+    _mnemonicPhrase = mnemonic.toString();
+    _receiveAddress = _generateFakeAddress();
+    _initialized = true;
+
+    return _receiveAddress!;
+  }
+
+  @override
   Future<String> createWallet(String mnemonic) async {
     if (_initialized) {
       throw WalletException('Wallet already initialized');

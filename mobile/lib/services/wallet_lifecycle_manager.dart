@@ -1,3 +1,4 @@
+import 'package:bdk_flutter/bdk_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'wallet_api.dart';
@@ -50,7 +51,27 @@ class WalletLifecycleManager {
     }
   }
 
-  /// Creates a new wallet with the given mnemonic and persists it.
+  /// Creates a new wallet with the given Mnemonic object and persists it.
+  ///
+  /// Returns the wallet's first receive address.
+  ///
+  /// Throws [WalletException] if wallet already exists or creation fails.
+  Future<String> createWalletWithMnemonic(Mnemonic mnemonic) async {
+    if (await hasStoredWallet()) {
+      throw WalletException('Wallet already exists. Delete first.');
+    }
+
+    final address = await _wallet.createWalletWithMnemonic(mnemonic);
+
+    // Persist mnemonic as string
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_mnemonicKey, mnemonic.asString());
+    await prefs.setBool(_hasWalletKey, true);
+
+    return address;
+  }
+
+  /// Creates a new wallet with the given mnemonic string and persists it.
   ///
   /// Returns the wallet's first receive address.
   ///

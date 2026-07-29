@@ -5,6 +5,16 @@
 ///
 /// Phase 2 target: Replace all Rails L1 wallet dependencies with BDK.
 abstract class WalletApi {
+  /// Creates a new wallet from a Mnemonic object.
+  ///
+  /// - Accepts a BDK Mnemonic object (avoids string conversion issues)
+  /// - Derives BIP84 descriptors (native segwit)
+  /// - Initializes wallet database
+  /// - Returns the first receive address
+  ///
+  /// Throws [WalletException] if mnemonic invalid or wallet already exists.
+  Future<String> createWalletWithMnemonic(dynamic mnemonic);
+
   /// Creates a new wallet from a mnemonic phrase.
   ///
   /// - Generates or accepts a 12/24-word BIP39 mnemonic

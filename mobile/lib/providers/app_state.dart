@@ -100,7 +100,8 @@ class WalletState extends ChangeNotifier {
       : _wallet = wallet ?? BdkWalletService(network: Network.regtest, electrumUrl: electrumUrl),
         _lifecycle = WalletLifecycleManager(
             wallet ?? BdkWalletService(network: Network.regtest, electrumUrl: electrumUrl)) {
-    _initialize();
+    // Delay initialization to avoid blocking UI during construction
+    Future.microtask(() => _initialize());
   }
 
   final WalletApi _wallet;
@@ -117,40 +118,57 @@ class WalletState extends ChangeNotifier {
   String? get mnemonicPhrase => _wallet.mnemonicPhrase;
 
   Future<void> _initialize() async {
+    print('[WalletState] Starting initialization...');
     loading = true;
     notifyListeners();
 
     try {
+      print('[WalletState] Checking for stored wallet...');
       final hasWallet = await _lifecycle.hasStoredWallet();
+      print('[WalletState] Has stored wallet: $hasWallet');
+      
       if (hasWallet) {
+        print('[WalletState] Loading existing wallet...');
         await _lifecycle.tryLoadWallet();
         await _refreshWalletData();
+        print('[WalletState] Wallet loaded successfully');
+      } else {
+        print('[WalletState] No existing wallet found');
       }
     } catch (e) {
+      print('[WalletState] Initialization error: $e');
       error = 'Failed to load wallet: $e';
     } finally {
       loading = false;
+      print('[WalletState] Initialization complete. Loading: $loading, Error: $error');
       notifyListeners();
     }
   }
 
   /// Creates a new wallet with a generated 12-word mnemonic.
   Future<String?> createWallet() async {
+    print('[WalletState.createWallet] Starting...');
     loading = true;
     error = null;
     notifyListeners();
 
     try {
+      print('[WalletState.createWallet] Generating mnemonic...');
       final mnemonic = await Mnemonic.create(WordCount.words12);
+      print('[WalletState.createWallet] Mnemonic generated, creating wallet...');
+      
       final address = await _lifecycle.createWallet(mnemonic.asString());
+      print('[WalletState.createWallet] Wallet created with address: $address');
 
       receiveAddress = address;
       balanceSats = 0;
       loading = false;
+      print('[WalletState.createWallet] Complete. Loading: $loading');
       notifyListeners();
 
       return mnemonic.asString();
     } catch (e) {
+      print('[WalletState.createWallet] Error: $e');
       error = 'Failed to create wallet: $e';
       loading = false;
       notifyListeners();

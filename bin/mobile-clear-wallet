@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Clear mobile wallet debug environment
+#
+# Removes:
+# - BDK wallet databases
+# - SharedPreferences (mnemonic storage)
+# - Flutter build artifacts
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR/.."
+
+echo "🧹 Clearing mobile debug environment..."
+
+# Get the app bundle identifier
+BUNDLE_ID="com.mat.matMobile"
+
+# macOS app data locations
+MACOS_CONTAINER=~/Library/Containers/$BUNDLE_ID
+MACOS_GROUP=~/Library/Group\ Containers/group.$BUNDLE_ID
+
+echo ""
+echo "📱 Clearing app data..."
+
+# Remove BDK wallet databases
+if [ -d "$MACOS_CONTAINER/Data/Documents" ]; then
+  echo "  - Removing wallet databases..."
+  find "$MACOS_CONTAINER/Data/Documents" -name "*.db" -delete 2>/dev/null || true
+  find "$MACOS_CONTAINER/Data/Documents" -name "*.sqlite" -delete 2>/dev/null || true
+  find "$MACOS_CONTAINER/Data/Documents" -name "*.db-*" -delete 2>/dev/null || true
+fi
+
+# Remove SharedPreferences
+if [ -d "$MACOS_CONTAINER/Data/Library/Preferences" ]; then
+  echo "  - Removing SharedPreferences (mnemonic storage)..."
+  rm -rf "$MACOS_CONTAINER/Data/Library/Preferences/"* 2>/dev/null || true
+fi
+
+# Remove app support files
+if [ -d "$MACOS_CONTAINER/Data/Library/Application Support" ]; then
+  echo "  - Removing application support files..."
+  rm -rf "$MACOS_CONTAINER/Data/Library/Application Support/"* 2>/dev/null || true
+fi
+
+echo ""
+echo "🏗️  Cleaning Flutter build..."
+cd mobile
+flutter clean > /dev/null 2>&1
+
+echo ""
+echo "✅ Mobile debug environment cleared!"
+echo ""
+echo "Next steps:"
+echo "  1. cd mobile"
+echo "  2. flutter pub get"
+echo "  3. flutter run -d macos --dart-define=API_BASE_URL=http://127.0.0.1:3000/api/v1"
+echo ""
+echo "The app will start fresh with no wallet."

@@ -23,11 +23,18 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
   // The build method shows appropriate UI based on wallet state.
 
   Future<void> _createWallet() async {
+    print('[AddFundsScreen] Create wallet button tapped');
     final wallet = context.read<WalletState>();
+    
+    print('[AddFundsScreen] Calling wallet.createWallet()...');
     final mnemonic = await wallet.createWallet();
+    print('[AddFundsScreen] Wallet created. Mnemonic: ${mnemonic?.substring(0, 20)}...');
 
     if (mnemonic != null && mounted) {
+      print('[AddFundsScreen] Showing mnemonic backup dialog');
       _showMnemonicBackupDialog(mnemonic);
+    } else {
+      print('[AddFundsScreen] Mnemonic is null or widget not mounted');
     }
   }
 

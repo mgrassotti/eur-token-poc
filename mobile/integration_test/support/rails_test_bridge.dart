@@ -76,4 +76,94 @@ class RailsTestBridge {
       throw StateError('fund_regtest_address failed (${response.statusCode}): ${response.body}');
     }
   }
+
+  /// Login or create a test user.
+  Future<Map<String, dynamic>> loginOrCreateUser(String email, String password) async {
+    try {
+      // Try login first
+      final loginResponse = await _client.post(
+        Uri.parse('$_apiBaseUrl/auth/login'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'email': email, 'password': password}),
+      );
+
+      if (loginResponse.statusCode == 200) {
+        return jsonDecode(loginResponse.body) as Map<String, dynamic>;
+      }
+
+      // Create user if login failed
+      final signupResponse = await _client.post(
+        Uri.parse('$_apiBaseUrl/auth/signup'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'email': email,
+          'password': password,
+          'password_confirmation': password,
+        }),
+      );
+
+      if (signupResponse.statusCode != 201) {
+        throw StateError('Failed to create user: ${signupResponse.body}');
+      }
+
+      return jsonDecode(signupResponse.body) as Map<String, dynamic>;
+    } catch (e) {
+      throw StateError('Failed to login or create user: $e');
+    }
+  }
+
+  /// Create a wallet for a user via API.
+  Future<Map<String, dynamic>> createWalletViaApi(String authToken) async {
+    final response = await _client.post(
+      Uri.parse('$_apiBaseUrl/wallet/create'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $authToken',
+      },
+    );
+
+    if (response.statusCode != 201) {
+      throw StateError('Failed to create wallet: ${response.body}');
+    }
+
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  /// Get wallet balance for a user via API.
+  Future<int> getBalanceViaApi(String authToken) async {
+    final response = await _client.get(
+      Uri.parse('$_apiBaseUrl/wallet/balance'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $authToken',
+      },
+    );
+
+    if (response.statusCode != 200) {
+      throw StateError('Failed to get balance: ${response.body}');
+    }
+
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return data['balance_sats'] as int;
+  }
+
+  /// Accept a recharge request via API.
+  Future<Map<String, dynamic>> acceptRequestViaApi(
+    String authToken,
+    String requestId,
+  ) async {
+    final response = await _client.post(
+      Uri.parse('$_apiBaseUrl/recharge_requests/$requestId/accept'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $authToken',
+      },
+    );
+
+    if (response.statusCode != 200) {
+      throw StateError('Failed to accept request: ${response.body}');
+    }
+
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
 }

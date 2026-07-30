@@ -27,14 +27,41 @@ class _AddFundsScreenState extends State<AddFundsScreen> {
     final wallet = context.read<WalletState>();
     
     print('[AddFundsScreen] Calling wallet.createWallet()...');
-    final mnemonic = await wallet.createWallet();
-    print('[AddFundsScreen] Wallet created. Mnemonic: ${mnemonic?.substring(0, 20)}...');
+    try {
+      final mnemonic = await wallet.createWallet();
+      print('[AddFundsScreen] ✓ wallet.createWallet() returned');
+      print('[AddFundsScreen] Mnemonic: ${mnemonic != null ? "${mnemonic.substring(0, 20)}..." : "null"}');
+      print('[AddFundsScreen] Widget mounted: $mounted');
 
-    if (mnemonic != null && mounted) {
-      print('[AddFundsScreen] Showing mnemonic backup dialog');
-      _showMnemonicBackupDialog(mnemonic);
-    } else {
-      print('[AddFundsScreen] Mnemonic is null or widget not mounted');
+      if (mnemonic != null && mounted) {
+        print('[AddFundsScreen] Showing mnemonic backup dialog...');
+        _showMnemonicBackupDialog(mnemonic);
+        print('[AddFundsScreen] ✓ Dialog shown');
+      } else {
+        print('[AddFundsScreen] ✗ Cannot show dialog: mnemonic=${mnemonic != null}, mounted=$mounted');
+      }
+    } catch (e) {
+      print('[AddFundsScreen] Error creating wallet: $e');
+      
+      if (e.toString().contains('already exists')) {
+        print('[AddFundsScreen] Wallet already exists, attempting to load it...');
+        // Wallet exists but wasn't loaded - try to load it
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Wallet already exists, loading...')),
+          );
+        }
+        // The WalletState should have already tried to load it in _initialize()
+        // Force a rebuild by navigating away and back
+        if (mounted) {
+          Navigator.pop(context);
+          Future.delayed(const Duration(milliseconds: 500), () {
+            if (mounted) {
+              Navigator.pushNamed(context, '/add-funds');
+            }
+          });
+        }
+      }
     }
   }
 

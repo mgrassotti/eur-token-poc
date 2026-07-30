@@ -130,8 +130,12 @@ class WalletState extends ChangeNotifier {
       if (hasWallet) {
         print('[WalletState] Loading existing wallet...');
         await _lifecycle.tryLoadWallet();
+        print('[WalletState] ✓ tryLoadWallet() completed, refreshing data...');
         await _refreshWalletData();
-        print('[WalletState] Wallet loaded successfully');
+        print('[WalletState] ✓ Wallet loaded successfully');
+        print('[WalletState]   - Address: $receiveAddress');
+        print('[WalletState]   - Balance: $balanceSats sats');
+        print('[WalletState]   - Initialized: ${_wallet.isInitialized}');
       } else {
         print('[WalletState] No existing wallet found');
       }
@@ -161,17 +165,20 @@ class WalletState extends ChangeNotifier {
       
       // Pass Mnemonic object directly to avoid string conversion issues
       final address = await _lifecycle.createWalletWithMnemonic(mnemonic);
-      print('[WalletState.createWallet] Wallet created with address: $address');
+      print('[WalletState.createWallet] ✓ Wallet created with address: $address');
 
+      print('[WalletState.createWallet] Setting receive address...');
       receiveAddress = address;
       balanceSats = 0;
+      
+      print('[WalletState.createWallet] Setting loading=false and notifying listeners...');
       loading = false;
-      print('[WalletState.createWallet] Complete. Loading: $loading');
       notifyListeners();
-
+      
+      print('[WalletState.createWallet] ✓ Complete! Returning mnemonic string');
       return mnemonicString;
     } catch (e) {
-      print('[WalletState.createWallet] Error: $e');
+      print('[WalletState.createWallet] ✗ Error: $e');
       error = 'Failed to create wallet: $e';
       loading = false;
       notifyListeners();
@@ -249,12 +256,22 @@ class WalletState extends ChangeNotifier {
   }
 
   Future<void> _refreshWalletData() async {
-    if (!_wallet.isInitialized) return;
+    print('[WalletState._refreshWalletData] Checking initialization...');
+    if (!_wallet.isInitialized) {
+      print('[WalletState._refreshWalletData] Wallet not initialized, skipping');
+      return;
+    }
 
     try {
+      print('[WalletState._refreshWalletData] Getting receive address...');
       receiveAddress = await _wallet.getReceiveAddress();
+      print('[WalletState._refreshWalletData] ✓ Address: $receiveAddress');
+      
+      print('[WalletState._refreshWalletData] Getting balance...');
       balanceSats = await _wallet.getBalance();
+      print('[WalletState._refreshWalletData] ✓ Balance: $balanceSats sats');
     } catch (e) {
+      print('[WalletState._refreshWalletData] Error: $e');
       error = 'Failed to refresh wallet data: $e';
       rethrow;
     }

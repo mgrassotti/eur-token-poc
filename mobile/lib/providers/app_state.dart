@@ -96,10 +96,13 @@ class DashboardState extends ChangeNotifier {
 
 /// Phase 2: On-device BDK wallet state (replaces relay reserve).
 class WalletState extends ChangeNotifier {
-  WalletState({WalletApi? wallet, String? electrumUrl})
-      : _wallet = wallet ?? BdkWalletService(network: Network.regtest, electrumUrl: electrumUrl),
-        _lifecycle = WalletLifecycleManager(
-            wallet ?? BdkWalletService(network: Network.regtest, electrumUrl: electrumUrl)) {
+  // Factory constructor to ensure _wallet and _lifecycle use the SAME instance
+  factory WalletState({WalletApi? wallet, String? electrumUrl}) {
+    final walletInstance = wallet ?? BdkWalletService(network: Network.regtest, electrumUrl: electrumUrl);
+    return WalletState._internal(walletInstance, WalletLifecycleManager(walletInstance));
+  }
+
+  WalletState._internal(this._wallet, this._lifecycle) {
     // Delay initialization to avoid blocking UI during construction
     Future.microtask(() => _initialize());
   }
@@ -161,10 +164,11 @@ class WalletState extends ChangeNotifier {
       final mnemonic = await Mnemonic.create(WordCount.words12);
       final mnemonicString = mnemonic.asString();
       print('[WalletState.createWallet] Mnemonic generated: ${mnemonicString.split(' ').take(3).join(' ')}...');
-      print('[WalletState.createWallet] Creating wallet directly with Mnemonic object...');
+      print('[WalletState.createWallet] Creating wallet with string mnemonic (no blockchain init)...');
       
-      // Pass Mnemonic object directly to avoid string conversion issues
-      final address = await _lifecycle.createWalletWithMnemonic(mnemonic);
+      // Use string-based createWallet which skips blockchain initialization
+      // Blockchain will be lazily initialized on first sync()
+      final address = await _lifecycle.createWallet(mnemonicString);
       print('[WalletState.createWallet] ✓ Wallet created with address: $address');
 
       print('[WalletState.createWallet] Setting receive address...');

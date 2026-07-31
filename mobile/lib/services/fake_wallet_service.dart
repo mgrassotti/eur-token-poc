@@ -154,6 +154,7 @@ class FakeWalletService implements WalletApi {
   /// Generate fake Bitcoin address for testing.
   String _generateFakeAddress() {
     final random = DateTime.now().microsecondsSinceEpoch;
-    return 'bcrt1qfake${random.toRadixString(16).substring(0, 36)}';
+    final hexStr = random.toRadixString(16).padRight(40, '0');
+    return 'bcrt1qfake${hexStr.substring(0, 36)}';
   }
 }

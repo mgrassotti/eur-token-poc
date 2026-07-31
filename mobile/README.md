@@ -62,6 +62,51 @@ Tests live in `integration_test/mobile_flow_test.dart`. Add new flows there as m
 
 After admin sends funds: pull to refresh or tap **Sync balance** on Add funds.
 
+### Wallet Lifecycle Integration Tests
+
+Two test suites for wallet functionality:
+
+#### 1. Fast Test (FakeWalletService) - ✅ Recommended for CI
+
+```bash
+cd mobile
+flutter test integration_test/wallet_manager_test.dart -d macos
+```
+
+Tests wallet lifecycle logic **without** actual BDK blockchain operations:
+- Generate 12-word mnemonic (real BDK)
+- Create wallet with mnemonic 
+- Verify mnemonic persistence (SharedPreferences)
+- Verify wallet address generation (fake)
+- Delete wallet
+- Verify deletion
+
+**Time:** ~18s | **Dependencies:** None
+
+#### 2. Real BDK Test - ⚠️ Requires Infrastructure
+
+```bash
+cd mobile
+flutter test integration_test/bdk_wallet_lifecycle_test.dart -d macos
+```
+
+Tests with **real BDK library** and blockchain operations:
+- Real Bitcoin wallet creation
+- Real descriptor generation
+- Real address derivation (bcrt1...)
+- Electrum sync (requires running server)
+
+**Time:** ~50s+ | **Dependencies:** 
+- Electrum server running on 127.0.0.1:50001 (regtest)
+- Or test will timeout after 30s at wallet creation
+
+**Known Issues:**
+- Timeouts if Electrum unavailable
+- `ChecksumMismatchException` on multiple creations (DB not cleaned)
+- Needs proper tearDown with DB file deletion
+
+**Use when:** Testing actual BDK integration before releases.
+
 ## Run
 
 First-time setup (generates `android/` and `ios/` platform folders):

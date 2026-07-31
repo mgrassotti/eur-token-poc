@@ -6,13 +6,20 @@ module Admin
     before_action :require_admin
 
     def create
-      user = User.where(admin: false).find(params[:user_id])
-      amount_sats = BtcConversion.btc_to_sats(params[:amount_btc])
       address = normalized_receive_address(params[:receive_address])
-      expected = L1::ReserveReceiveAddressService.ensure!(user: user)
+      amount_sats = BtcConversion.btc_to_sats(params[:amount_btc])
 
-      if address.present? && address != expected
-        return redirect_to root_path, alert: t("flash.admin.reserve_deposits.address_mismatch")
+      # Find user by their receive address
+      user = User.where(admin: false).find do |u|
+        begin
+          L1::ReserveReceiveAddressService.ensure!(user: u) == address
+        rescue L1::ReserveReceiveAddressService::Error
+          false
+        end
+      end
+
+      unless user
+        return redirect_to root_path, alert: t("flash.admin.reserve_deposits.address_not_found")
       end
 
       L1::DepositReserveService.call(user: user, amount_sats: amount_sats)
@@ -22,13 +29,10 @@ module Admin
                   notice: t(
                     "flash.admin.reserve_deposits.created",
                     wallet_name: L1::ExchangeWallet::DISPLAY_NAME,
-                    name: user.name,
                     amount: BtcConversion.format_btc(amount_sats),
-                    address: expected,
+                    address: address,
                     balance: BtcConversion.format_btc(account.balance_sats)
                   )
-    rescue ActiveRecord::RecordNotFound
-      redirect_to root_path, alert: t("flash.admin.reserve_deposits.user_not_found")
     rescue L1::DepositReserveService::Error, L1::ReserveReceiveAddressService::Error => e
       redirect_to root_path, alert: e.message
     end

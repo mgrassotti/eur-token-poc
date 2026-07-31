@@ -47,9 +47,8 @@ en:
         updated: "BTC/EUR rate updated to %{rate} EUR/BTC."
         margin_calls: "LTV warning (>=%{threshold}%): deal #%{ids} entered the risk zone."
       reserve_deposits:
-        created: "Sent %{amount} from %{wallet_name} to %{name} (%{address}). Reserve balance: %{balance}."
-        user_not_found: "User not found."
-        address_mismatch: "Receive address does not match the selected user's reserve wallet."
+        created: "Sent %{amount} from %{wallet_name} to %{address}. Reserve balance: %{balance}."
+        address_not_found: "No user found with that receive address."
       demo_reset:
         done: "Demo reset."
         unavailable_in_production: "Demo reset is not available in production."
@@ -180,11 +179,9 @@ en:
         reserve_funding:
           title: "Fund user reserve (regtest)"
           description_html: "Send BTC from <strong>%{wallet_name}</strong> to the user's stable receive address (same QR shown in the mobile app)."
-          user: "User"
           amount: "Amount (BTC)"
           receive_address: "Receive address"
           receive_address_placeholder: "bcrt1q…"
-          receive_address_help: "Auto-filled when you pick a user. Paste from the mobile app to verify, or edit before sending."
           submit: "Send to receive address"
         reset:
           button: "Reset demo DB"

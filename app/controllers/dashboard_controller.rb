@@ -26,14 +26,6 @@ class DashboardController < ApplicationController
     return unless admin?
 
     @active_budgets = Budget.active.order(created_at: :desc)
-    @on_chain_wallets = L1::WalletInventoryService.call(market_rate: @market_rate)
-    @fundable_users = User.where(admin: false).includes(:btc_account).order(:name)
-    @user_receive_addresses = @fundable_users.to_h do |user|
-      address = L1::ReserveReceiveAddressService.ensure!(user: user)
-      [user.id.to_s, address]
-    rescue L1::ReserveReceiveAddressService::Error
-      [user.id.to_s, ""]
-    end
   end
 
   private

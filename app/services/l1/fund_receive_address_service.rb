@@ -3,8 +3,9 @@
 module L1
   # Send regtest BTC from the exchange wallet to any receive address.
   # If the address belongs to a known user reserve, sync that account balance.
+  # Phase 2: No server-side wallets. Balances updated in DB only.
   class FundReceiveAddressService
-    BLOCKS_PER_DEPOSIT = DepositReserveService::BLOCKS_PER_DEPOSIT
+    BLOCKS_PER_DEPOSIT = 6
 
     class Error < StandardError; end
 
@@ -21,15 +22,17 @@ module L1
 
     def call
       raise Error, I18n.t("services.l1.fund_receive_address.address_required") if @address.blank?
-      raise Error, I18n.t("services.l1.deposit_reserve.invalid_amount") unless @amount_sats.positive?
+      raise Error, "Invalid amount" unless @amount_sats.positive?
       validate_bitcoind!
 
       txid = ExchangeWallet.new.transfer_to!(address: @address, amount_sats: @amount_sats)
       advance_simulated_chain!
 
+      # Phase 2: Update balance in DB when funding a known user address
       account = BtcAccount.find_by(reserve_receive_address: @address)
       if account
-        UserWallet.for(account.user).sync_balance_to_account!
+        new_balance = account.balance_sats + @amount_sats
+        account.update!(balance_sats: new_balance)
         account.reload
       end
 

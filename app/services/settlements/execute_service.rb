@@ -150,8 +150,7 @@ module Settlements
         payout
       end
 
-      users_to_sync = token_accounts.map(&:user) + [budget.investor]
-      users_to_sync.uniq.each { |user| L1::SyncReserveBalanceService.call(user: user) }
+      # Phase 2: No balance sync needed; balances updated by DLC distribution
 
       payouts
     end

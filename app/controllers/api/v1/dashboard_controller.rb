@@ -39,9 +39,9 @@ module Api
       end
 
       def savings_payload(market_rate)
-        sats = L1::ReserveBalance.sats_for(current_user)
-        eur = market_rate.set? ? BtcConversion.sats_to_eur(sats, market_rate.btc_eur_per_btc) : nil
-        { sats: sats, eur: eur }
+        # Phase 2: Mobile clients show their BDK wallet balance directly
+        # Server no longer tracks reserve balance
+        { sats: 0, eur: 0 }
       end
 
       def investable_deals(market_rate)

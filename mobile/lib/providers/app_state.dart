@@ -74,6 +74,7 @@ class DashboardState extends ChangeNotifier {
 
   final RelayApiClient _api;
   DashboardData? data;
+  double? marketRateEur;
   bool loading = false;
   String? error;
 
@@ -84,6 +85,7 @@ class DashboardState extends ChangeNotifier {
 
     try {
       data = await _api.fetchDashboard();
+      marketRateEur = data?.marketRateEur ?? marketRateEur;
       loading = false;
       notifyListeners();
     } on RelayApiException catch (e) {
@@ -92,23 +94,37 @@ class DashboardState extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  /// Phase 2: Fetch public BTC/EUR rate without login for reserve EUR display.
+  Future<void> refreshMarketRate() async {
+    try {
+      marketRateEur = await _api.fetchMarketRate();
+      error = null;
+      notifyListeners();
+    } on RelayApiException catch (e) {
+      // Keep last known rate; surface error lightly
+      error = e.message;
+      notifyListeners();
+    }
+  }
 }
 
 /// Phase 2: On-device BDK wallet state (replaces relay reserve).
 class WalletState extends ChangeNotifier {
   // Factory constructor to ensure _wallet and _lifecycle use the SAME instance
-  factory WalletState({WalletApi? wallet, String? electrumUrl}) {
+  factory WalletState({WalletApi? wallet, String? electrumUrl, RelayApiClient? api}) {
     final walletInstance = wallet ?? BdkWalletService(network: Network.regtest, electrumUrl: electrumUrl);
-    return WalletState._internal(walletInstance, WalletLifecycleManager(walletInstance));
+    return WalletState._internal(walletInstance, WalletLifecycleManager(walletInstance), api);
   }
 
-  WalletState._internal(this._wallet, this._lifecycle) {
+  WalletState._internal(this._wallet, this._lifecycle, this._api) {
     // Delay initialization to avoid blocking UI during construction
     Future.microtask(() => _initialize());
   }
 
   final WalletApi _wallet;
   final WalletLifecycleManager _lifecycle;
+  final RelayApiClient? _api;
 
   String? receiveAddress;
   int balanceSats = 0;
@@ -174,6 +190,19 @@ class WalletState extends ChangeNotifier {
       print('[WalletState.createWallet] Setting receive address...');
       receiveAddress = address;
       balanceSats = 0;
+
+      // Phase 2: Register address with server so admin can fund
+      if (_api != null) {
+        try {
+          print('[WalletState.createWallet] Registering address with server...');
+          await _api.updateReserveAddress(address);
+          print('[WalletState.createWallet] ✓ Address registered with server');
+        } catch (e) {
+          print('[WalletState.createWallet] Warning: Failed to register address with server: $e');
+          // Don't fail wallet creation if server registration fails
+          // User can still use the wallet, just admin funding won't work until they register manually
+        }
+      }
       
       print('[WalletState.createWallet] Setting loading=false and notifying listeners...');
       loading = false;
@@ -228,11 +257,14 @@ class WalletState extends ChangeNotifier {
       await _wallet.sync();
       await _refreshWalletData();
     } on NetworkException catch (e) {
-      lastSyncError = e.message;
+      // Include cause so macOS sandbox / connection errors are visible in the UI
+      lastSyncError = e.cause != null ? '${e.message} (${e.cause})' : e.message;
       error = 'Sync failed: ${e.message}';
+      print('[WalletState.sync] ✗ $lastSyncError');
     } catch (e) {
       lastSyncError = e.toString();
       error = 'Sync failed: $e';
+      print('[WalletState.sync] ✗ $lastSyncError');
     } finally {
       syncing = false;
       notifyListeners();
@@ -287,6 +319,56 @@ class WalletState extends ChangeNotifier {
       _wallet.close();
     }
     super.dispose();
+  }
+}
+
+class NameState extends ChangeNotifier {
+  static const _nameKey = 'user_name';
+
+  String? _name;
+  bool _hydrated = false;
+
+  String? get name => _name;
+  bool get hasName => _name != null && _name!.isNotEmpty;
+
+  NameState() {
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (_hydrated) return;
+      _name = prefs.getString(_nameKey);
+      _hydrated = true;
+      notifyListeners();
+    } catch (_) {
+      _hydrated = true;
+    }
+  }
+
+  Future<void> setName(String name) async {
+    _hydrated = true;
+    _name = name;
+    notifyListeners();
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_nameKey, name);
+    } catch (_) {
+    }
+  }
+
+  Future<void> clearName() async {
+    _hydrated = true;
+    _name = null;
+    notifyListeners();
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_nameKey);
+    } catch (_) {
+    }
   }
 }
 

@@ -30,8 +30,8 @@ class RailsTestBridge {
     }
   }
 
-  Future<int> adminFundReserve({
-    required String userEmail,
+  /// Funds an on-device BDK receive address via the admin integration path.
+  Future<Map<String, dynamic>> adminFundReserve({
     required String receiveAddress,
     required String amountBtc,
   }) async {
@@ -39,7 +39,6 @@ class RailsTestBridge {
       Uri.parse('$_integrationBase/admin_fund_reserve'),
       headers: _headers,
       body: jsonEncode({
-        'user_email': userEmail,
         'receive_address': receiveAddress,
         'amount_btc': amountBtc,
       }),
@@ -47,16 +46,27 @@ class RailsTestBridge {
     if (response.statusCode != 200) {
       throw StateError('admin_fund_reserve failed (${response.statusCode}): ${response.body}');
     }
-    final body = jsonDecode(response.body) as Map<String, dynamic>;
-    return body['balance_sats'] as int;
+    return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
-  /// Funds a user's reserve on regtest (admin path, no pasted address).
+  /// Test helper: fund a seeded user's reserve by email (registers UserWallet address).
   Future<int> fundUserReserve({
     required String userEmail,
     required String amountBtc,
-  }) {
-    return adminFundReserve(userEmail: userEmail, receiveAddress: '', amountBtc: amountBtc);
+  }) async {
+    final response = await _client.post(
+      Uri.parse('$_integrationBase/admin_fund_reserve'),
+      headers: _headers,
+      body: jsonEncode({
+        'user_email': userEmail,
+        'amount_btc': amountBtc,
+      }),
+    );
+    if (response.statusCode != 200) {
+      throw StateError('fundUserReserve failed (${response.statusCode}): ${response.body}');
+    }
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    return (body['balance_sats'] as num?)?.toInt() ?? 0;
   }
 
   /// Sends regtest BTC to any address (on-device BDK receive address).

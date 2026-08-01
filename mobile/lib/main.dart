@@ -10,8 +10,9 @@ import 'screens/add_funds_screen.dart';
 import 'screens/create_deal_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/deal_detail_screen.dart';
-import 'screens/login_screen.dart';
+// import 'screens/login_screen.dart'; // Saved for future: bank transfer deposits
 import 'screens/local_wallet_debug_screen.dart';
+import 'screens/name_form_screen.dart';
 import 'screens/receive_money_screen.dart';
 import 'screens/scan_pay_screen.dart';
 import 'screens/send_money_screen.dart';
@@ -38,14 +39,19 @@ class MatApp extends StatelessWidget {
       providers: [
         Provider<RelayApiClient>.value(value: api),
         ChangeNotifierProvider(create: (_) => SettingsState()),
+        ChangeNotifierProvider(create: (_) => NameState()),
         ChangeNotifierProvider(create: (_) => AuthState(api)),
         ChangeNotifierProvider(create: (_) => DashboardState(api)),
-        ChangeNotifierProxyProvider<SettingsState, WalletState>(
+        ChangeNotifierProxyProvider2<SettingsState, AuthState, WalletState>(
           create: (context) {
             final settings = context.read<SettingsState>();
-            return WalletState(electrumUrl: settings.electrumUrl);
+            final api = context.read<RelayApiClient>();
+            return WalletState(electrumUrl: settings.electrumUrl, api: api);
           },
-          update: (context, settings, previous) => previous ?? WalletState(electrumUrl: settings.electrumUrl),
+          update: (context, settings, auth, previous) {
+            final api = context.read<RelayApiClient>();
+            return previous ?? WalletState(electrumUrl: settings.electrumUrl, api: api);
+          },
         ),
       ],
       child: const MatAppRouter(),
@@ -58,21 +64,22 @@ class MatAppRouter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final auth = context.watch<AuthState>();
+    final nameState = context.watch<NameState>();
     final settings = context.watch<SettingsState>();
 
     final router = GoRouter(
-      initialLocation: auth.isLoggedIn ? '/' : '/login',
-      refreshListenable: auth,
+      initialLocation: nameState.hasName ? '/' : '/name',
+      refreshListenable: nameState,
       redirect: (context, state) {
-        final loggedIn = auth.isLoggedIn;
-        final loggingIn = state.matchedLocation == '/login';
-        if (!loggedIn && !loggingIn) return '/login';
-        if (loggedIn && loggingIn) return '/';
+        final hasName = nameState.hasName;
+        final onNameForm = state.matchedLocation == '/name';
+        if (!hasName && !onNameForm) return '/name';
+        if (hasName && onNameForm) return '/';
         return null;
       },
       routes: [
-        GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
+        // GoRoute(path: '/login', builder: (_, __) => const LoginScreen()), // Saved for future: bank transfer deposits
+        GoRoute(path: '/name', builder: (_, __) => const NameFormScreen()),
         GoRoute(path: '/', builder: (_, __) => const DashboardScreen()),
         GoRoute(path: '/reserve/add-funds', builder: (_, __) => const AddFundsScreen()),
         GoRoute(path: '/send-money', builder: (_, __) => const SendMoneyScreen()),

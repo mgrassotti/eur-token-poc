@@ -8,6 +8,13 @@ RSpec.describe "Demo end-to-end flow", :regtest, :demo_flow do
     L1::Bitcoind::Client.new.available?
   end
 
+  def setup_phase2_reserve_address!(user)
+    # Phase 2: Generate address from user's wallet (still exists for DLC) and store it
+    wallet = L1::UserWallet.for(user)
+    address = wallet.receive_address
+    user.btc_account.update!(reserve_receive_address: address)
+  end
+
   before do
     skip "Start regtest: ./bin/regtest up" unless bitcoind_available?
     reset_demo_with_regtest!
@@ -22,9 +29,19 @@ RSpec.describe "Demo end-to-end flow", :regtest, :demo_flow do
 
     MarketRate.current.update!(btc_eur_per_btc: DemoFlowHelpers::PEG_EUR_PER_BTC, set_by: admin)
 
-    # Depositi on-chain
-    L1::DepositReserveService.call(user: alice, amount_sats: DemoFlowHelpers::ALICE_DEPOSIT_SATS)
-    L1::DepositReserveService.call(user: bob, amount_sats: DemoFlowHelpers::BOB_DEPOSIT_SATS)
+    # Phase 2: Set up mobile-registered addresses and fund them
+    setup_phase2_reserve_address!(alice)
+    setup_phase2_reserve_address!(bob)
+
+    # Depositi on-chain via admin funding
+    L1::FundReceiveAddressService.call(
+      address: alice.btc_account.reserve_receive_address,
+      amount_sats: DemoFlowHelpers::ALICE_DEPOSIT_SATS
+    )
+    L1::FundReceiveAddressService.call(
+      address: bob.btc_account.reserve_receive_address,
+      amount_sats: DemoFlowHelpers::BOB_DEPOSIT_SATS
+    )
 
     expect_reserve_sats!(alice, DemoFlowHelpers::ALICE_DEPOSIT_SATS)
     expect_reserve_sats!(bob, DemoFlowHelpers::BOB_DEPOSIT_SATS)

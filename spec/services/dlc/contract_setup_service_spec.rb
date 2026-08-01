@@ -164,6 +164,6 @@ RSpec.describe Dlc::ContractSetupService do
     budget.update!(peg_eur_per_btc: nil)
 
     expect { described_class.call(budget: budget, oracle: oracle, node: node) }
-      .to raise_error(described_class::Error, /peg/)
+      .to raise_error(described_class::Error, /peg/i)  # Case-insensitive for localization
   end
 end

@@ -1,6 +1,20 @@
 # frozen_string_literal: true
 
 module L1
+  # Server-side bitcoind wallet for PoC DLC operations.
+  #
+  # Phase 2 Status: PARTIALLY DEPRECATED
+  # - Reserve deposits: Now handled by mobile BDK wallets (on-device)
+  # - DLC operations: Still uses server-side bitcoind (borrower/investor wallets)
+  #
+  # Phase 3: This entire class will be replaced by on-device DLC signing via mat-dlc.
+  # See docs/mobile-production-plan.md for migration timeline.
+  #
+  # Current usage (PoC only):
+  # - DLC contract funding (borrower and investor inputs)
+  # - PSBT signing for DLC transactions
+  # - Escrow identity keys
+  # - Coin selection for DLC funding
   class UserWallet
     EscrowIdentity = Data.define(:wif, :public_key_hex)
     def self.for(user)
@@ -88,6 +102,8 @@ module L1
       result.fetch("psbt")
     end
 
+    # Phase 2 note: Still used for PoC DLC wallet balance sync.
+    # Not used for mobile reserve deposits (mobile clients use BDK).
     def sync_balance_to_account!
       ensure_wallet!
       @btc_account.update!(balance_sats: spendable_sats)

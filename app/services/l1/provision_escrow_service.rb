@@ -27,7 +27,7 @@ module L1
 
       Rgb::IssueService.call(budget: budget.reload)
 
-      sync_wallet_balances!
+      # Phase 2: No balance sync needed; balances already in DB
 
       budget.reload
     rescue Bitcoind::Error => e
@@ -48,11 +48,6 @@ module L1
 
     def ensure_chain_ready!
       RegtestHarness.new(wallet_name: L1::SHARED_REGTEST_WALLET).ensure_chain_ready!
-    end
-
-    def sync_wallet_balances!
-      SyncReserveBalanceService.call(user: budget.borrower)
-      SyncReserveBalanceService.call(user: budget.investor)
     end
 
     def validate_bitcoind!

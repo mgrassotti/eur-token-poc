@@ -2,11 +2,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mat_mobile/main.dart';
 
 void main() {
-  testWidgets('Login screen renders', (tester) async {
+  testWidgets('Name form screen renders on first launch', (tester) async {
     bootstrap();
     await tester.pumpAndSettle();
 
-    expect(find.text('Log in'), findsOneWidget);
-    expect(find.text('Email'), findsOneWidget);
+    expect(find.text('Welcome!'), findsOneWidget);
+    expect(find.text('Your name'), findsOneWidget);
+    expect(find.text('Continue'), findsOneWidget);
   });
 }

@@ -32,8 +32,7 @@ module Budgets
       ActiveRecord::Base.transaction do
         investor.btc_account.lock!
         budget.borrower.btc_account.lock!
-        L1::SyncReserveBalanceService.call(user: investor)
-        L1::SyncReserveBalanceService.call(user: budget.borrower)
+        # Phase 2: No balance sync needed; mobile clients sync via BDK
 
         validate_investor_reserve!(collateral_sats, peg_eur_per_btc)
         validate_funding_balances!(collateral_sats)

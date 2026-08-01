@@ -1,11 +1,11 @@
 <h1 class="h3 mb-4"><%= t(".title") %></h1>
 
-<% begin %>
-  <% @receive_address = L1::ReserveReceiveAddressService.ensure!(user: current_user) %>
+<%# Phase 2: Show stored receive address (set by mobile client) %>
+<% if @receive_address.present? %>
   <div class="card mb-4 border-secondary">
     <div class="card-body">
       <h2 class="h6"><%= t(".receive_address.title") %></h2>
-      <p class="text-muted small"><%= t(".receive_address.note_html", wallet_name: L1::ExchangeWallet::DISPLAY_NAME) %></p>
+      <p class="text-muted small">Your on-device wallet address (Phase 2 BDK)</p>
       <p class="mb-0">
         <input type="text"
           class="form-control form-control-sm font-monospace"
@@ -16,18 +16,16 @@
       </p>
     </div>
   </div>
-<% rescue L1::ReserveReceiveAddressService::Error => e %>
-  <div class="alert alert-warning"><%= e.message %></div>
+<% else %>
+  <div class="alert alert-warning">
+    No receive address registered. Create a wallet in the mobile app first (Phase 2 BDK).
+  </div>
 <% end %>
 
 <div class="card mb-4">
   <div class="card-body">
     <p class="text-muted">
-      <%= t(".description_html",
-        wallet_name: L1::ExchangeWallet::DISPLAY_NAME,
-        wallet_code: L1::ExchangeWallet::WALLET_NAME,
-        float_balance: BtcConversion.format_btc(L1::ExchangeWallet::INITIAL_BALANCE_SATS),
-        blocks: L1::DepositReserveService::BLOCKS_PER_DEPOSIT) %>
+      Test funding from the Exchange wallet. In production, users receive real BTC to their on-device wallets.
     </p>
 
     <%= form_with url: reserve_deposit_path, method: :post, class: "row g-3 align-items-end" do %>
@@ -37,11 +35,12 @@
           class: "form-control",
           step: 0.00000001,
           min: 0.00000001,
-          required: true %>
-        <div class="form-text"><%= t(".form.default_values") %></div>
+          required: true,
+          disabled: @receive_address.blank? %>
+        <div class="form-text">Amount in BTC</div>
       </div>
       <div class="col-auto">
-        <%= submit_tag t(".form.submit"), class: "btn btn-success" %>
+        <%= submit_tag t(".form.submit"), class: "btn btn-success", disabled: @receive_address.blank? %>
       </div>
     <% end %>
   </div>

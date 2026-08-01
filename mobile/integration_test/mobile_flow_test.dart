@@ -48,7 +48,6 @@ void main() {
       final address = await copyReceiveAddress(tester);
 
       await rails.adminFundReserve(
-        userEmail: IntegrationConfig.aliceEmail,
         receiveAddress: address,
         amountBtc: IntegrationConfig.fundAmountBtc,
       );

@@ -11,8 +11,21 @@ RSpec.describe "RGB transfer via RGB Lightning Node", :l1_integration, :rgb_lib,
   it "issues RGB20 on activate and supports partial transfer across nodes" do
     assign_rln_nodes!(alice, bob, claude)
 
-    L1::DepositReserveService.call(user: alice, amount_sats: 25_000_000)
-    L1::DepositReserveService.call(user: bob, amount_sats: 25_000_000)
+    # Phase 2: Set up reserve addresses and fund them
+    alice_wallet = L1::UserWallet.for(alice)
+    bob_wallet = L1::UserWallet.for(bob)
+    alice.btc_account.update!(reserve_receive_address: alice_wallet.receive_address)
+    bob.btc_account.update!(reserve_receive_address: bob_wallet.receive_address)
+
+    # Add 10,000 sats funding fee buffer required by Budgets::CreateService
+    L1::FundReceiveAddressService.call(
+      address: alice.btc_account.reserve_receive_address,
+      amount_sats: 25_010_000
+    )
+    L1::FundReceiveAddressService.call(
+      address: bob.btc_account.reserve_receive_address,
+      amount_sats: 25_010_000
+    )
 
     MarketRate.current.update!(btc_eur_per_btc: strike)
     period_start = Date.new(2026, 1, 1)

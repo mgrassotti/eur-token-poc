@@ -47,8 +47,8 @@ en:
         updated: "BTC/EUR rate updated to %{rate} EUR/BTC."
         margin_calls: "LTV warning (>=%{threshold}%): deal #%{ids} entered the risk zone."
       reserve_deposits:
-        created: "Sent %{amount} from %{wallet_name} to %{address}. Reserve balance: %{balance}."
-        address_not_found: "No user found with that receive address."
+        created: "Sent %{amount} from %{wallet_name} to %{address} (txid %{txid}). Sync the mobile wallet to see the balance."
+        address_required: "Receive address is required."
       demo_reset:
         done: "Demo reset."
         unavailable_in_production: "Demo reset is not available in production."
@@ -177,11 +177,12 @@ en:
             eur: "EUR equivalent"
             total: "Total"
         reserve_funding:
-          title: "Fund user reserve (regtest)"
-          description_html: "Send BTC from <strong>%{wallet_name}</strong> to the user's stable receive address (same QR shown in the mobile app)."
+          title: "Fund on-device wallet (regtest)"
+          description_html: "Send BTC from <strong>%{wallet_name}</strong> to any BDK receive address from the mobile app. No user lookup — sync the device wallet via Electrum to see the balance."
           amount: "Amount (BTC)"
           receive_address: "Receive address"
           receive_address_placeholder: "bcrt1q…"
+          receive_address_help: "Paste the receive address from the mobile app Add funds screen."
           submit: "Send to receive address"
         reset:
           button: "Reset demo DB"

@@ -8,6 +8,7 @@ Rails.application.routes.draw do
       resource :dashboard, only: :show, controller: "dashboard"
       resource :market_rate, only: :show, controller: "market_rates"
       resource :reserve, only: :show, controller: "reserve" do
+        put :update_address, on: :member
         post :sync, on: :member
       end
       resources :users, only: :index

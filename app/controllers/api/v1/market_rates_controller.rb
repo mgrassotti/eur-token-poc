@@ -3,6 +3,9 @@
 module Api
   module V1
     class MarketRatesController < BaseController
+      # Public: mobile clients need the rate for EUR display without login (Phase 2).
+      skip_before_action :authenticate_api_user!
+
       def show
         market_rate = MarketRate.current
 

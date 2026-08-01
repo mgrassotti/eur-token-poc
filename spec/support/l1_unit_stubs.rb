@@ -4,8 +4,7 @@ module L1UnitStubs
   L1_INTEGRATION_PATH = %r{
     spec/integration/l1/|
     spec/integration/rgb_lib_transfer_spec\.rb|
-    spec/integration/demo_end_to_end_flow_spec\.rb|
-    spec/services/l1/deposit_reserve_service_spec\.rb
+    spec/integration/demo_end_to_end_flow_spec\.rb
   }x
 
   def l1_integration_spec?(example)
@@ -124,8 +123,6 @@ module L1UnitStubs
       allow(wallet).to receive(:identity_pubkey) { account.escrow_identity_pubkey }
       wallet
     end
-
-    allow(L1::SyncReserveBalanceService).to receive(:call) { |user:| user.btc_account.reload }
   end
 
   # Specs that exercise the real DLC services (oracle/node clients + Ruby

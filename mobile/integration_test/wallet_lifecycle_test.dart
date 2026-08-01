@@ -51,13 +51,14 @@ void main() {
       
       print('✓ App launched');
 
-      // Login
-      print('Logging in as alice@example.com...');
-      await tester.enterText(find.byKey(const Key('email_field')), 'alice@example.com');
-      await tester.enterText(find.byKey(const Key('password_field')), 'password123');
-      await tester.tap(find.byKey(const Key('login_button')));
-      await tester.pumpAndSettle(const Duration(seconds: 2));
-      print('✓ Logged in');
+      // Phase 2: Enter name (login removed, saved for future: bank transfer deposits)
+      print('Entering name as Alice...');
+      if (find.text('Welcome!').evaluate().isNotEmpty) {
+        await tester.enterText(find.byType(TextField).first, 'Alice');
+        await tester.tap(find.text('Continue'));
+        await tester.pumpAndSettle(const Duration(seconds: 2));
+      }
+      print('✓ Name entered');
 
       // Navigate to Add Funds
       print('Navigating to Add Funds screen...');

@@ -13,8 +13,9 @@ RSpec.describe "Demo interest at peg (€1000, 1 month @ 50k)" do
   let(:david) { create(:user, name: "David") }
 
   let(:budget) do
-    alice.btc_account.update!(balance_sats: BtcConversion.eur_cents_to_sats(100_000, peg))
-    bob.btc_account.update!(balance_sats: BtcConversion.eur_cents_to_sats(200_000, peg))
+    # Add 10,000 sats funding fee buffer required by Budgets::CreateService
+    alice.btc_account.update!(balance_sats: BtcConversion.eur_cents_to_sats(100_000, peg) + 10_000)
+    bob.btc_account.update!(balance_sats: BtcConversion.eur_cents_to_sats(200_000, peg) + 10_000)
     MarketRate.current.update!(btc_eur_per_btc: peg)
     created = Budgets::CreateService.call(
       borrower: alice,

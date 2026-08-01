@@ -49,6 +49,9 @@ it:
       demo_reset:
         done: "Demo resettata."
         unavailable_in_production: "Reset demo non disponibile in produzione."
+      reserve_deposits:
+        created: "Inviati %{amount} da %{wallet_name} a %{address} (txid %{txid}). Sincronizza il wallet mobile per vedere il saldo."
+        address_required: "L'indirizzo di ricezione e' obbligatorio."
     recovery_packages:
       unauthorized: "Non autorizzato."
       missing: "Recovery package non disponibile per questo deal."

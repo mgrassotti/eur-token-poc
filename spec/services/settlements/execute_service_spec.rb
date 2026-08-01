@@ -16,8 +16,8 @@ RSpec.describe Settlements::ExecuteService do
 
   let!(:budget) do
     period_start, period_end = six_month_period
-    alice.btc_account.update!(balance_sats: BtcConversion.eur_cents_to_sats(500_000, peg))
-    bob.btc_account.update!(balance_sats: BtcConversion.eur_cents_to_sats(1_000_000, peg))
+    alice.btc_account.update!(balance_sats: BtcConversion.eur_cents_to_sats(500_000, peg) + 10_000)
+    bob.btc_account.update!(balance_sats: BtcConversion.eur_cents_to_sats(1_000_000, peg) + 10_000)
     MarketRate.current.update!(btc_eur_per_btc: peg)
     created = Budgets::CreateService.call(
       borrower: alice,
@@ -117,8 +117,8 @@ RSpec.describe Settlements::ExecuteService do
 
   def activate_fresh_budget
     period_start, period_end = six_month_period
-    bob.btc_account.update!(balance_sats: BtcConversion.eur_cents_to_sats(1_000_000, peg))
-    alice.btc_account.update!(balance_sats: BtcConversion.eur_cents_to_sats(500_000, peg))
+    bob.btc_account.update!(balance_sats: BtcConversion.eur_cents_to_sats(1_000_000, peg) + 10_000)
+    alice.btc_account.update!(balance_sats: BtcConversion.eur_cents_to_sats(500_000, peg) + 10_000)
     MarketRate.current.update!(btc_eur_per_btc: peg)
     created = Budgets::CreateService.call(
       borrower: alice,

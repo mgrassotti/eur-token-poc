@@ -17,8 +17,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
+    // Phase 2: Sync on-device wallet + fetch public BTC/EUR rate from Rails
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<DashboardState>().refresh();
+      final wallet = context.read<WalletState>();
+      final dashboard = context.read<DashboardState>();
+      dashboard.refreshMarketRate();
+      if (wallet.isInitialized) {
+        wallet.sync();
+      }
     });
   }
 
@@ -26,44 +32,49 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final dashboard = context.watch<DashboardState>();
-    final auth = context.watch<AuthState>();
+    final nameState = context.watch<NameState>();
+    final wallet = context.watch<WalletState>();
     final settings = context.watch<SettingsState>();
     final data = dashboard.data;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(l10n.hiUser(auth.user?.name ?? '')),
+        title: Text(l10n.hiUser(nameState.name ?? '')),
         actions: [
           IconButton(
             icon: const Icon(Icons.settings_outlined),
             tooltip: l10n.settings,
             onPressed: () => context.push('/settings'),
           ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () {
-              auth.logout();
-              context.go('/login');
-            },
-          ),
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: () => context.read<DashboardState>().refresh(),
-        child: dashboard.loading && data == null
+        onRefresh: () async {
+          final dashboard = context.read<DashboardState>();
+          final wallet = context.read<WalletState>();
+          await Future.wait([
+            dashboard.refreshMarketRate(),
+            if (wallet.isInitialized) wallet.sync(),
+          ]);
+        },
+        child: wallet.loading && !wallet.isInitialized
             ? const Center(child: CircularProgressIndicator())
             : ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
-                  if (dashboard.error != null)
+                  if (wallet.error != null)
                     Card(
                       color: Theme.of(context).colorScheme.errorContainer,
                       child: Padding(
                         padding: const EdgeInsets.all(12),
-                        child: Text(dashboard.error!),
+                        child: Text(wallet.error!),
                       ),
                     ),
-                  _SummaryCard(data: data),
+                  _SummaryCard(
+                    data: data,
+                    walletSats: wallet.balanceSats,
+                    marketRateEur: dashboard.marketRateEur ?? data?.marketRateEur,
+                  ),
                   const SizedBox(height: 12),
                   _PendingTopUpSection(deals: data?.borrowedDeals ?? const []),
                   const SizedBox(height: 12),
@@ -75,7 +86,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                     const SizedBox(height: 8),
                   ],
-                  if ((data?.savingsSats ?? 0) <= 0) ...[
+                  if (wallet.balanceSats <= 0) ...[
                     FilledButton.tonalIcon(
                       onPressed: () => context.push('/reserve/add-funds'),
                       icon: const Icon(Icons.qr_code),
@@ -137,9 +148,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
 }
 
 class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({this.data});
+  const _SummaryCard({this.data, required this.walletSats, this.marketRateEur});
 
   final DashboardData? data;
+  final int walletSats;
+  final double? marketRateEur;
 
   static String _formatBtc(double btc) {
     var formatted = btc.toStringAsFixed(8);
@@ -182,20 +195,26 @@ class _SummaryCard extends StatelessWidget {
   }
 
   Widget _reserveRow(BuildContext context, AppLocalizations l10n) {
-    final sats = data?.savingsSats ?? 0;
-    final rateEur = data?.marketRateEur;
+    // Phase 2: On-device BDK balance; EUR from Rails public market rate.
+    final sats = walletSats;
+    final btc = sats / 100000000.0;
+    final rateEur = marketRateEur ?? data?.marketRateEur;
     final pendingAmountEurCents = (data?.borrowedDeals ?? const <Deal>[])
         .where((deal) => deal.isPending)
         .fold<int>(0, (sum, deal) => sum + deal.amountEurCents);
-
-    if (rateEur == null || rateEur <= 0) {
-      return _row(l10n.availableReserve, '—');
-    }
-
-    final btc = sats / 100000000.0;
-    final eur = btc * rateEur;
-    final availableEur = (eur - (pendingAmountEurCents / 100.0)).clamp(0, double.infinity);
     final muted = Theme.of(context).colorScheme.onSurfaceVariant;
+
+    final String primary;
+    final String secondary;
+    if (rateEur != null && rateEur > 0) {
+      final eur = btc * rateEur;
+      final availableEur = (eur - (pendingAmountEurCents / 100.0)).clamp(0, double.infinity);
+      primary = '€${availableEur.toStringAsFixed(2)}';
+      secondary = '${_formatBtc(btc)} BTC';
+    } else {
+      primary = '${_formatBtc(btc)} BTC';
+      secondary = '$sats sats';
+    }
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -212,22 +231,22 @@ class _SummaryCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  '€${availableEur.toStringAsFixed(2)}',
+                  primary,
                   style: const TextStyle(fontWeight: FontWeight.w600),
                   textAlign: TextAlign.right,
                 ),
                 Text(
-                  '${_formatBtc(btc)} BTC',
+                  secondary,
                   style: TextStyle(fontSize: 12, color: muted),
                   textAlign: TextAlign.right,
                 ),
-                if (pendingAmountEurCents > 0)
+                if (pendingAmountEurCents > 0 && rateEur != null && rateEur > 0)
                   Text(
                     '€${(pendingAmountEurCents / 100.0).toStringAsFixed(2)} ${l10n.pending}',
                     style: TextStyle(fontSize: 12, color: muted),
                     textAlign: TextAlign.right,
                   )
-                else
+                else if (rateEur != null && rateEur > 0)
                   Text(
                     _formatShortMarketRate(rateEur),
                     style: TextStyle(fontSize: 12, color: muted),

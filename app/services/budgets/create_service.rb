@@ -29,7 +29,7 @@ module Budgets
 
       ActiveRecord::Base.transaction do
         borrower.btc_account.lock!
-        L1::SyncReserveBalanceService.call(user: borrower)
+        # Phase 2: No balance sync needed; mobile clients sync via BDK
 
         available_sats = ReserveRequirement.available_sats_for(borrower)
 

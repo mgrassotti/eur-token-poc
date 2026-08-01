@@ -42,6 +42,12 @@ class RelayApiClient {
     return DashboardData.fromJson(body);
   }
 
+  /// Public BTC/EUR rate from Rails (no auth). Used for on-device reserve EUR display.
+  Future<double?> fetchMarketRate() async {
+    final body = await _get('/market_rate', auth: false);
+    return (body['btc_eur_per_btc'] as num?)?.toDouble();
+  }
+
   Future<List<Deal>> fetchDeals() async {
     final body = await _get('/deals');
     return (body['deals'] as List<dynamic>)
@@ -141,15 +147,20 @@ class RelayApiClient {
     return ReserveInfo.fromJson(body);
   }
 
+  /// Phase 2: Register BDK-generated receive address with server.
+  Future<void> updateReserveAddress(String address) async {
+    await _put('/reserve/update_address', {'receive_address': address});
+  }
+
   Future<int> syncReserve() async {
     final body = await _post('/reserve/sync', {});
     return body['balance_sats'] as int? ?? 0;
   }
 
-  Future<Map<String, dynamic>> _get(String path) async {
+  Future<Map<String, dynamic>> _get(String path, {bool auth = true}) async {
     final response = await _client.get(
       Uri.parse('$_baseUrl$path'),
-      headers: _headers(),
+      headers: _headers(includeAuth: auth),
     );
     return _decode(response);
   }
@@ -160,6 +171,19 @@ class RelayApiClient {
     bool auth = true,
   }) async {
     final response = await _client.post(
+      Uri.parse('$_baseUrl$path'),
+      headers: _headers(includeAuth: auth),
+      body: jsonEncode(payload),
+    );
+    return _decode(response);
+  }
+
+  Future<Map<String, dynamic>> _put(
+    String path,
+    Map<String, dynamic> payload, {
+    bool auth = true,
+  }) async {
+    final response = await _client.put(
       Uri.parse('$_baseUrl$path'),
       headers: _headers(includeAuth: auth),
       body: jsonEncode(payload),

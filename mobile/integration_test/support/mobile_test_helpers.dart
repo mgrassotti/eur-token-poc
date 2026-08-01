@@ -15,17 +15,24 @@ Future<void> resetMobilePrefs({bool advancedFeatures = false}) async {
   }
 }
 
+/// Phase 2: Enter name instead of login (login saved for future: bank transfer deposits)
 Future<void> loginAs(
   WidgetTester tester, {
   required String email,
   String password = IntegrationConfig.password,
 }) async {
-  expect(find.text('Log in'), findsOneWidget);
+  // Extract name from email (e.g. "alice@example.com" -> "Alice")
+  final name = email.split('@').first.replaceFirst(
+        email[0],
+        email[0].toUpperCase(),
+      );
 
-  await tester.enterText(find.byType(TextField).first, email);
-  await tester.enterText(find.byType(TextField).last, password);
-  await tester.tap(find.text('Log in'));
-  await tester.pumpAndSettle(const Duration(seconds: 5));
+  // Check if name form is shown
+  if (find.text('Welcome!').evaluate().isNotEmpty) {
+    await tester.enterText(find.byType(TextField).first, name);
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle(const Duration(seconds: 5));
+  }
 
   expect(find.text('Overview'), findsOneWidget);
 }
@@ -59,10 +66,12 @@ Future<String> copyReceiveAddress(WidgetTester tester) async {
   return address;
 }
 
+/// Phase 2: Clear name instead of logout (no login for now)
 Future<void> logout(WidgetTester tester) async {
-  await tester.tap(find.byIcon(Icons.logout));
-  await tester.pumpAndSettle(const Duration(seconds: 5));
-  expect(find.text('Log in'), findsOneWidget);
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.remove('user_name');
+  // Note: logout button removed from dashboard in Phase 2
+  // This helper is kept for compatibility with existing tests
 }
 
 Future<void> goHome(WidgetTester tester) async {

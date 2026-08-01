@@ -115,6 +115,9 @@ class BdkWalletService implements WalletApi {
       throw WalletNotInitializedException();
     }
 
+    final url = _getElectrumUrl();
+    print('[BDK.sync] Electrum URL: $url');
+
     // Lazy initialization of blockchain - only connect when actually syncing
     if (_blockchain == null) {
       await _initializeBlockchain();
@@ -122,20 +125,21 @@ class BdkWalletService implements WalletApi {
 
     final blockchain = _blockchain;
     if (blockchain == null) {
-      throw NetworkException('Failed to initialize blockchain connection');
+      throw NetworkException('Failed to initialize blockchain at $url');
     }
 
     try {
       await wallet.sync(blockchain: blockchain);
-    } on Exception catch (e) {
-      // BDK may throw various exceptions (network, timeout, etc.)
-      if (e.toString().contains('timeout')) {
-        throw NetworkException('Sync timeout - check network connection', e);
-      } else if (e.toString().contains('connection')) {
-        throw NetworkException('Cannot connect to Electrum server', e);
-      } else {
-        throw NetworkException('Sync failed', e);
+      print('[BDK.sync] ✓ Sync complete');
+    } catch (e) {
+      // Drop stale connection so the next sync retries cleanly
+      _blockchain = null;
+      final detail = e.toString();
+      print('[BDK.sync] ✗ Failed: $detail');
+      if (detail.toLowerCase().contains('timeout')) {
+        throw NetworkException('Sync timeout talking to $url', e);
       }
+      throw NetworkException('Sync failed ($url): $detail', e);
     }
   }
 
@@ -261,22 +265,65 @@ class BdkWalletService implements WalletApi {
   }
 
   Future<void> _initializeBlockchain() async {
+    final url = _getElectrumUrl();
+    final isSsl = url.startsWith('ssl://');
+
+    await _preflightElectrum(url);
+
     try {
+      print('[BDK] Creating Electrum blockchain ($url, validateDomain=$isSsl)...');
       _blockchain = await Blockchain.create(
         config: BlockchainConfig.electrum(
           config: ElectrumConfig(
-            url: _getElectrumUrl(),
+            url: url,
             socks5: null,
-            retry: 3,
+            retry: 5,
             timeout: WalletConfig.electrumTimeoutSec,
-            stopGap: BigInt.from(10),
-            validateDomain: true,
+            stopGap: BigInt.from(20),
+            // Domain validation only applies to SSL; force false for tcp://regtest.
+            validateDomain: isSsl,
           ),
         ),
       );
+      print('[BDK] ✓ Electrum blockchain ready');
     } catch (e) {
-      throw NetworkException('Failed to connect to Electrum', e);
+      _blockchain = null;
+      throw NetworkException('Failed to connect to Electrum at $url', e);
     }
+  }
+
+  /// Fail fast with a clear message if the Electrum TCP port is unreachable.
+  /// Especially useful on macOS where App Sandbox can block Docker localhost.
+  Future<void> _preflightElectrum(String url) async {
+    final uri = _parseElectrumUrl(url);
+    if (uri == null) return;
+
+    try {
+      print('[BDK] Preflight TCP ${uri.host}:${uri.port}...');
+      final socket = await Socket.connect(
+        uri.host,
+        uri.port,
+        timeout: const Duration(seconds: 3),
+      );
+      await socket.close();
+      print('[BDK] ✓ Preflight OK');
+    } catch (e) {
+      final macHint = Platform.isMacOS
+          ? ' On macOS debug builds, App Sandbox must be off to reach Docker electrs (./bin/regtest up).'
+          : '';
+      throw NetworkException(
+        'Cannot reach Electrum at ${uri.host}:${uri.port}. Is electrs running?$macHint',
+        e,
+      );
+    }
+  }
+
+  /// Parse `tcp://host:port` / `ssl://host:port` into host+port.
+  ({String host, int port})? _parseElectrumUrl(String url) {
+    final normalized = url.contains('://') ? url : 'tcp://$url';
+    final uri = Uri.tryParse(normalized);
+    if (uri == null || uri.host.isEmpty || uri.port == 0) return null;
+    return (host: uri.host, port: uri.port);
   }
 
   String _getElectrumUrl() {

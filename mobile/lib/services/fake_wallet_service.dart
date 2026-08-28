@@ -97,6 +97,38 @@ class FakeWalletService implements WalletApi {
   }
 
   @override
+  Future<Set<String>> knownReceiveAddresses({int lookback = 30}) async {
+    if (!_initialized) throw WalletNotInitializedException();
+    return {
+      if (_receiveAddress != null) _receiveAddress!,
+    };
+  }
+
+  @override
+  Future<List<Utxo>> selectCoins(int requiredSats) async {
+    final utxos = await listUnspent();
+    utxos.sort((a, b) => b.valueSats.compareTo(a.valueSats));
+    final selected = <Utxo>[];
+    var total = 0;
+    for (final u in utxos) {
+      selected.add(u);
+      total += u.valueSats;
+      if (total >= requiredSats) return selected;
+    }
+    throw InsufficientFundsException(requiredSats, total);
+  }
+
+  @override
+  Future<String> buildCommitmentPsbt({
+    required int requiredSats,
+    String? changeAddress,
+  }) async {
+    if (!_initialized) throw WalletNotInitializedException();
+    await selectCoins(requiredSats);
+    return 'cHNidP2CommitmentFake${requiredSats}';
+  }
+
+  @override
   Future<String> signPsbt(String psbtBase64) async {
     if (!_initialized) throw WalletNotInitializedException();
     await Future.delayed(const Duration(milliseconds: 20)); // Simulate signing

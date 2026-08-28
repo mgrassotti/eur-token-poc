@@ -23,7 +23,7 @@ RSpec.describe "Demo interest at peg (€1000, 1 month @ 50k)" do
       period_start: Date.new(2026, 1, 1),
       period_end: Date.new(2026, 2, 1)
     )
-    Budgets::ActivateService.call(budget: created, investor: bob)
+    unit_activate_budget!(created, investor: bob)
     created
   end
 

@@ -56,6 +56,12 @@ class Deal {
     this.readyForSettlement = false,
     this.tokenHolders = const [],
     this.liabilityEurCents,
+    this.fundingAddress,
+    this.investorFundingAddress,
+    this.fundingPsbt,
+    this.awaitingFundingSignatures = false,
+    this.borrowerFundingSigned = false,
+    this.investorFundingSigned = false,
   });
 
   final String id;
@@ -70,6 +76,12 @@ class Deal {
   final bool readyForSettlement;
   final List<TokenHolder> tokenHolders;
   final int? liabilityEurCents;
+  final String? fundingAddress;
+  final String? investorFundingAddress;
+  final String? fundingPsbt;
+  final bool awaitingFundingSignatures;
+  final bool borrowerFundingSigned;
+  final bool investorFundingSigned;
 
   double get amountEur => amountEurCents / 100.0;
 
@@ -98,6 +110,12 @@ class Deal {
               .toList() ??
           const [],
       liabilityEurCents: json['liability_eur_cents'] as int?,
+      fundingAddress: json['funding_address'] as String?,
+      investorFundingAddress: json['investor_funding_address'] as String?,
+      fundingPsbt: json['funding_psbt'] as String?,
+      awaitingFundingSignatures: json['awaiting_funding_signatures'] as bool? ?? false,
+      borrowerFundingSigned: json['borrower_funding_signed'] as bool? ?? false,
+      investorFundingSigned: json['investor_funding_signed'] as bool? ?? false,
     );
   }
 }

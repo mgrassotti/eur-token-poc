@@ -54,7 +54,7 @@ RSpec.describe "DLC settlement (regtest)", :regtest, :dlc_integration do
     )
 
     # Activation funds the DLC on the node (oracle announcement + 2-of-2 funding tx).
-    Budgets::ActivateService.call(budget: budget, investor: bob)
+    activate_budget_with_wallets!(budget, investor: bob)
     budget.reload
 
     expect(budget.dlc_contract).to be_present

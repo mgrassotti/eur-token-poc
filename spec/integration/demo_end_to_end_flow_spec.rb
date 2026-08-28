@@ -62,7 +62,7 @@ RSpec.describe "Demo end-to-end flow", :regtest, :demo_flow do
     expect(investable_budgets_for(bob).map(&:id)).to include(budget.id)
 
     # Bob accetta: escrow L1 + conti aggiornati
-    Budgets::ActivateService.call(budget: budget, investor: bob)
+    activate_budget_with_wallets!(budget, investor: bob)
     budget.reload
 
     expect(budget).to be_active
@@ -147,7 +147,7 @@ RSpec.describe "Demo end-to-end flow", :regtest, :demo_flow do
     expect(second_budget).to be_pending
     expect(second_budget.borrower_locked_sats).to eq(required_sats)
 
-    Budgets::ActivateService.call(budget: second_budget, investor: bob)
+    activate_budget_with_wallets!(second_budget, investor: bob)
     second_budget.reload
 
     expect(second_budget).to be_active

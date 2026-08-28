@@ -12,6 +12,7 @@
     }
   },
   "settings": "Settings",
+  "refresh": "Refresh",
   "language": "Language",
   "languageEnglish": "English",
   "languageItalian": "Italiano",

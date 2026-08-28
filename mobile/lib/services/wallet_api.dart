@@ -62,6 +62,21 @@ abstract class WalletApi {
   /// Throws [WalletException] if wallet not initialized.
   Future<List<Utxo>> listUnspent();
 
+  /// Builds an unsigned commitment PSBT covering at least [requiredSats]
+  /// (self-send to [changeAddress] or receive address). Not broadcast — used
+  /// as proof-of-funds when posting an anonymous top-up.
+  Future<String> buildCommitmentPsbt({
+    required int requiredSats,
+    String? changeAddress,
+  });
+
+  /// Selects UTXOs totaling at least [requiredSats] (largest-first).
+  Future<List<Utxo>> selectCoins(int requiredSats);
+
+  /// Returns recently derived receive addresses (for matching own deals after
+  /// [getReceiveAddress] advances past the address used at create/accept).
+  Future<Set<String>> knownReceiveAddresses({int lookback = 30});
+
   /// Signs a Partially Signed Bitcoin Transaction (PSBT).
   ///
   /// - Parses PSBT base64

@@ -14,18 +14,29 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  Set<String> _knownAddresses = {};
+
   @override
   void initState() {
     super.initState();
     // Phase 2: Sync on-device wallet + fetch public BTC/EUR rate from Rails
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final wallet = context.read<WalletState>();
-      final dashboard = context.read<DashboardState>();
-      dashboard.refreshMarketRate();
-      if (wallet.isInitialized) {
-        wallet.sync();
-      }
+      _refreshAll(context);
     });
+  }
+
+  Future<void> _refreshAll(BuildContext context) async {
+    final dashboard = context.read<DashboardState>();
+    final wallet = context.read<WalletState>();
+    await Future.wait([
+      dashboard.refreshMarketRate(),
+      dashboard.refreshOpenDeals(),
+      if (wallet.isInitialized) wallet.sync(),
+    ]);
+    if (wallet.isInitialized) {
+      final known = await wallet.knownReceiveAddresses();
+      if (mounted) setState(() => _knownAddresses = known);
+    }
   }
 
   @override
@@ -34,13 +45,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final dashboard = context.watch<DashboardState>();
     final nameState = context.watch<NameState>();
     final wallet = context.watch<WalletState>();
-    final settings = context.watch<SettingsState>();
     final data = dashboard.data;
+    final myTopUps = dashboard.openDeals
+        .where(
+          (d) =>
+              wallet.ownsAddressSync(d.fundingAddress, _knownAddresses) &&
+              (d.isPending || d.awaitingFundingSignatures || d.isActive),
+        )
+        .toList();
+    final myInvestments = dashboard.openDeals
+        .where(
+          (d) =>
+              wallet.ownsAddressSync(d.investorFundingAddress, _knownAddresses) &&
+              (d.awaitingFundingSignatures || d.isActive),
+        )
+        .toList();
+    final openToInvest = dashboard.openDeals
+        .where(
+          (d) =>
+              d.isPending &&
+              !wallet.ownsAddressSync(d.fundingAddress, _knownAddresses),
+        )
+        .toList();
 
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.hiUser(nameState.name ?? '')),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: l10n.refresh,
+            onPressed: () => _refreshAll(context),
+          ),
           IconButton(
             icon: const Icon(Icons.settings_outlined),
             tooltip: l10n.settings,
@@ -49,14 +85,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: () async {
-          final dashboard = context.read<DashboardState>();
-          final wallet = context.read<WalletState>();
-          await Future.wait([
-            dashboard.refreshMarketRate(),
-            if (wallet.isInitialized) wallet.sync(),
-          ]);
-        },
+        onRefresh: () => _refreshAll(context),
         child: wallet.loading && !wallet.isInitialized
             ? const Center(child: CircularProgressIndicator())
             : ListView(
@@ -76,9 +105,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     marketRateEur: dashboard.marketRateEur ?? data?.marketRateEur,
                   ),
                   const SizedBox(height: 12),
-                  _PendingTopUpSection(deals: data?.borrowedDeals ?? const []),
+                  _PendingTopUpSection(deals: myTopUps),
+                  if (myInvestments.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    _DealSection(
+                      title: l10n.interests,
+                      deals: myInvestments,
+                      empty: l10n.noInterestsYet,
+                    ),
+                  ],
                   const SizedBox(height: 12),
-                  if ((data?.spendingEurCents ?? 0) <= 0) ...[
+                  if ((data?.spendingEurCents ?? 0) <= 0 && myTopUps.isEmpty) ...[
                     OutlinedButton.icon(
                       onPressed: () => context.push('/deals/new'),
                       icon: const Icon(Icons.account_balance_wallet_outlined),
@@ -127,19 +164,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  _FundPositionSection(
-                    positions: data?.fundPositions ?? const [],
-                  ),
-                  if (settings.advancedFeatures) ...[
+                  if (myInvestments.isEmpty) ...[
                     const SizedBox(height: 16),
-                    _DealSection(
-                      title: l10n.openToInvest,
-                      deals: data?.investableDeals ?? const [],
-                      empty: l10n.noPendingOffers,
-                      showAccept: true,
+                    _FundPositionSection(
+                      positions: data?.fundPositions ?? const [],
                     ),
                   ],
+                  const SizedBox(height: 16),
+                  _DealSection(
+                    title: l10n.openToInvest,
+                    deals: openToInvest,
+                    empty: l10n.noPendingOffers,
+                    showAccept: true,
+                  ),
                 ],
               ),
       ),
@@ -155,28 +192,31 @@ class _SummaryCard extends StatelessWidget {
   final double? marketRateEur;
 
   static String _formatBtc(double btc) {
-    var formatted = btc.toStringAsFixed(8);
-    formatted = formatted.replaceFirst(RegExp(r'0+$'), '');
-    formatted = formatted.replaceFirst(RegExp(r'\.$'), '');
-    return formatted;
+    if (btc == 0) return '0 BTC';
+    var s = btc.toStringAsFixed(8);
+    s = s.replaceFirst(RegExp(r'0+$'), '');
+    s = s.replaceFirst(RegExp(r'\.$'), '');
+    return '$s BTC';
   }
 
-  static String _formatShortMarketRate(double rateEur) {
-    if (rateEur >= 1000) {
-      final thousands = rateEur / 1000;
-      if (thousands == thousands.roundToDouble()) {
-        return '${thousands.toInt()}k€/BTC';
-      }
-      final oneDecimal = thousands.toStringAsFixed(1);
-      final trimmed = oneDecimal.endsWith('.0') ? oneDecimal.substring(0, oneDecimal.length - 2) : oneDecimal;
-      return '${trimmed}k€/BTC';
+  static String _formatShortMarketRate(double rate) {
+    if (rate >= 1000) {
+      final k = rate / 1000;
+      final text = k == k.roundToDouble() ? k.toStringAsFixed(0) : k.toStringAsFixed(1);
+      return '${text}k€/BTC';
     }
-    return '${rateEur.toStringAsFixed(0)}€/BTC';
+    return '€${rate.toStringAsFixed(0)}/BTC';
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
+    final rateEur = marketRateEur ?? data?.marketRateEur;
+    final reserveEur = (rateEur != null && rateEur > 0) ? walletSats / 1e8 * rateEur : null;
+    final pendingAmountEurCents = (data?.borrowedDeals ?? const <Deal>[])
+        .where((deal) => deal.isPending)
+        .fold<int>(0, (sum, deal) => sum + deal.amountEurCents);
 
     return Card(
       child: Padding(
@@ -187,75 +227,53 @@ class _SummaryCard extends StatelessWidget {
             Text(l10n.overview, style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 12),
             _row(l10n.spendingSavings, '€${((data?.spendingEurCents ?? 0) / 100).toStringAsFixed(2)}'),
-            _reserveRow(context, l10n),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _reserveRow(BuildContext context, AppLocalizations l10n) {
-    // Phase 2: On-device BDK balance; EUR from Rails public market rate.
-    final sats = walletSats;
-    final btc = sats / 100000000.0;
-    final rateEur = marketRateEur ?? data?.marketRateEur;
-    final pendingAmountEurCents = (data?.borrowedDeals ?? const <Deal>[])
-        .where((deal) => deal.isPending)
-        .fold<int>(0, (sum, deal) => sum + deal.amountEurCents);
-    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
-
-    final String primary;
-    final String secondary;
-    if (rateEur != null && rateEur > 0) {
-      final eur = btc * rateEur;
-      final availableEur = (eur - (pendingAmountEurCents / 100.0)).clamp(0, double.infinity);
-      primary = '€${availableEur.toStringAsFixed(2)}';
-      secondary = '${_formatBtc(btc)} BTC';
-    } else {
-      primary = '${_formatBtc(btc)} BTC';
-      secondary = '$sats sats';
-    }
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            flex: 2,
-            child: Text(l10n.availableReserve),
-          ),
-          Expanded(
-            flex: 3,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  primary,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                  textAlign: TextAlign.right,
-                ),
-                Text(
-                  secondary,
-                  style: TextStyle(fontSize: 12, color: muted),
-                  textAlign: TextAlign.right,
-                ),
-                if (pendingAmountEurCents > 0 && rateEur != null && rateEur > 0)
+            const Divider(height: 20),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: Text(l10n.availableReserve)),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        reserveEur != null
+                            ? '€${reserveEur.toStringAsFixed(2)}'
+                            : '—',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      if (pendingAmountEurCents > 0)
+                        Text(
+                          '€${(pendingAmountEurCents / 100.0).toStringAsFixed(2)} ${l10n.pending}',
+                          style: TextStyle(fontSize: 12, color: muted),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
                   Text(
-                    '€${(pendingAmountEurCents / 100.0).toStringAsFixed(2)} ${l10n.pending}',
-                    style: TextStyle(fontSize: 12, color: muted),
-                    textAlign: TextAlign.right,
-                  )
-                else if (rateEur != null && rateEur > 0)
-                  Text(
-                    _formatShortMarketRate(rateEur),
+                    _formatBtc(walletSats / 1e8),
                     style: TextStyle(fontSize: 12, color: muted),
                     textAlign: TextAlign.right,
                   ),
-              ],
+                  if (rateEur != null)
+                    Text(
+                      _formatShortMarketRate(rateEur),
+                      style: TextStyle(fontSize: 12, color: muted),
+                      textAlign: TextAlign.right,
+                    ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -279,21 +297,30 @@ class _PendingTopUpSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final pendingDeals = deals.where((deal) => deal.isPending).toList();
-    if (pendingDeals.isEmpty) return const SizedBox.shrink();
+    if (deals.isEmpty) return const SizedBox.shrink();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(l10n.pendingTopUps, style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 8),
-        ...pendingDeals.map(
+        ...deals.map(
           (deal) => Card(
             color: Theme.of(context).colorScheme.secondaryContainer,
             child: ListTile(
-              leading: const Icon(Icons.hourglass_top_outlined),
+              leading: Icon(
+                deal.awaitingFundingSignatures
+                    ? Icons.draw_outlined
+                    : Icons.hourglass_top_outlined,
+              ),
               title: Text(l10n.pendingTopUpAmount(deal.amountEur.toStringAsFixed(2))),
-              subtitle: Text(l10n.awaitingInvestor),
+              subtitle: Text(
+                deal.awaitingFundingSignatures
+                    ? (deal.borrowerFundingSigned
+                        ? 'Awaiting investor funding signature'
+                        : 'Sign funding to activate')
+                    : l10n.awaitingInvestor,
+              ),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => context.push('/deals/${deal.id}'),
             ),
@@ -332,12 +359,16 @@ class _DealSection extends StatelessWidget {
               child: ListTile(
                 title: Text('€${deal.amountEur.toStringAsFixed(0)} · ${deal.status}'),
                 subtitle: Text(
-                  '${deal.period.start} → ${deal.period.end}'
-                  '${deal.borrower != null ? ' · ${deal.borrower!.name}' : ''}',
+                  deal.awaitingFundingSignatures
+                      ? 'Awaiting funding signatures'
+                      : '${deal.period.start} → ${deal.period.end}'
+                          '${deal.borrower != null ? ' · ${deal.borrower!.name}' : ''}',
                 ),
                 trailing: showAccept && deal.isPending
                     ? const Icon(Icons.handshake_outlined)
-                    : const Icon(Icons.chevron_right),
+                    : deal.awaitingFundingSignatures
+                        ? const Icon(Icons.draw_outlined)
+                        : const Icon(Icons.chevron_right),
                 onTap: () => context.push('/deals/${deal.id}'),
               ),
             ),
@@ -376,7 +407,9 @@ class _FundPositionSection extends StatelessWidget {
                       style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
                     Text(
-                      position.periodEnd.substring(0, 10),
+                      position.periodEnd.length >= 10
+                          ? position.periodEnd.substring(0, 10)
+                          : position.periodEnd,
                       style: TextStyle(color: Theme.of(context).colorScheme.outline),
                     ),
                   ],

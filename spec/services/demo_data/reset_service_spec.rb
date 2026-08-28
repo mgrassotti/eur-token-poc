@@ -19,7 +19,7 @@ RSpec.describe DemoData::ResetService do
       period_start: Date.current,
       period_end: Date.current + 1.month
     )
-    Budgets::ActivateService.call(budget: budget, investor: bob)
+    unit_activate_budget!(budget, investor: bob)
   end
 
   it "clears ledger and zeros all reserve balances" do

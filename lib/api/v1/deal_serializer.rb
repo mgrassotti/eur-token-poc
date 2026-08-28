@@ -35,6 +35,12 @@ module Api
           maturity_block_height: deal.maturity_block_height,
           blocks_remaining: deal.blocks_remaining,
           ready_for_settlement: deal.ready_for_settlement?,
+          funding_address: deal.funding_address,
+          investor_funding_address: deal.investor&.btc_account&.reserve_receive_address.presence ||
+                                    deal.investor_change_address,
+          awaiting_funding_signatures: deal.funding_psbt.present? && !deal.l1_multisig_provisioned?,
+          borrower_funding_signed: deal.borrower_funding_signed,
+          investor_funding_signed: deal.investor_funding_signed,
           created_at: deal.created_at.iso8601,
           updated_at: deal.updated_at.iso8601
         }
@@ -50,7 +56,8 @@ module Api
           token_holders: token_holders,
           token_transfers_count: deal.token_transfers.count,
           liability_eur_cents: liability_preview,
-          dlc_funded: deal.dlc_contract&.funded? || false
+          dlc_funded: deal.dlc_contract&.funded? || false,
+          funding_psbt: deal.l1_multisig_provisioned? ? nil : deal.funding_psbt
         )
       end
 

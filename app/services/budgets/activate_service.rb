@@ -1,6 +1,11 @@
 # frozen_string_literal: true
 
 module Budgets
+  # Accepts a pending top-up with client-supplied funding UTXOs (BDK / on-device).
+  # Does not use L1::UserWallet for balances or signing.
+  #
+  # When auto_sign_wallets is provided (regtest helpers only), signs + broadcasts
+  # immediately. Otherwise stores an unsigned funding PSBT for the mobile sign round.
   class ActivateService
     class Error < StandardError; end
 
@@ -11,16 +16,27 @@ module Budgets
       Rgb::Nodes::Error,
       Rgb::WalletSetupService::Error,
       Rgb::LibIssueService::Error,
-      Rgb::IssueService::Error
+      Rgb::IssueService::Error,
+      FundingParams::Error,
+      L1::UtxoSetValidator::Error
     ].freeze
 
-    def self.call(budget:, investor:)
-      new(budget:, investor:).call
+    def self.call(budget:, investor:, funding:, auto_sign_wallets: nil, verify_utxos: true)
+      new(
+        budget: budget,
+        investor: investor,
+        funding: funding,
+        auto_sign_wallets: auto_sign_wallets,
+        verify_utxos: verify_utxos
+      ).call
     end
 
-    def initialize(budget:, investor:)
+    def initialize(budget:, investor:, funding:, auto_sign_wallets: nil, verify_utxos: true)
       @budget = budget
       @investor = investor
+      @funding = funding.is_a?(FundingParams) ? funding : FundingParams.from_hash(funding)
+      @auto_sign_wallets = auto_sign_wallets
+      @verify_utxos = verify_utxos
     end
 
     def call
@@ -29,13 +45,12 @@ module Budgets
       peg_eur_per_btc = MarketRate.current.btc_eur_per_btc
       collateral_sats = ReserveRequirement.investor_collateral_sats_for(budget, peg_eur_per_btc)
 
+      validate_funding_amounts!(collateral_sats)
+      verify_on_chain_utxos!(collateral_sats) if @verify_utxos
+
       ActiveRecord::Base.transaction do
         investor.btc_account.lock!
         budget.borrower.btc_account.lock!
-        # Phase 2: No balance sync needed; mobile clients sync via BDK
-
-        validate_investor_reserve!(collateral_sats, peg_eur_per_btc)
-        validate_funding_balances!(collateral_sats)
 
         total_locked_sats = collateral_sats + budget.borrower_locked_sats
 
@@ -48,7 +63,16 @@ module Budgets
           peg_eur_per_btc: peg_eur_per_btc,
           genesis_block_height: genesis_height,
           maturity_block_height: maturity_height,
-          status: :active
+          status: :active,
+          borrower_change_address: funding.peg_change_address,
+          investor_change_address: funding.investor_change_address,
+          investor_payout_address: funding.investor_payout_address,
+          investor_funding_inputs: funding.investor_inputs,
+          reserved_outpoints: funding.peg_inputs,
+          peg_party_pubkey: funding.peg_identity_pubkey,
+          investor_pubkey: funding.investor_identity_pubkey,
+          borrower_funding_signed: false,
+          investor_funding_signed: false
         )
 
         CollateralLock.create!(
@@ -63,57 +87,50 @@ module Budgets
 
     private
 
-    attr_reader :budget, :investor
+    attr_reader :budget, :investor, :funding
 
     def validate!
       raise Error, I18n.t("services.budgets.activate.not_pending") unless budget.pending?
       raise Error, I18n.t("services.budgets.activate.investor_is_borrower") if investor.id == budget.borrower_id
       raise Error, I18n.t("services.budgets.create.market_rate_required") unless MarketRate.current.set?
 
+      funding.validate_presence!
+
       return if L1::Bitcoind::Client.new.available?
 
       raise Error, I18n.t("services.shared.bitcoind_unreachable")
     end
 
-    def validate_investor_reserve!(collateral_sats, peg_eur_per_btc)
-      required_sats = ReserveRequirement.investor_required_sats_for(budget, peg_eur_per_btc)
-      available_sats = ReserveRequirement.available_sats_for(investor)
-
-      return if available_sats >= required_sats
-
-      raise Error,
-            ReserveRequirement.insufficient_message(
-              label: I18n.t("services.budgets.reserve_requirement.investor_label"),
-              required_sats: required_sats,
-              available_sats: available_sats,
-              eur_per_btc: peg_eur_per_btc
-            )
-    end
-
-    def validate_funding_balances!(collateral_sats)
-      peg_wallet = L1::UserWallet.for(budget.borrower)
-      investor_wallet = L1::UserWallet.for(investor)
-
+    def validate_funding_amounts!(collateral_sats)
       required_borrower = ReserveRequirement.borrower_funding_required_sats_for(budget)
-      if peg_wallet.spendable_sats < required_borrower
-        raise Error, insufficient_on_chain_message(peg_wallet, required_borrower)
+      if funding.peg_total_sats < required_borrower
+        raise Error,
+              I18n.t("services.dlc.contract_setup.insufficient_on_chain_balance",
+                wallet_name: "borrower",
+                available_sats: funding.peg_total_sats,
+                required_sats: required_borrower)
       end
 
       required_investor = collateral_sats + ReserveRequirement.funding_fee_buffer_sats
-      return if investor_wallet.spendable_sats >= required_investor
+      return if funding.investor_total_sats >= required_investor
 
-      raise Error, insufficient_on_chain_message(investor_wallet, required_investor)
+      raise Error,
+            I18n.t("services.dlc.contract_setup.insufficient_on_chain_balance",
+              wallet_name: "investor",
+              available_sats: funding.investor_total_sats,
+              required_sats: required_investor)
     end
 
-    def insufficient_on_chain_message(wallet, required_sats)
-      I18n.t("services.dlc.contract_setup.insufficient_on_chain_balance",
-        wallet_name: wallet.wallet_name,
-        available_sats: wallet.spendable_sats,
-        required_sats: required_sats)
+    def verify_on_chain_utxos!(collateral_sats)
+      required_borrower = ReserveRequirement.borrower_funding_required_sats_for(budget)
+      required_investor = collateral_sats + ReserveRequirement.funding_fee_buffer_sats
+
+      L1::UtxoSetValidator.call(inputs: funding.peg_inputs, required_sats: required_borrower, label: "borrower")
+      L1::UtxoSetValidator.call(inputs: funding.investor_inputs, required_sats: required_investor, label: "investor")
     end
 
     def provision!(budget)
-      L1::ProvisionEscrowService.call(budget: budget)
+      L1::ProvisionEscrowService.call(budget: budget, auto_sign_wallets: @auto_sign_wallets)
       budget.reload
     rescue *PROVISION_ERRORS => e
       revert_activation!(budget)
@@ -143,6 +160,14 @@ module Budgets
           refund_delay_blocks: Budget::REFUND_DELAY_BLOCKS,
           recovery_package: nil,
           rgb_asset_id: nil,
+          funding_psbt: nil,
+          funding_tx_hex: nil,
+          investor_funding_inputs: nil,
+          borrower_change_address: nil,
+          investor_change_address: nil,
+          investor_payout_address: nil,
+          borrower_funding_signed: false,
+          investor_funding_signed: false,
           status: :pending
         )
       end

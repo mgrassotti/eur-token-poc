@@ -17,6 +17,7 @@ Rails.application.routes.draw do
       resources :deals, only: %i[index show create] do
         member do
           post :accept
+          post :funding_signature
         end
         resource :settlement, only: %i[show create], controller: "deals/settlements"
         resources :transfers, only: %i[index create], controller: "deals/transfers"

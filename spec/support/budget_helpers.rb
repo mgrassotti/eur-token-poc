@@ -12,8 +12,39 @@ module BudgetHelpers
       period_start: Date.current,
       period_end: Date.current + 6.months
     )
-    Budgets::ActivateService.call(budget: budget, investor: investor)
+    unit_activate_budget!(budget, investor: investor)
     budget.reload
+  end
+
+  def synthetic_funding_for(budget, peg: MarketRate.current.btc_eur_per_btc)
+    collateral = budget.collateral_sats_at_peg(peg)
+    buffer = Dlc::ContractSetupService::FUNDING_FEE_BUFFER_SATS
+    Budgets::FundingParams.synthetic(
+      peg_sats: budget.borrower_locked_sats + buffer,
+      investor_sats: collateral + buffer
+    )
+  end
+
+  def unit_activate_budget!(budget, investor:, verify_utxos: false, auto_sign_wallets: nil)
+    Budgets::ActivateService.call(
+      budget: budget,
+      investor: investor,
+      funding: synthetic_funding_for(budget),
+      verify_utxos: verify_utxos,
+      auto_sign_wallets: auto_sign_wallets
+    )
+  end
+
+  # Real L1: select coins from bitcoind wallets and auto-sign funding.
+  def activate_budget_with_wallets!(budget, investor:)
+    builder = Budgets::WalletFundingBuilder.new(budget: budget, investor: investor)
+    Budgets::ActivateService.call(
+      budget: budget,
+      investor: investor,
+      funding: builder.call,
+      verify_utxos: true,
+      auto_sign_wallets: builder.wallets
+    )
   end
 
   def advance_to_maturity!(budget, auto_settle: false)

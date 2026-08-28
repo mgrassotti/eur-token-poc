@@ -25,7 +25,7 @@ RSpec.describe Settlements::ExecuteService do
       period_start: period_start,
       period_end: period_end
     )
-    Budgets::ActivateService.call(budget: created, investor: bob)
+    unit_activate_budget!(created, investor: bob)
     created
   end
 
@@ -126,7 +126,7 @@ RSpec.describe Settlements::ExecuteService do
       period_start: period_start,
       period_end: period_end
     )
-    Budgets::ActivateService.call(budget: created, investor: bob)
+    unit_activate_budget!(created, investor: bob)
     advance_to_maturity!(created)
     created
   end

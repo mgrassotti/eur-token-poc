@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:bdk_flutter/bdk_flutter.dart';
+import 'package:bdk_flutter/bdk_flutter.dart' hide InsufficientFundsException;
 import 'package:path_provider/path_provider.dart';
 
 import '../config/wallet_config.dart';
@@ -160,6 +160,70 @@ class BdkWalletService implements WalletApi {
       }).toList();
     } catch (e) {
       throw WalletException('Failed to list UTXOs', e);
+    }
+  }
+
+  @override
+  Future<Set<String>> knownReceiveAddresses({int lookback = 30}) async {
+    final wallet = _wallet;
+    if (wallet == null) throw WalletNotInitializedException();
+
+    final addrs = <String>{};
+    try {
+      addrs.add(await getReceiveAddress());
+      for (var i = 0; i < lookback; i++) {
+        final info = wallet.getAddress(
+          addressIndex: AddressIndex.peek(index: i),
+        );
+        addrs.add(info.address.asString());
+      }
+    } catch (_) {
+      // peek may fail on some indices; return what we have
+    }
+    return addrs;
+  }
+
+  @override
+  Future<List<Utxo>> selectCoins(int requiredSats) async {
+    final utxos = await listUnspent();
+    utxos.sort((a, b) => b.valueSats.compareTo(a.valueSats));
+    final selected = <Utxo>[];
+    var total = 0;
+    for (final u in utxos) {
+      selected.add(u);
+      total += u.valueSats;
+      if (total >= requiredSats) return selected;
+    }
+    throw InsufficientFundsException(requiredSats, total);
+  }
+
+  @override
+  Future<String> buildCommitmentPsbt({
+    required int requiredSats,
+    String? changeAddress,
+  }) async {
+    final wallet = _wallet;
+    if (wallet == null) throw WalletNotInitializedException();
+
+    try {
+      final addressStr = changeAddress ?? await getReceiveAddress();
+      final address = await Address.fromString(s: addressStr, network: network);
+      final script = address.scriptPubkey();
+
+      // Self-send covering required sats; not broadcast — proof-of-funds only.
+      // Leave dust headroom for fee so finish() succeeds.
+      final sendAmount = requiredSats > 1000 ? requiredSats - 500 : requiredSats;
+      final txBuilder = TxBuilder();
+      final (psbt, _) = await txBuilder
+          .addRecipient(script, BigInt.from(sendAmount))
+          .feeRate(1.0)
+          .finish(wallet);
+
+      return psbt.toString(); // base64 PSBT
+    } on InsufficientFundsException {
+      rethrow;
+    } catch (e) {
+      throw WalletException('Failed to build commitment PSBT', e);
     }
   }
 

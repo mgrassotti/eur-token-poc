@@ -26,7 +26,7 @@ RSpec.describe "PAYOFF-SPEC §11 integration" do
       period_end: period_end
     )
     budget.update!(rate_bps_monthly: rate_bps)
-    Budgets::ActivateService.call(budget: budget, investor: bob)
+    unit_activate_budget!(budget, investor: bob)
     budget.reload
     advance_to_maturity!(budget)
     budget

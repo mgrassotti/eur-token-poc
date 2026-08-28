@@ -49,14 +49,14 @@ class RelayApiClient {
   }
 
   Future<List<Deal>> fetchDeals() async {
-    final body = await _get('/deals');
+    final body = await _get('/deals', auth: false);
     return (body['deals'] as List<dynamic>)
         .map((e) => Deal.fromJson(e as Map<String, dynamic>))
         .toList();
   }
 
   Future<Deal> fetchDeal(String id) async {
-    final body = await _get('/deals/$id');
+    final body = await _get('/deals/$id', auth: false);
     return Deal.fromJson(body);
   }
 
@@ -64,19 +64,70 @@ class RelayApiClient {
     required int amountEurCents,
     required String periodStart,
     required String periodEnd,
+    required String fundingAddress,
+    required String commitmentPsbt,
+    String? borrowerName,
   }) async {
-    final body = await _post('/deals', {
-      'deal': {
-        'amount_eur_cents': amountEurCents,
-        'period_start': periodStart,
-        'period_end': periodEnd,
+    final body = await _post(
+      '/deals',
+      {
+        'deal': {
+          'amount_eur_cents': amountEurCents,
+          'period_start': periodStart,
+          'period_end': periodEnd,
+          'funding_address': fundingAddress,
+          'commitment_psbt': commitmentPsbt,
+          if (borrowerName != null) 'borrower_name': borrowerName,
+        },
       },
-    });
+      auth: false,
+    );
     return Deal.fromJson(body);
   }
 
-  Future<Deal> acceptDeal(String id) async {
-    final body = await _post('/deals/$id/accept', {});
+  Future<Deal> acceptDeal(
+    String id, {
+    required String fundingAddress,
+    required List<Map<String, dynamic>> investorInputs,
+    required String investorChangeAddress,
+    required String investorPayoutAddress,
+    required String investorIdentityPubkey,
+    String? investorName,
+    List<Map<String, dynamic>>? pegInputs,
+    String? pegChangeAddress,
+    String? pegIdentityPubkey,
+  }) async {
+    final body = await _post(
+      '/deals/$id/accept',
+      {
+        'funding_address': fundingAddress,
+        if (investorName != null) 'investor_name': investorName,
+        'investor_inputs': investorInputs,
+        'investor_change_address': investorChangeAddress,
+        'investor_payout_address': investorPayoutAddress,
+        'investor_identity_pubkey': investorIdentityPubkey,
+        if (pegInputs != null) 'peg_inputs': pegInputs,
+        if (pegChangeAddress != null) 'peg_change_address': pegChangeAddress,
+        if (pegIdentityPubkey != null) 'peg_identity_pubkey': pegIdentityPubkey,
+      },
+      auth: false,
+    );
+    return Deal.fromJson(body);
+  }
+
+  Future<Deal> submitFundingSignature({
+    required String dealId,
+    required String fundingAddress,
+    required String signedPsbt,
+  }) async {
+    final body = await _post(
+      '/deals/$dealId/funding_signature',
+      {
+        'funding_address': fundingAddress,
+        'signed_psbt': signedPsbt,
+      },
+      auth: false,
+    );
     return Deal.fromJson(body);
   }
 

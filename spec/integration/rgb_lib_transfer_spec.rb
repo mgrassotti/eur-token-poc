@@ -36,7 +36,7 @@ RSpec.describe "RGB transfer via RGB Lightning Node", :l1_integration, :rgb_lib,
       period_start: period_start,
       period_end: period_start >> 6
     )
-    Budgets::ActivateService.call(budget: budget, investor: bob)
+    activate_budget_with_wallets!(budget, investor: bob)
     budget.reload
 
     expect(budget.rgb_asset_id).to be_present

@@ -22,6 +22,7 @@ module L1
         sendrawtransaction
         createmultisig
         getrawtransaction
+        gettxout
         decodepsbt
         decoderawtransaction
         deriveaddresses

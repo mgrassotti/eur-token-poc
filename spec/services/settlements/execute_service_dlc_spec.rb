@@ -18,7 +18,7 @@ RSpec.describe Settlements::ExecuteService, "DLC settlement path" do
       period_start: Date.new(2026, 1, 1),
       period_end: Date.new(2026, 7, 1)
     )
-    Budgets::ActivateService.call(budget: created, investor: bob)
+    unit_activate_budget!(created, investor: bob)
     created
   end
 

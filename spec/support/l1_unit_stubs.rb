@@ -110,7 +110,7 @@ module L1UnitStubs
   end
 
   def stub_l1_unit_operations!
-    allow(L1::ProvisionEscrowService).to receive(:call) do |budget:|
+    allow(L1::ProvisionEscrowService).to receive(:call) do |budget:, auto_sign_wallets: nil|
       budget.tap { |b| stub_l1_provisioned!(b) if b.persisted? && !b.l1_multisig_provisioned? }
     end
 

@@ -75,6 +75,7 @@ class DashboardState extends ChangeNotifier {
   final RelayApiClient _api;
   DashboardData? data;
   double? marketRateEur;
+  List<Deal> openDeals = const [];
   bool loading = false;
   String? error;
 
@@ -103,6 +104,17 @@ class DashboardState extends ChangeNotifier {
       notifyListeners();
     } on RelayApiException catch (e) {
       // Keep last known rate; surface error lightly
+      error = e.message;
+      notifyListeners();
+    }
+  }
+
+  /// Public marketplace list (no auth).
+  Future<void> refreshOpenDeals() async {
+    try {
+      openDeals = await _api.fetchDeals();
+      notifyListeners();
+    } on RelayApiException catch (e) {
       error = e.message;
       notifyListeners();
     }
@@ -289,6 +301,44 @@ class WalletState extends ChangeNotifier {
       loading = false;
       notifyListeners();
     }
+  }
+
+  Future<String> buildCommitmentPsbt({required int requiredSats}) {
+    return _wallet.buildCommitmentPsbt(
+      requiredSats: requiredSats,
+      changeAddress: receiveAddress,
+    );
+  }
+
+  Future<List<Utxo>> selectCoins(int requiredSats) => _wallet.selectCoins(requiredSats);
+
+  Future<String> signPsbt(String psbtBase64) => _wallet.signPsbt(psbtBase64);
+
+  Future<List<Utxo>> listUnspent() => _wallet.listUnspent();
+
+  Future<String> nextChangeAddress() => _wallet.getReceiveAddress();
+
+  Future<Set<String>> knownReceiveAddresses() async {
+    if (!_wallet.isInitialized) {
+      return {
+        if (receiveAddress != null) receiveAddress!,
+      };
+    }
+    return _wallet.knownReceiveAddresses();
+  }
+
+  /// True if [address] was derived by this wallet (current or recent receive).
+  Future<bool> ownsAddress(String? address) async {
+    if (address == null || address.isEmpty) return false;
+    if (address == receiveAddress) return true;
+    if (!_wallet.isInitialized) return false;
+    final known = await knownReceiveAddresses();
+    return known.contains(address);
+  }
+
+  bool ownsAddressSync(String? address, Set<String> known) {
+    if (address == null || address.isEmpty) return false;
+    return address == receiveAddress || known.contains(address);
   }
 
   Future<void> _refreshWalletData() async {

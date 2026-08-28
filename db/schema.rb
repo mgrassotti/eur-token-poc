@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_18_104321) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_01_102833) do
   create_table "btc_accounts", force: :cascade do |t|
     t.bigint "balance_sats", default: 0, null: false
     t.string "bitcoind_wallet_name"
@@ -32,16 +32,26 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_18_104321) do
 
   create_table "budgets", force: :cascade do |t|
     t.integer "amount_eur_cents", null: false
+    t.string "borrower_change_address"
+    t.boolean "borrower_funding_signed", default: false, null: false
     t.integer "borrower_id", null: false
     t.bigint "borrower_locked_sats", default: 0, null: false
     t.string "bot_pubkey"
     t.integer "collateral_eur_cents", null: false
+    t.text "commitment_psbt"
     t.datetime "created_at", null: false
     t.string "escrow_txid"
     t.integer "escrow_vout"
+    t.string "funding_address"
+    t.text "funding_psbt"
+    t.text "funding_tx_hex"
     t.bigint "genesis_block_height"
+    t.string "investor_change_address"
+    t.json "investor_funding_inputs"
+    t.boolean "investor_funding_signed", default: false, null: false
     t.integer "investor_id"
     t.bigint "investor_locked_sats", default: 0, null: false
+    t.string "investor_payout_address"
     t.string "investor_pubkey"
     t.bigint "maturity_block_height"
     t.decimal "peg_eur_per_btc", precision: 16, scale: 2
@@ -51,6 +61,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_18_104321) do
     t.integer "rate_bps_monthly", default: 100, null: false
     t.json "recovery_package"
     t.integer "refund_delay_blocks", default: 1008, null: false
+    t.json "reserved_outpoints"
     t.string "rgb_asset_id"
     t.integer "status", default: 0, null: false
     t.datetime "updated_at", null: false

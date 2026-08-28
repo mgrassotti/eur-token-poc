@@ -34,6 +34,10 @@ class Budget < ApplicationRecord
   before_validation :set_default_collateral, on: :create
 
   scope :awaiting_investor, -> { pending.where(investor_id: nil) }
+  # Open offers + deals waiting on-device funding signatures (escrow not yet broadcast).
+  scope :marketplace_visible, lambda {
+    awaiting_investor.or(active.where.not(funding_psbt: [nil, ""]).where(escrow_txid: nil))
+  }
 
   def peg_set?
     peg_eur_per_btc.present? && peg_eur_per_btc.positive?
@@ -78,7 +82,12 @@ class Budget < ApplicationRecord
   def symbolic_months_duration
     end_months = period_end.year * 12 + period_end.month
     start_months = period_start.year * 12 + period_start.month
-    end_months - start_months
+    delta = end_months - start_months
+    return delta if delta.positive?
+
+    # Same calendar month (e.g. Aug 1 → Aug 31 from mobile top-up duration) still
+    # counts as one symbolic month for maturity / refund locktime.
+    period_end > period_start ? 1 : 0
   end
 
   def blocks_remaining

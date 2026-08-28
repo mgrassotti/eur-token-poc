@@ -17,7 +17,7 @@ RSpec.describe Tokens::WalletTransferService do
       period_start: Date.current,
       period_end: Date.current + 6.months
     )
-    Budgets::ActivateService.call(budget: budget, investor: investor)
+    unit_activate_budget!(budget, investor: investor)
     budget
   end
 

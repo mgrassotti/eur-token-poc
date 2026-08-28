@@ -20,7 +20,7 @@ RSpec.describe Tokens::TransferService do
 
   before do
     bob.btc_account.update!(balance_sats: 5_000_000)
-    Budgets::ActivateService.call(budget: budget, investor: bob)
+    unit_activate_budget!(budget, investor: bob)
   end
 
   it "transfers tokens between users" do

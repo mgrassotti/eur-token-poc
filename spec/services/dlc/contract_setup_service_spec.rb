@@ -17,7 +17,14 @@ RSpec.describe Dlc::ContractSetupService do
       investor: investor,
       maturity_block_height: 1_000,
       period_start: Date.new(2026, 1, 1),
-      period_end: Date.new(2026, 7, 1)
+      period_end: Date.new(2026, 7, 1),
+      peg_party_pubkey: "02peg",
+      investor_pubkey: "02inv",
+      borrower_change_address: "bcrt1peg",
+      investor_change_address: "bcrt1invchg",
+      investor_payout_address: "bcrt1invpay",
+      reserved_outpoints: [ { "txid" => "aa" * 32, "vout" => 0, "amount_sats" => 10_100_000 } ],
+      investor_funding_inputs: [ { "txid" => "bb" * 32, "vout" => 1, "amount_sats" => 10_100_000 } ]
     )
     CollateralLock.create!(budget: b, amount_sats: 20_000_000, locked_at: Time.current)
     b
@@ -33,8 +40,6 @@ RSpec.describe Dlc::ContractSetupService do
       L1::UserWallet,
       wallet_name: "user_peg",
       identity_pubkey: "02peg",
-      spendable_sats: 100_000_000,
-      change_address: "bcrt1peg",
       client: peg_rpc
     )
   end
@@ -44,8 +49,7 @@ RSpec.describe Dlc::ContractSetupService do
       L1::UserWallet,
       wallet_name: "user_inv",
       identity_pubkey: "02inv",
-      spendable_sats: 100_000_000,
-      change_address: "bcrt1invchg"
+      client: investor_rpc
     )
   end
 
@@ -70,33 +74,39 @@ RSpec.describe Dlc::ContractSetupService do
     allow(oracle).to receive(:announce_numeric).and_return(announcement)
     allow(node).to receive(:create_contract).and_return(contract)
 
-    allow(L1::UserWallet).to receive(:for) do |user|
-      user == investor ? investor_wallet : peg_wallet
-    end
-    allow(peg_wallet).to receive(:select_coins).and_return(
-      [{ "txid" => "aa" * 32, "vout" => 0, "amount" => 0.101 }]
-    )
-    allow(investor_wallet).to receive(:select_coins).and_return(
-      [{ "txid" => "bb" * 32, "vout" => 1, "amount" => 0.101 }]
-    )
-    allow(investor_wallet).to receive(:receive_address).and_return("bcrt1invpay")
-
     allow(L1::Bitcoind::Client).to receive(:new).and_return(global_client)
+    allow(global_client).to receive(:call).with("converttopsbt", "0200000000", false).and_return("cHNidP2")
+    allow(global_client).to receive(:call).with("gettxout", anything, anything).and_return(
+      "value" => 0.101,
+      "scriptPubKey" => { "address" => "bcrt1qtest" }
+    )
+    allow(global_client).to receive(:call).with("getdescriptorinfo", anything).and_return(
+      "descriptor" => "addr(bcrt1qtest)#checksum"
+    )
+    allow(global_client).to receive(:call).with("utxoupdatepsbt", "cHNidP2", anything).and_return("cHNidP2")
     allow(peg_rpc).to receive(:call)
       .with("signrawtransactionwithwallet", "0200000000")
       .and_return("hex" => "signed_peg", "complete" => false)
     allow(investor_rpc).to receive(:call)
       .with("signrawtransactionwithwallet", "signed_peg")
       .and_return("hex" => "signed_both", "complete" => true)
-    allow(investor_wallet).to receive(:client).and_return(investor_rpc)
     allow(global_client).to receive(:call).with("sendrawtransaction", "signed_both").and_return("ab" * 32)
 
     allow(L1::RegtestHarness).to receive(:new).and_return(harness)
     allow(harness).to receive(:mine_blocks)
   end
 
-  it "announces the event, funds the contract from reserves and persists a DlcContract" do
-    result = described_class.call(budget: budget, oracle: oracle, node: node)
+  def call_setup!
+    described_class.call(
+      budget: budget,
+      oracle: oracle,
+      node: node,
+      auto_sign_wallets: [peg_wallet, investor_wallet]
+    )
+  end
+
+  it "announces the event, funds the contract from client UTXOs and persists a DlcContract" do
+    result = call_setup!
 
     expect(result).to be_a(DlcContract)
     expect(result).to be_funded
@@ -109,7 +119,7 @@ RSpec.describe Dlc::ContractSetupService do
   end
 
   it "records the DLC funding as the collateral lock on the budget" do
-    described_class.call(budget: budget, oracle: oracle, node: node)
+    call_setup!
     budget.reload
 
     expect(budget.l1_multisig_provisioned?).to be(true)
@@ -119,8 +129,8 @@ RSpec.describe Dlc::ContractSetupService do
     expect(budget.recovery_package.dig("escrow", "outpoint")).to eq("#{'ab' * 32}:0")
   end
 
-  it "signs the unsigned funding tx with both reserve wallets and broadcasts it" do
-    described_class.call(budget: budget, oracle: oracle, node: node)
+  it "signs the unsigned funding tx with both wallets and broadcasts it" do
+    call_setup!
 
     expect(peg_rpc).to have_received(:call).with("signrawtransactionwithwallet", "0200000000")
     expect(investor_rpc).to have_received(:call).with("signrawtransactionwithwallet", "signed_peg")
@@ -128,8 +138,8 @@ RSpec.describe Dlc::ContractSetupService do
     expect(harness).to have_received(:mine_blocks).with(1)
   end
 
-  it "passes the reserve inputs, change and payout addresses to the node" do
-    described_class.call(budget: budget, oracle: oracle, node: node)
+  it "passes client inputs, change and payout addresses to the node" do
+    call_setup!
 
     expect(node).to have_received(:create_contract) do |args|
       expect(args[:oracle_announcement]).to eq("annhex")
@@ -146,8 +156,13 @@ RSpec.describe Dlc::ContractSetupService do
   end
 
   it "is idempotent: a second call returns the existing contract" do
-    first = described_class.call(budget: budget, oracle: oracle, node: node)
-    second = described_class.call(budget: budget.reload, oracle: oracle, node: node)
+    first = call_setup!
+    second = described_class.call(
+      budget: budget.reload,
+      oracle: oracle,
+      node: node,
+      auto_sign_wallets: [peg_wallet, investor_wallet]
+    )
 
     expect(second.id).to eq(first.id)
     expect(node).to have_received(:create_contract).once
@@ -156,14 +171,24 @@ RSpec.describe Dlc::ContractSetupService do
   it "raises a setup error when the oracle fails" do
     allow(oracle).to receive(:announce_numeric).and_raise(Dlc::OracleClient::Error, "boom")
 
-    expect { described_class.call(budget: budget, oracle: oracle, node: node) }
+    expect { call_setup! }
       .to raise_error(described_class::Error, /Setup DLC fallito: boom/)
   end
 
-  it "raises when the budget peg is missing" do
-    budget.update!(peg_eur_per_btc: nil)
+  it "defers broadcast when auto_sign_wallets is omitted" do
+    result = described_class.call(budget: budget, oracle: oracle, node: node)
 
-    expect { described_class.call(budget: budget, oracle: oracle, node: node) }
-      .to raise_error(described_class::Error, /peg/i)  # Case-insensitive for localization
+    expect(result).to be_a(DlcContract)
+    expect(result).to be_announced
+    expect(budget.reload.funding_psbt).to eq("cHNidP2")
+    expect(budget.l1_multisig_provisioned?).to be(false)
+    expect(global_client).not_to have_received(:call).with("sendrawtransaction", anything)
+  end
+
+  it "calls converttopsbt with a boolean permitsigdata (not an array)" do
+    described_class.call(budget: budget, oracle: oracle, node: node)
+
+    expect(global_client).to have_received(:call).with("converttopsbt", "0200000000", false)
   end
 end
+

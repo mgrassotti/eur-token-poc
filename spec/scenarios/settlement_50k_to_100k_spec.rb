@@ -29,7 +29,7 @@ RSpec.describe "Settlement scenario 50k → 100k (FloorEUR)" do
       period_start: period_start,
       period_end: period_end
     )
-    Budgets::ActivateService.call(budget: @budget, investor: bob)
+    unit_activate_budget!(@budget, investor: bob)
     advance_to_maturity!(@budget)
     Tokens::TransferService.call(budget: @budget, from_user: alice, to_user: claude, amount_cents: 50_000)
     Tokens::TransferService.call(budget: @budget, from_user: claude, to_user: david, amount_cents: 25_000)

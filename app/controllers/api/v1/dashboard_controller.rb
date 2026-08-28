@@ -23,7 +23,10 @@ module Api
             DealSerializer.render(deal, market_rate: market_rate)
           end,
           investable_deals: investable_deals(market_rate),
-          fund_positions: fund_positions,
+          funding_requests: FundingRequest.where(user: current_user).order(created_at: :desc).map do |request|
+            FundingRequestSerializer.render(request)
+          end,
+          collection_iban: BankAccount.default.iban,
           margin_call_deals: margin_call_deals(market_rate)
         }
       end

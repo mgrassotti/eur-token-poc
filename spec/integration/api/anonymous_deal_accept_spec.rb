@@ -4,7 +4,7 @@ require "rails_helper"
 
 # Reproduces the mobile anonymous accept + funding sign round against regtest + DLC:
 # create → accept → both funding_signatures → funded (not rolled back / hidden).
-RSpec.describe "Anonymous deal accept (regtest)", :regtest, :dlc_integration, type: :request do
+RSpec.describe "Anonymous deal accept (regtest)", :regtest, :dlc_integration, type: :request, skip: "MVP savings: accept is replaced by automatic matching" do
   def bitcoind_available?
     L1::Bitcoind::Client.new.available?
   end

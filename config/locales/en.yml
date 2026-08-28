@@ -52,6 +52,12 @@ en:
       demo_reset:
         done: "Demo reset."
         unavailable_in_production: "Demo reset is not available in production."
+      sepa_in:
+        created: "Simulated SEPA inbound %{amount}. Equivalent BTC sent to the saver wallet."
+      sepa_out:
+        created: "Simulated SEPA outbound to the saver IBAN."
+      investor_deposit:
+        created: "Simulated external BTC deposit to the investor wallet."
     recovery_packages:
       unauthorized: "Unauthorized."
       missing: "Recovery package not available for this deal."
@@ -164,6 +170,14 @@ en:
           maturity_html: "Maturity block <strong>%{height}</strong> (%{remaining} remaining)"
           action: "Settlement"
           empty: "No active budgets waiting for settlement."
+        bank:
+          title: "MAT bank (simulated SEPA)"
+          iban_html: "%{name} IBAN <code>%{iban}</code> — ledger balance %{balance}"
+          simulate_sepa_in: "Simulate SEPA in"
+          simulate_sepa_out: "Simulate SEPA out"
+          simulate_investor_btc: "Simulate BTC deposit"
+          empty_requests: "No pending savings or investment requests."
+          sepa_out_title: "Settled deals awaiting EUR payout"
         wallets:
           title: "L1 multisig (regtest)"
           description_html: "Per-user regtest wallets; deposits come from <strong>%{wallet_name}</strong> (<code>%{wallet_code}</code>). Each deposit advances the simulated chain by %{blocks} blocks."

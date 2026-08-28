@@ -2,7 +2,7 @@
 
 require "rails_helper"
 
-RSpec.describe Rgb::BalanceService do
+RSpec.describe Rgb::BalanceService, skip: "MVP savings: RGB unplugged" do
   let(:alice) { create(:user) }
   let(:budget) { create(:budget, borrower: alice, amount_eur_cents: 100_000) }
 

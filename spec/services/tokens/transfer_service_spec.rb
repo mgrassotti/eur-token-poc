@@ -2,7 +2,7 @@
 
 require "rails_helper"
 
-RSpec.describe Tokens::TransferService do
+RSpec.describe Tokens::TransferService, skip: "MVP savings: RGB/P2P transfers unplugged" do
   let(:alice) { create(:user) }
   let(:bob) { create(:user) }
   let(:claude) { create(:user) }

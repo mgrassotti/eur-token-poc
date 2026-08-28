@@ -50,7 +50,8 @@ RSpec.describe Settlements::ExecuteService, "DLC settlement path" do
       budget: budget,
       peg_pot_sats: 10_600_000,
       shares: kind_of(Array),
-      holder_targets: kind_of(Array)
+      holder_targets: kind_of(Array),
+      address_resolver: kind_of(Proc)
     )
     expect(budget.reload).to be_settled
     expect(budget.recovery_package["settlement_txid"]).to eq(cet_txid)

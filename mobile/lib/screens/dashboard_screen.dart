@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -5,6 +7,8 @@ import 'package:provider/provider.dart';
 import '../l10n/app_localizations.dart';
 import '../models/models.dart';
 import '../providers/app_state.dart';
+import '../services/btc_math.dart';
+import '../services/relay_api_client.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -15,14 +19,23 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   Set<String> _knownAddresses = {};
+  Timer? _poll;
 
   @override
   void initState() {
     super.initState();
-    // Phase 2: Sync on-device wallet + fetch public BTC/EUR rate from Rails
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _refreshAll(context);
     });
+    _poll = Timer.periodic(const Duration(seconds: 8), (_) {
+      if (mounted) _automate(context);
+    });
+  }
+
+  @override
+  void dispose() {
+    _poll?.cancel();
+    super.dispose();
   }
 
   Future<void> _refreshAll(BuildContext context) async {
@@ -30,13 +43,62 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final wallet = context.read<WalletState>();
     await Future.wait([
       dashboard.refreshMarketRate(),
-      dashboard.refreshOpenDeals(),
       if (wallet.isInitialized) wallet.sync(),
     ]);
-    if (wallet.isInitialized) {
-      final known = await wallet.knownReceiveAddresses();
-      if (mounted) setState(() => _knownAddresses = known);
+    final known = wallet.isInitialized ? await wallet.knownReceiveAddresses() : <String>{};
+    if (wallet.receiveAddress != null) known.add(wallet.receiveAddress!);
+    if (mounted) setState(() => _knownAddresses = known);
+    await dashboard.refreshFundingRequests(addresses: known.toList());
+    await dashboard.refreshOpenDeals(addresses: known.toList());
+    await _automate(context);
+  }
+
+  Future<void> _automate(BuildContext context) async {
+    if (!mounted) return;
+    final wallet = context.read<WalletState>();
+    final dashboard = context.read<DashboardState>();
+    final api = context.read<RelayApiClient>();
+    if (!wallet.isInitialized || wallet.receiveAddress == null) return;
+
+    final rate = dashboard.marketRateEur;
+    for (final request in dashboard.fundingRequests.where((r) => r.awaitingDeposit)) {
+      if (rate == null || rate <= 0) continue;
+      final required = request.requiredSats ??
+          BtcMath.borrowerRequiredSats(request.remainingEurCents ?? request.amountEurCents, rate);
+      if (wallet.balanceSats < required) continue;
+      try {
+        final coins = await wallet.selectCoins(required);
+        final change = await wallet.nextChangeAddress();
+        await api.submitFundingUtxos(
+          requestId: request.id,
+          inputs: coins
+              .map((u) => {'txid': u.txid, 'vout': u.vout, 'amount_sats': u.valueSats})
+              .toList(),
+          changeAddress: change,
+          identityPubkey: BtcMath.placeholderIdentityPubkey(wallet.receiveAddress!),
+        );
+      } catch (_) {}
     }
+
+    for (final deal in dashboard.openDeals.where((d) => d.awaitingFundingSignatures && d.fundingPsbt != null)) {
+      final isBorrower = wallet.ownsAddressSync(deal.fundingAddress, _knownAddresses);
+      final isInvestor = wallet.ownsAddressSync(deal.investorFundingAddress, _knownAddresses);
+      if (!isBorrower && !isInvestor) continue;
+      if (isBorrower && deal.borrowerFundingSigned) continue;
+      if (isInvestor && deal.investorFundingSigned) continue;
+      try {
+        final signed = await wallet.signPsbt(deal.fundingPsbt!);
+        final address = isBorrower ? deal.fundingAddress : deal.investorFundingAddress;
+        await api.submitFundingSignature(
+          dealId: deal.id,
+          fundingAddress: address ?? wallet.receiveAddress!,
+          signedPsbt: signed,
+        );
+      } catch (_) {}
+    }
+
+    await dashboard.refreshFundingRequests(addresses: _knownAddresses.toList());
+    await dashboard.refreshOpenDeals(addresses: _knownAddresses.toList());
   }
 
   @override
@@ -60,13 +122,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               (d.awaitingFundingSignatures || d.isActive),
         )
         .toList();
-    final openToInvest = dashboard.openDeals
-        .where(
-          (d) =>
-              d.isPending &&
-              !wallet.ownsAddressSync(d.fundingAddress, _knownAddresses),
-        )
-        .toList();
+    final saverRequests = dashboard.fundingRequests.where((r) => r.isSaver && !r.matched).toList();
+    final investorRequests = dashboard.fundingRequests.where((r) => r.isInvestor && !r.matched).toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -105,6 +162,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     marketRateEur: dashboard.marketRateEur ?? data?.marketRateEur,
                   ),
                   const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: () => context.push('/requests/new/saver'),
+                          icon: const Icon(Icons.savings_outlined),
+                          label: Text(l10n.saveMoney),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => context.push('/requests/new/investor'),
+                          icon: const Icon(Icons.trending_up),
+                          label: Text(l10n.invest),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _RequestSection(title: l10n.savingsRequests, requests: saverRequests, saver: true),
+                  const SizedBox(height: 12),
+                  _RequestSection(title: l10n.investmentRequests, requests: investorRequests, saver: false),
+                  const SizedBox(height: 12),
                   _PendingTopUpSection(deals: myTopUps),
                   if (myInvestments.isNotEmpty) ...[
                     const SizedBox(height: 12),
@@ -114,69 +195,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       empty: l10n.noInterestsYet,
                     ),
                   ],
-                  const SizedBox(height: 12),
-                  if ((data?.spendingEurCents ?? 0) <= 0 && myTopUps.isEmpty) ...[
-                    OutlinedButton.icon(
-                      onPressed: () => context.push('/deals/new'),
-                      icon: const Icon(Icons.account_balance_wallet_outlined),
-                      label: Text(l10n.topUpSpending),
-                    ),
-                    const SizedBox(height: 8),
-                  ],
-                  if (wallet.balanceSats <= 0) ...[
-                    FilledButton.tonalIcon(
-                      onPressed: () => context.push('/reserve/add-funds'),
-                      icon: const Icon(Icons.qr_code),
-                      label: Text(l10n.depositFunds),
-                    ),
-                    const SizedBox(height: 8),
-                  ],
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () => context.push('/send-money'),
-                          icon: const Icon(Icons.send_outlined, size: 18),
-                          label: Text(
-                            l10n.sendMoney,
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () => context.push('/receive-money'),
-                          icon: const Icon(Icons.qr_code_2_outlined, size: 18),
-                          label: Text(
-                            l10n.receiveMoney,
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (myInvestments.isEmpty) ...[
-                    const SizedBox(height: 16),
-                    _FundPositionSection(
-                      positions: data?.fundPositions ?? const [],
-                    ),
-                  ],
-                  const SizedBox(height: 16),
-                  _DealSection(
-                    title: l10n.openToInvest,
-                    deals: openToInvest,
-                    empty: l10n.noPendingOffers,
-                    showAccept: true,
-                  ),
                 ],
               ),
       ),
@@ -285,6 +303,48 @@ class _SummaryCard extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [Text(label), Text(value, style: const TextStyle(fontWeight: FontWeight.w600))],
       ),
+    );
+  }
+}
+
+class _RequestSection extends StatelessWidget {
+  const _RequestSection({required this.title, required this.requests, required this.saver});
+
+  final String title;
+  final List<FundingRequest> requests;
+  final bool saver;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 8),
+        if (requests.isEmpty)
+          Text(l10n.noPendingRequests, style: TextStyle(color: Theme.of(context).colorScheme.outline))
+        else
+          ...requests.map((request) {
+            final status = request.awaitingDeposit
+                ? (saver ? l10n.awaitingBankTransfer : l10n.awaitingBtcDeposit)
+                : request.queued
+                    ? l10n.awaitingMatch
+                    : request.status;
+            return Card(
+              child: ListTile(
+                title: Text('€${((request.remainingEurCents ?? request.amountEurCents) / 100).toStringAsFixed(2)}'),
+                subtitle: Text('$status · ${request.payoutMode}'),
+                trailing: request.budgetId != null
+                    ? IconButton(
+                        icon: const Icon(Icons.chevron_right),
+                        onPressed: () => context.push('/deals/${request.budgetId}'),
+                      )
+                    : null,
+              ),
+            );
+          }),
+      ],
     );
   }
 }

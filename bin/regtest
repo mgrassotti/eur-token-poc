@@ -2,36 +2,40 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-PROFILE_ARGS=(--profile rgb)
+# MVP savings: bitcoind + electrs (BDK) + DLC oracle/sidecar. RGB/LN is opt-in.
+PROFILE_ARGS=(--profile dlc)
 if [[ "${1:-}" == "--rgb" ]]; then
+  PROFILE_ARGS=(--profile rgb --profile dlc)
   shift
 fi
 
-RLN_PORTS=(3001 3002 3003 3004 3005)
-
-wait_for_rln() {
-  echo "Waiting for RGB Lightning Nodes on :${RLN_PORTS[*]}..."
-  for port in "${RLN_PORTS[@]}"; do
-    ready=""
-    for _ in $(seq 1 120); do
-      # /nodeinfo answers (any HTTP status) once the daemon is listening.
-      if curl -s -o /dev/null "http://127.0.0.1:${port}/nodeinfo" 2>/dev/null; then
-        ready="yes"
-        break
-      fi
-      sleep 2
-    done
-    if [[ -z "$ready" ]]; then
-      echo "RLN node on :${port} did not become ready in time" >&2
-      exit 1
+wait_for_electrs() {
+  echo "Waiting for electrs on :50001..."
+  for _ in $(seq 1 60); do
+    if (echo > /dev/tcp/127.0.0.1/50001) >/dev/null 2>&1; then
+      echo "electrs ready"
+      return 0
     fi
-    echo "RLN node on :${port} ready"
+    sleep 1
   done
+  echo "electrs did not become ready in time" >&2
+  exit 1
+}
+
+wait_for_pythia() {
+  echo "Waiting for Pythia on :8000..."
+  for _ in $(seq 1 60); do
+    if curl -sf http://127.0.0.1:8000/v1/oracle/publickey >/dev/null 2>&1; then
+      echo "Pythia ready"
+      return 0
+    fi
+    sleep 1
+  done
+  echo "Pythia did not become ready in time (DLC stack still starting)" >&2
 }
 
 case "${1:-up}" in
   up)
-    # --build compiles the RLN image from vendor/rgb-lightning-node (first run is slow).
     docker compose -f docker-compose.regtest.yml "${PROFILE_ARGS[@]}" up -d --build
     echo "Waiting for bitcoind regtest on :18443..."
     for _ in $(seq 1 60); do
@@ -40,7 +44,8 @@ case "${1:-up}" in
         -H "content-type: application/json" \
         http://127.0.0.1:18443/ >/dev/null 2>&1; then
         echo "bitcoind regtest ready"
-        wait_for_rln
+        wait_for_electrs
+        wait_for_pythia
         exit 0
       fi
       sleep 1
@@ -49,10 +54,10 @@ case "${1:-up}" in
     exit 1
     ;;
   down)
-    docker compose -f docker-compose.regtest.yml --profile rgb down
+    docker compose -f docker-compose.regtest.yml --profile dlc --profile rgb down
     ;;
   reset)
-    docker compose -f docker-compose.regtest.yml --profile rgb down
+    docker compose -f docker-compose.regtest.yml --profile dlc --profile rgb down
     exec "$0" up
     ;;
   logs)

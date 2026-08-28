@@ -38,3 +38,6 @@
 
 # Rust workspace (mat-core / mat-ffi)
 /target/
+
+# Local bundler install (Ruby may differ from .ruby-version on this VM)
+/vendor/bundle/

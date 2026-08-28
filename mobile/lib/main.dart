@@ -7,18 +7,13 @@ import 'config/api_config.dart';
 import 'l10n/app_localizations.dart';
 import 'providers/app_state.dart';
 import 'screens/add_funds_screen.dart';
-import 'screens/create_deal_screen.dart';
+import 'screens/create_request_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/deal_detail_screen.dart';
-// import 'screens/login_screen.dart'; // Saved for future: bank transfer deposits
 import 'screens/local_wallet_debug_screen.dart';
 import 'screens/name_form_screen.dart';
-import 'screens/receive_money_screen.dart';
-import 'screens/scan_pay_screen.dart';
-import 'screens/send_money_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/settlement_summary_screen.dart';
-import 'screens/transfer_list_screen.dart';
 import 'services/relay_api_client.dart';
 
 void bootstrap({RelayApiClient? api, String? apiBaseUrl}) {
@@ -82,22 +77,16 @@ class MatAppRouter extends StatelessWidget {
         GoRoute(path: '/name', builder: (_, __) => const NameFormScreen()),
         GoRoute(path: '/', builder: (_, __) => const DashboardScreen()),
         GoRoute(path: '/reserve/add-funds', builder: (_, __) => const AddFundsScreen()),
-        GoRoute(path: '/send-money', builder: (_, __) => const SendMoneyScreen()),
-        GoRoute(path: '/receive-money', builder: (_, __) => const ReceiveMoneyScreen()),
-        GoRoute(path: '/scan-pay', builder: (_, __) => const ScanPayScreen()),
+        GoRoute(path: '/requests/new/:role', builder: (_, state) => CreateRequestScreen(role: state.pathParameters['role']!)),
+        GoRoute(path: '/deals/new', builder: (_, __) => const CreateRequestScreen(role: 'saver')),
         GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
         GoRoute(
           path: '/settings/local-wallet',
           builder: (_, __) => const LocalWalletDebugScreen(),
         ),
-        GoRoute(path: '/deals/new', builder: (_, __) => const CreateDealScreen()),
         GoRoute(
           path: '/deals/:id',
           builder: (_, state) => DealDetailScreen(dealId: state.pathParameters['id']!),
-        ),
-        GoRoute(
-          path: '/deals/:id/transfers',
-          builder: (_, state) => TransferListScreen(dealId: state.pathParameters['id']!),
         ),
         GoRoute(
           path: '/deals/:id/settlement',

@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import '../l10n/app_localizations.dart';
 import '../models/models.dart';
 import '../providers/app_state.dart';
-import '../services/btc_math.dart';
 import '../services/relay_api_client.dart';
 
 class DealDetailScreen extends StatefulWidget {
@@ -71,81 +70,6 @@ class _DealDetailScreenState extends State<DealDetailScreen> {
     return wallet.ownsAddressSync(deal.investorFundingAddress, _knownAddresses);
   }
 
-  Future<void> _accept(RelayApiClient api) async {
-    final l10n = AppLocalizations.of(context);
-    final wallet = context.read<WalletState>();
-    final dashboard = context.read<DashboardState>();
-    final nameState = context.read<NameState>();
-    final deal = _deal;
-    final rate = dashboard.marketRateEur;
-    final address = wallet.receiveAddress;
-
-    if (deal == null || rate == null || address == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Wallet or market rate not ready')),
-      );
-      return;
-    }
-
-    setState(() => _busy = true);
-    try {
-      await wallet.sync();
-      final collateralSats = BtcMath.eurCentsToSats(deal.amountEurCents, rate);
-      final required = collateralSats + BtcMath.fundingFeeBufferSats;
-      final coins = await wallet.selectCoins(required);
-      final change = await wallet.nextChangeAddress();
-      final payout = await wallet.nextChangeAddress();
-
-      final updated = await api.acceptDeal(
-        widget.dealId,
-        fundingAddress: address,
-        investorName: nameState.name,
-        investorInputs: coins
-            .map((u) => {
-                  'txid': u.txid,
-                  'vout': u.vout,
-                  'amount_sats': u.valueSats,
-                })
-            .toList(),
-        investorChangeAddress: change,
-        investorPayoutAddress: payout,
-        investorIdentityPubkey: BtcMath.placeholderIdentityPubkey(address),
-      );
-
-      // Investor signs funding PSBT when returned.
-      var finalDeal = updated;
-      if (updated.fundingPsbt != null && updated.awaitingFundingSignatures) {
-        final signed = await wallet.signPsbt(updated.fundingPsbt!);
-        finalDeal = await api.submitFundingSignature(
-          dealId: widget.dealId,
-          fundingAddress: address,
-          signedPsbt: signed,
-        );
-      }
-
-      final dashboard = context.read<DashboardState>();
-      await dashboard.refreshOpenDeals();
-      if (!mounted) return;
-      setState(() {
-        _deal = finalDeal;
-        _busy = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.dealActivated)),
-      );
-    } on RelayApiException catch (e) {
-      if (mounted) {
-        setState(() => _busy = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _busy = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
-      }
-    }
-  }
-
   Future<void> _signFunding(RelayApiClient api) async {
     final wallet = context.read<WalletState>();
     final deal = _deal;
@@ -192,7 +116,6 @@ class _DealDetailScreenState extends State<DealDetailScreen> {
     final deal = _deal;
     final isBorrower = deal != null && _isBorrower(deal, wallet);
     final isInvestor = deal != null && _isInvestor(deal, wallet);
-    final canAccept = deal != null && deal.isPending && !isBorrower;
     final needsBorrowerSign = deal != null &&
         deal.awaitingFundingSignatures &&
         isBorrower &&
@@ -213,11 +136,6 @@ class _DealDetailScreenState extends State<DealDetailScreen> {
         ),
         title: Text(l10n.dealTitle(widget.dealId)),
         actions: [
-          if (deal?.isActive == true)
-            IconButton(
-              icon: const Icon(Icons.swap_horiz),
-              onPressed: () => context.push('/deals/${widget.dealId}/transfers'),
-            ),
           IconButton(
             icon: const Icon(Icons.payments_outlined),
             onPressed: () => context.push('/deals/${widget.dealId}/settlement'),
@@ -270,15 +188,6 @@ class _DealDetailScreenState extends State<DealDetailScreen> {
                                   )
                                 : null,
                           ),
-                        ),
-                      ],
-                      if (canAccept) ...[
-                        const SizedBox(height: 24),
-                        FilledButton(
-                          onPressed: _busy ? null : () => _accept(context.read<RelayApiClient>()),
-                          child: _busy
-                              ? const CircularProgressIndicator()
-                              : Text(l10n.acceptAndActivate),
                         ),
                       ],
                       if (needsBorrowerSign || needsInvestorSign) ...[

@@ -5,7 +5,8 @@ module Budgets
     class Error < StandardError; end
 
     def self.call(amount_eur_cents:, period_start:, period_end:, borrower: nil,
-                  funding_address: nil, commitment_psbt: nil, borrower_name: nil)
+                  funding_address: nil, commitment_psbt: nil, borrower_name: nil,
+                  skip_fund_check: false)
       new(
         borrower: borrower,
         funding_address: funding_address,
@@ -13,12 +14,13 @@ module Budgets
         borrower_name: borrower_name,
         amount_eur_cents: amount_eur_cents,
         period_start: period_start,
-        period_end: period_end
+        period_end: period_end,
+        skip_fund_check: skip_fund_check
       ).call
     end
 
     def initialize(borrower:, funding_address:, commitment_psbt:, borrower_name:,
-                   amount_eur_cents:, period_start:, period_end:)
+                   amount_eur_cents:, period_start:, period_end:, skip_fund_check: false)
       @borrower = borrower
       @funding_address = funding_address.to_s.strip.presence
       @commitment_psbt = commitment_psbt.to_s.strip.presence
@@ -26,6 +28,7 @@ module Budgets
       @amount_eur_cents = amount_eur_cents
       @period_start = period_start
       @period_end = period_end
+      @skip_fund_check = skip_fund_check
     end
 
     def call
@@ -79,6 +82,8 @@ module Budgets
     end
 
     def validate_funds!(required_sats)
+      return nil if @skip_fund_check
+
       if @commitment_psbt.present?
         return validate_commitment!(required_sats)
       end

@@ -41,6 +41,9 @@ module Api
           awaiting_funding_signatures: deal.funding_psbt.present? && !deal.l1_multisig_provisioned?,
           borrower_funding_signed: deal.borrower_funding_signed,
           investor_funding_signed: deal.investor_funding_signed,
+          saver_payout_mode: deal.saver_payout_mode,
+          investor_payout_mode: deal.investor_payout_mode,
+          saver_payout_iban: deal.saver_payout_iban,
           created_at: deal.created_at.iso8601,
           updated_at: deal.updated_at.iso8601
         }

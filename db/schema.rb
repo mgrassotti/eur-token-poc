@@ -10,7 +10,34 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_01_102833) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_28_120000) do
+  create_table "bank_accounts", force: :cascade do |t|
+    t.integer "balance_eur_cents", default: 0, null: false
+    t.string "btc_receive_address"
+    t.datetime "created_at", null: false
+    t.boolean "default", default: false, null: false
+    t.string "iban", null: false
+    t.string "name", null: false
+    t.datetime "updated_at", null: false
+    t.index ["iban"], name: "index_bank_accounts_on_iban", unique: true
+  end
+
+  create_table "bank_transfers", force: :cascade do |t|
+    t.integer "amount_eur_cents", null: false
+    t.integer "bank_account_id", null: false
+    t.integer "btc_sats"
+    t.string "btc_txid"
+    t.integer "budget_id"
+    t.string "counterparty_iban"
+    t.datetime "created_at", null: false
+    t.integer "direction", null: false
+    t.integer "funding_request_id"
+    t.integer "status", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.index ["bank_account_id"], name: "index_bank_transfers_on_bank_account_id"
+    t.index ["funding_request_id"], name: "index_bank_transfers_on_funding_request_id"
+  end
+
   create_table "btc_accounts", force: :cascade do |t|
     t.bigint "balance_sats", default: 0, null: false
     t.string "bitcoind_wallet_name"
@@ -48,10 +75,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_01_102833) do
     t.bigint "genesis_block_height"
     t.string "investor_change_address"
     t.json "investor_funding_inputs"
+    t.integer "investor_funding_request_id"
     t.boolean "investor_funding_signed", default: false, null: false
     t.integer "investor_id"
     t.bigint "investor_locked_sats", default: 0, null: false
     t.string "investor_payout_address"
+    t.integer "investor_payout_mode", default: 0, null: false
     t.string "investor_pubkey"
     t.bigint "maturity_block_height"
     t.decimal "peg_eur_per_btc", precision: 16, scale: 2
@@ -63,6 +92,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_01_102833) do
     t.integer "refund_delay_blocks", default: 1008, null: false
     t.json "reserved_outpoints"
     t.string "rgb_asset_id"
+    t.integer "saver_funding_request_id"
+    t.string "saver_payout_address"
+    t.string "saver_payout_iban"
+    t.integer "saver_payout_mode", default: 0, null: false
     t.integer "status", default: 0, null: false
     t.datetime "updated_at", null: false
     t.index ["borrower_id"], name: "index_budgets_on_borrower_id"
@@ -110,6 +143,27 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_01_102833) do
     t.datetime "updated_at", null: false
     t.index ["budget_id"], name: "index_dlc_settlements_on_budget_id", unique: true
     t.index ["dlc_contract_id"], name: "index_dlc_settlements_on_dlc_contract_id"
+  end
+
+  create_table "funding_requests", force: :cascade do |t|
+    t.integer "amount_eur_cents", null: false
+    t.integer "budget_id"
+    t.string "change_address"
+    t.datetime "created_at", null: false
+    t.string "display_name"
+    t.json "funding_inputs"
+    t.string "identity_pubkey"
+    t.string "payout_iban"
+    t.integer "payout_mode", default: 0, null: false
+    t.string "receive_address", null: false
+    t.integer "remaining_eur_cents", null: false
+    t.integer "role", null: false
+    t.integer "status", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.integer "user_id", null: false
+    t.index ["budget_id"], name: "index_funding_requests_on_budget_id"
+    t.index ["role", "status"], name: "index_funding_requests_on_role_and_status"
+    t.index ["user_id"], name: "index_funding_requests_on_user_id"
   end
 
   create_table "investor_yield_payouts", force: :cascade do |t|

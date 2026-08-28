@@ -11,16 +11,18 @@ Rails.application.routes.draw do
         put :update_address, on: :member
         post :sync, on: :member
       end
-      resources :users, only: :index
-      resources :transfers, only: :create
-      resources :receive_requests, only: %i[create show], param: :id
-      resources :deals, only: %i[index show create] do
+      resource :bank, only: :show, controller: "bank"
+      resources :funding_requests, only: %i[index show create] do
         member do
-          post :accept
+          post :submit_utxos
+        end
+      end
+      resources :users, only: :index
+      resources :deals, only: %i[index show] do
+        member do
           post :funding_signature
         end
-        resource :settlement, only: %i[show create], controller: "deals/settlements"
-        resources :transfers, only: %i[index create], controller: "deals/transfers"
+        resource :settlement, only: %i[show], controller: "deals/settlements"
       end
 
       if Rails.env.development? || Rails.env.test?
@@ -58,6 +60,17 @@ Rails.application.routes.draw do
     resource :market_rate, only: :update
     resource :chain_state, only: :update
     resource :reserve_deposit, only: :create, controller: "reserve_deposits"
+    resources :funding_requests, only: [] do
+      member do
+        post :simulate_sepa_in
+        post :simulate_investor_deposit
+      end
+    end
+    resources :budgets, only: [] do
+      member do
+        post :simulate_sepa_out
+      end
+    end
   end
 
   if Rails.env.development? || Rails.env.test?

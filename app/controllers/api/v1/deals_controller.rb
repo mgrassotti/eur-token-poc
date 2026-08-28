@@ -3,9 +3,9 @@
 module Api
   module V1
     class DealsController < BaseController
-      skip_before_action :authenticate_api_user!, only: %i[index show create accept funding_signature]
-      before_action :optional_authenticate!, only: %i[index show create accept funding_signature]
-      before_action :set_deal, only: %i[show accept funding_signature]
+      skip_before_action :authenticate_api_user!, only: %i[index show funding_signature]
+      before_action :optional_authenticate!, only: %i[index show funding_signature]
+      before_action :set_deal, only: %i[show funding_signature]
 
       def index
         market_rate = MarketRate.current
@@ -85,15 +85,23 @@ module Api
       private
 
       def visible_deals
-        if current_user&.admin?
+        addresses = indexed_addresses
+        if addresses.any?
+          Budget.where(funding_address: addresses)
+                .or(Budget.where(investor_payout_address: addresses))
+                .or(Budget.where(investor_change_address: addresses))
+                .or(Budget.where(borrower_change_address: addresses))
+        elsif current_user&.admin?
           Budget.all
         elsif current_user
-          Budget.where(borrower_id: current_user.id)
-                .or(Budget.where(investor_id: current_user.id))
-                .or(Budget.awaiting_investor)
+          Budget.where(borrower_id: current_user.id).or(Budget.where(investor_id: current_user.id))
         else
-          Budget.marketplace_visible
+          Budget.none
         end
+      end
+
+      def indexed_addresses
+        Array(params[:address] || params[:addresses]).map { |a| a.to_s.strip }.reject(&:blank?)
       end
 
       def optional_authenticate!

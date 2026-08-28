@@ -48,34 +48,26 @@ RSpec.describe "Relay API v1", type: :request do
     end
   end
 
-  describe "deals lifecycle" do
-    let(:token) { login(alice) }
-
-    before do
+  describe "funding request lifecycle" do
+    it "creates a savings request without auth" do
       MarketRate.current.update!(btc_eur_per_btc: 50_000)
-      alice.btc_account.update!(balance_sats: 5_000_000)
-    end
 
-    it "creates, lists, and shows a deal" do
-      post "/api/v1/deals",
+      post "/api/v1/funding_requests",
            params: {
-             deal: {
+             funding_request: {
+               role: "saver",
                amount_eur_cents: 100_000,
-               period_start: "2026-01-01",
-               period_end: "2026-02-01"
+               receive_address: "bcrt1qalice0000000000000000000000001",
+               payout_mode: "keep_btc",
+               display_name: "Alice"
              }
            },
-           headers: headers
+           as: :json
 
       expect(response).to have_http_status(:created)
-      deal_id = JSON.parse(response.body).fetch("id")
-
-      get "/api/v1/deals", headers: headers
-      ids = JSON.parse(response.body).fetch("deals").map { |d| d["id"] }
-      expect(ids).to include(deal_id)
-
-      get "/api/v1/deals/#{deal_id}", headers: headers
-      expect(JSON.parse(response.body).fetch("status")).to eq("pending")
+      body = JSON.parse(response.body)
+      expect(body.fetch("status")).to eq("awaiting_deposit")
+      expect(body.fetch("collection_iban")).to be_present
     end
   end
 

@@ -117,5 +117,21 @@
     "placeholders": {
       "detail": { "type": "String" }
     }
-  }
+  },
+  "saveMoney": "Risparmia",
+  "invest": "Investi",
+  "savingsRequests": "Richieste di risparmio",
+  "investmentRequests": "Richieste di investimento",
+  "awaitingBankTransfer": "In attesa del bonifico",
+  "awaitingBtcDeposit": "In attesa del deposito BTC",
+  "awaitingMatch": "In attesa di matching",
+  "contractActive": "Contratto attivo",
+  "payoutKeepBtc": "Tieni i BTC in app",
+  "payoutReinvest": "Reinvesti il mese successivo",
+  "payoutEur": "Ricevi EUR sul mio IBAN",
+  "yourIban": "Il tuo IBAN",
+  "matIban": "Bonifico a questo IBAN",
+  "onePercentMonth": "1% per 1 mese",
+  "noPendingRequests": "Nessuna richiesta in attesa.",
+  "signFundingAutomatically": "Firma del contratto in corso…"
 }

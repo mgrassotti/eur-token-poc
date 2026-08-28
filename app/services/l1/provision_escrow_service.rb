@@ -24,8 +24,8 @@ module L1
       # auto_sign_wallets (regtest) signs immediately; otherwise PSBT sign round.
       setup_dlc!(budget.reload)
 
-      if budget.l1_multisig_provisioned?
-        Rgb::IssueService.call(budget: budget.reload)
+      if budget.l1_multisig_provisioned? || budget.funding_psbt.present?
+        Budgets::AssignSaverShareService.call(budget: budget.reload)
       end
 
       budget.reload

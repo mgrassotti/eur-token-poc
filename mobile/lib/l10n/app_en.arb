@@ -204,5 +204,21 @@
     "placeholders": {
       "detail": { "type": "String" }
     }
-  }
+  },
+  "saveMoney": "Save",
+  "invest": "Invest",
+  "savingsRequests": "Savings requests",
+  "investmentRequests": "Investment requests",
+  "awaitingBankTransfer": "Waiting for bank transfer",
+  "awaitingBtcDeposit": "Waiting for BTC deposit",
+  "awaitingMatch": "Waiting for a match",
+  "contractActive": "Contract active",
+  "payoutKeepBtc": "Keep BTC in the app",
+  "payoutReinvest": "Reinvest next month",
+  "payoutEur": "Receive EUR to my IBAN",
+  "yourIban": "Your IBAN",
+  "matIban": "Pay to this IBAN",
+  "onePercentMonth": "1% for 1 month",
+  "noPendingRequests": "No pending requests.",
+  "signFundingAutomatically": "Signing the contract…"
 }

@@ -2,7 +2,7 @@
 
 require "rails_helper"
 
-RSpec.describe "API v1 receive requests", type: :request do
+RSpec.describe "API v1 receive requests", type: :request, skip: "MVP savings: P2P receive requests unplugged" do
   let(:claude) { create(:user, name: "Claude") }
   let(:alice) { create(:user, name: "Alice") }
   let(:headers) { { "Authorization" => "Bearer #{token}", "CONTENT_TYPE" => "application/json" } }

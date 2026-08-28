@@ -2,7 +2,7 @@
 
 require "rails_helper"
 
-RSpec.describe "Api::V1 anonymous deals", type: :request do
+RSpec.describe "Api::V1 anonymous deals", type: :request, skip: "MVP savings: deals are matched, not listed on a marketplace" do
   let(:address) { "bcrt1qanonymousfundingaddress00000000000000" }
 
   before do

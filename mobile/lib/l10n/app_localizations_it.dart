@@ -395,4 +395,52 @@ class AppLocalizationsIt extends AppLocalizations {
   String localWalletError(String detail) {
     return 'Errore wallet: $detail';
   }
+
+  @override
+  String get saveMoney => 'Risparmia';
+
+  @override
+  String get invest => 'Investi';
+
+  @override
+  String get savingsRequests => 'Richieste di risparmio';
+
+  @override
+  String get investmentRequests => 'Richieste di investimento';
+
+  @override
+  String get awaitingBankTransfer => 'In attesa del bonifico';
+
+  @override
+  String get awaitingBtcDeposit => 'In attesa del deposito BTC';
+
+  @override
+  String get awaitingMatch => 'In attesa di matching';
+
+  @override
+  String get contractActive => 'Contratto attivo';
+
+  @override
+  String get payoutKeepBtc => 'Tieni i BTC in app';
+
+  @override
+  String get payoutReinvest => 'Reinvesti il mese successivo';
+
+  @override
+  String get payoutEur => 'Ricevi EUR sul mio IBAN';
+
+  @override
+  String get yourIban => 'Il tuo IBAN';
+
+  @override
+  String get matIban => 'Bonifico a questo IBAN';
+
+  @override
+  String get onePercentMonth => '1% per 1 mese';
+
+  @override
+  String get noPendingRequests => 'Nessuna richiesta in attesa.';
+
+  @override
+  String get signFundingAutomatically => 'Firma del contratto in corso…';
 }

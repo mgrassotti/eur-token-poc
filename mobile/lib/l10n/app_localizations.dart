@@ -775,6 +775,23 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Wallet error: {detail}'**
   String localWalletError(String detail);
+
+  String get saveMoney;
+  String get invest;
+  String get savingsRequests;
+  String get investmentRequests;
+  String get awaitingBankTransfer;
+  String get awaitingBtcDeposit;
+  String get awaitingMatch;
+  String get contractActive;
+  String get payoutKeepBtc;
+  String get payoutReinvest;
+  String get payoutEur;
+  String get yourIban;
+  String get matIban;
+  String get onePercentMonth;
+  String get noPendingRequests;
+  String get signFundingAutomatically;
 }
 
 class _AppLocalizationsDelegate

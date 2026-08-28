@@ -48,8 +48,11 @@ class RelayApiClient {
     return (body['btc_eur_per_btc'] as num?)?.toDouble();
   }
 
-  Future<List<Deal>> fetchDeals() async {
-    final body = await _get('/deals', auth: false);
+  Future<List<Deal>> fetchDeals({List<String>? addresses}) async {
+    final query = (addresses == null || addresses.isEmpty)
+        ? ''
+        : '?${addresses.map((a) => 'addresses[]=${Uri.encodeQueryComponent(a)}').join('&')}';
+    final body = await _get('/deals$query', auth: false);
     return (body['deals'] as List<dynamic>)
         .map((e) => Deal.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -60,29 +63,61 @@ class RelayApiClient {
     return Deal.fromJson(body);
   }
 
-  Future<Deal> createDeal({
+  Future<List<FundingRequest>> fetchFundingRequests({List<String>? addresses}) async {
+    final query = (addresses == null || addresses.isEmpty)
+        ? ''
+        : '?${addresses.map((a) => 'addresses[]=${Uri.encodeQueryComponent(a)}').join('&')}';
+    final body = await _get('/funding_requests$query', auth: false);
+    return (body['requests'] as List<dynamic>)
+        .map((e) => FundingRequest.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<FundingRequest> createFundingRequest({
+    required String role,
     required int amountEurCents,
-    required String periodStart,
-    required String periodEnd,
-    required String fundingAddress,
-    required String commitmentPsbt,
-    String? borrowerName,
+    required String receiveAddress,
+    required String payoutMode,
+    String? payoutIban,
+    String? displayName,
   }) async {
     final body = await _post(
-      '/deals',
+      '/funding_requests',
       {
-        'deal': {
+        'funding_request': {
+          'role': role,
           'amount_eur_cents': amountEurCents,
-          'period_start': periodStart,
-          'period_end': periodEnd,
-          'funding_address': fundingAddress,
-          'commitment_psbt': commitmentPsbt,
-          if (borrowerName != null) 'borrower_name': borrowerName,
+          'receive_address': receiveAddress,
+          'payout_mode': payoutMode,
+          if (payoutIban != null) 'payout_iban': payoutIban,
+          if (displayName != null) 'display_name': displayName,
         },
       },
       auth: false,
     );
-    return Deal.fromJson(body);
+    return FundingRequest.fromJson(body);
+  }
+
+  Future<FundingRequest> submitFundingUtxos({
+    required String requestId,
+    required List<Map<String, dynamic>> inputs,
+    required String changeAddress,
+    String? identityPubkey,
+  }) async {
+    final body = await _post(
+      '/funding_requests/$requestId/submit_utxos',
+      {
+        'inputs': inputs,
+        'change_address': changeAddress,
+        if (identityPubkey != null) 'identity_pubkey': identityPubkey,
+      },
+      auth: false,
+    );
+    return FundingRequest.fromJson(body);
+  }
+
+  Future<Map<String, dynamic>> fetchBank() async {
+    return _get('/bank', auth: false);
   }
 
   Future<Deal> acceptDeal(

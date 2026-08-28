@@ -110,6 +110,8 @@ module L1UnitStubs
   end
 
   def stub_l1_unit_operations!
+    allow_any_instance_of(L1::Bitcoind::Client).to receive(:available?).and_return(true)
+
     allow(L1::ProvisionEscrowService).to receive(:call) do |budget:, auto_sign_wallets: nil|
       budget.tap { |b| stub_l1_provisioned!(b) if b.persisted? && !b.l1_multisig_provisioned? }
     end

@@ -2,7 +2,7 @@
 
 require "rails_helper"
 
-RSpec.describe "RGB transfer via RGB Lightning Node", :l1_integration, :rgb_lib, :regtest do
+RSpec.describe "RGB transfer via RGB Lightning Node", :l1_integration, :rgb_lib, :regtest, skip: "MVP savings: RGB unplugged" do
   let(:strike) { 50_000 }
   let(:alice) { create(:user, name: "Alice") }
   let(:bob) { create(:user, name: "Bob") }

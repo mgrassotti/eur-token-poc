@@ -14,6 +14,8 @@ class Budget < ApplicationRecord
 
   belongs_to :borrower, class_name: "User"
   belongs_to :investor, class_name: "User", optional: true
+  belongs_to :saver_funding_request, class_name: "FundingRequest", optional: true
+  belongs_to :investor_funding_request, class_name: "FundingRequest", optional: true
 
   has_one :collateral_lock, dependent: :destroy
   has_one :settlement, dependent: :destroy
@@ -25,6 +27,8 @@ class Budget < ApplicationRecord
   has_many :investor_yield_payouts, dependent: :destroy
 
   enum :status, { pending: 0, active: 1, settled: 2 }
+  enum :saver_payout_mode, { keep_btc: 0, reinvest: 1, eur: 2 }, prefix: :saver
+  enum :investor_payout_mode, { keep_btc: 0, reinvest: 1, eur: 2 }, prefix: :investor
 
   validates :amount_eur_cents, numericality: { only_integer: true, greater_than: 0 }
   validates :collateral_eur_cents, numericality: { only_integer: true, greater_than: 0 }

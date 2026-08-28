@@ -76,6 +76,7 @@ class DashboardState extends ChangeNotifier {
   DashboardData? data;
   double? marketRateEur;
   List<Deal> openDeals = const [];
+  List<FundingRequest> fundingRequests = const [];
   bool loading = false;
   String? error;
 
@@ -109,10 +110,20 @@ class DashboardState extends ChangeNotifier {
     }
   }
 
-  /// Public marketplace list (no auth).
-  Future<void> refreshOpenDeals() async {
+  /// Own deals (no marketplace). Pass wallet addresses to match guest requests.
+  Future<void> refreshOpenDeals({List<String>? addresses}) async {
     try {
-      openDeals = await _api.fetchDeals();
+      openDeals = await _api.fetchDeals(addresses: addresses);
+      notifyListeners();
+    } on RelayApiException catch (e) {
+      error = e.message;
+      notifyListeners();
+    }
+  }
+
+  Future<void> refreshFundingRequests({List<String>? addresses}) async {
+    try {
+      fundingRequests = await _api.fetchFundingRequests(addresses: addresses);
       notifyListeners();
     } on RelayApiException catch (e) {
       error = e.message;

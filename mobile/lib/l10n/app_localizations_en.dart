@@ -391,4 +391,52 @@ class AppLocalizationsEn extends AppLocalizations {
   String localWalletError(String detail) {
     return 'Wallet error: $detail';
   }
+
+  @override
+  String get saveMoney => 'Save';
+
+  @override
+  String get invest => 'Invest';
+
+  @override
+  String get savingsRequests => 'Savings requests';
+
+  @override
+  String get investmentRequests => 'Investment requests';
+
+  @override
+  String get awaitingBankTransfer => 'Waiting for bank transfer';
+
+  @override
+  String get awaitingBtcDeposit => 'Waiting for BTC deposit';
+
+  @override
+  String get awaitingMatch => 'Waiting for a match';
+
+  @override
+  String get contractActive => 'Contract active';
+
+  @override
+  String get payoutKeepBtc => 'Keep BTC in the app';
+
+  @override
+  String get payoutReinvest => 'Reinvest next month';
+
+  @override
+  String get payoutEur => 'Receive EUR to my IBAN';
+
+  @override
+  String get yourIban => 'Your IBAN';
+
+  @override
+  String get matIban => 'Pay to this IBAN';
+
+  @override
+  String get onePercentMonth => '1% for 1 month';
+
+  @override
+  String get noPendingRequests => 'No pending requests.';
+
+  @override
+  String get signFundingAutomatically => 'Signing the contract…';
 }

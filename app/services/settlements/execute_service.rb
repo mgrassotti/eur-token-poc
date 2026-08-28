@@ -26,18 +26,18 @@ module Settlements
     def call
       validate!
 
-      token_accounts = budget.token_accounts.lock.where("balance_cents > 0").order(:id).to_a
+      token_accounts = saver_token_accounts
       payoff = Payoffs::FloorEurCalculator.call(
         notional_eur_cents: budget.notional_eur_cents,
         notional_total_cents: budget.amount_eur_cents,
-        holder_shares_cents: token_accounts.map(&:balance_cents),
+        holder_shares_cents: token_accounts.map { |ta| ta[:cents] },
         spot_eur_per_btc: end_btc_eur_rate,
         rate_bps_monthly: budget.rate_bps_monthly,
         months_elapsed: settlement_months_elapsed,
         escrow_total_sats: budget.pool_sats
       )
 
-      payouts = []
+      result = nil
 
       ActiveRecord::Base.transaction do
         payouts = settle!(token_accounts, payoff)
@@ -74,9 +74,10 @@ module Settlements
           end_btc_eur_rate: end_btc_eur_rate,
           market_rate_updated: market_rate_updated
         )
-
-        result
       end
+
+      post_settlement!(result)
+      result
     end
 
     Result = Data.define(
@@ -126,8 +127,7 @@ module Settlements
     def settle!(token_accounts, payoff)
       raise Error, I18n.t("services.settlements.execute.dlc_not_funded") unless budget.dlc_contract&.funded?
 
-      # Snapshot holder allocations before redemption zeroes the token balances.
-      dlc_shares = token_accounts.map { |ta| { user: ta.user, cents: ta.balance_cents } }
+      dlc_shares = token_accounts.map { |ta| { user: ta[:user], cents: ta[:cents] } }
 
       cet_result = Dlc::SettlementService.call(budget: budget, end_btc_eur_rate: end_btc_eur_rate)
       holder_targets = holder_targets_for(payoff, cet_result, token_accounts)
@@ -135,7 +135,8 @@ module Settlements
         budget: budget,
         peg_pot_sats: cet_result.peg_pot_sats,
         shares: dlc_shares,
-        holder_targets: holder_targets
+        holder_targets: holder_targets,
+        address_resolver: saver_address_resolver
       )
       distribution_by_user = distributions.index_by(&:user)
 
@@ -143,16 +144,35 @@ module Settlements
       persist_dlc_recovery!
 
       payouts = token_accounts.map do |token_account|
-        actual_sats = distribution_by_user.fetch(token_account.user).sats
-        payout = payout_for(token_account, actual_sats, payoff)
-        redeem_rgb!(token_account.user)
-        Rgb::ProjectionService.apply_redeem!(budget: budget, holder: token_account.user)
-        payout
+        actual_sats = distribution_by_user.fetch(token_account[:user]).sats
+        payout_for_holder(token_account, actual_sats, payoff)
       end
 
-      # Phase 2: No balance sync needed; balances updated by DLC distribution
+      close_holder_shares!(token_accounts)
 
       payouts
+    end
+
+    def saver_token_accounts
+      accounts = budget.token_accounts.lock.where("balance_cents > 0").order(:id).to_a
+      if accounts.any?
+        return accounts.map { |ta| { user: ta.user, cents: ta.balance_cents, record: ta } }
+      end
+
+      Budgets::AssignSaverShareService.call(budget: budget)
+      [{ user: budget.borrower, cents: budget.amount_eur_cents, record: budget.token_accounts.find_by!(user: budget.borrower) }]
+    end
+
+    def saver_address_resolver
+      lambda do |user|
+        if user.id == budget.borrower_id
+          budget.saver_payout_address.presence || budget.funding_address.presence ||
+            L1::UserWallet.for(user).receive_address(label: "dlc_payout")
+        else
+          budget.investor_payout_address.presence ||
+            L1::UserWallet.for(user).receive_address(label: "dlc_payout")
+        end
+      end
     end
 
     def holder_targets_for(payoff, cet_result, token_accounts)
@@ -168,7 +188,7 @@ module Settlements
                end
 
       token_accounts.zip(scaled).map do |token_account, sats|
-        { user: token_account.user, sats: sats }
+        { user: token_account[:user], sats: sats }
       end
     end
 
@@ -196,27 +216,34 @@ module Settlements
       budget.update!(recovery_package: package)
     end
 
-    # Best-effort RGB redemption. Settlement finality lives on L1 (the BTC payout
-    # below is what matters); the RGB EURT redemption is an on-chain mirror that
-    # can lag confirmations. A redemption failure must not block settlement — log
-    # it and let the DB projection reconcile.
-    def redeem_rgb!(holder)
-      Rgb::RedeemService.call(budget: budget, holder: holder)
-    rescue Rgb::RedeemService::Error, Rgb::LightningClient::Error, Rgb::Nodes::Error => e
-      Rails.logger.warn("Redemption RGB best-effort fallita per #{holder.name}: #{e.message}")
-    end
-
     def persist_settlement_txid!(txid)
-      package = budget.recovery_package.deep_dup
+      package = budget.recovery_package&.deep_dup || {}
       package["settlement_txid"] = txid
       package["psbt_maturity"] = package.fetch("psbt_maturity", {}).merge("broadcast_txid" => txid)
       budget.update!(recovery_package: package)
     end
 
-    def payout_for(token_account, btc_sats, payoff)
-      token_cents = token_account.balance_cents
+    def post_settlement!(result)
+      Funding::SimulateSepaOut.call(budget: budget.reload) if budget.saver_eur?
+      Funding::QueueReinvest.call(budget: budget)
+    rescue Funding::SimulateSepaOut::Error, Funding::CreateRequest::Error => e
+      Rails.logger.warn("Post-settlement payout failed for budget ##{budget.id}: #{e.message}")
+      result
+    end
+
+    def close_holder_shares!(token_accounts)
+      token_accounts.each do |token_account|
+        record = token_account[:record]
+        next unless record
+
+        record.update!(balance_cents: 0)
+      end
+    end
+
+    def payout_for_holder(token_account, btc_sats, payoff)
+      token_cents = token_account[:cents]
       Payout.new(
-        user: token_account.user,
+        user: token_account[:user],
         token_cents: token_cents,
         btc_sats: btc_sats,
         liability_eur_cents: payoff.liability_eur_cents,

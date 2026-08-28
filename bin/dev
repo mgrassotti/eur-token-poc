@@ -2,7 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-echo "→ Avvio regtest + RGB Lightning Nodes (Docker)…"
+echo "→ Avvio regtest + DLC (bitcoind, electrs, Pythia)…"
 ./bin/regtest up
 
 echo "→ Avvio Rails…"

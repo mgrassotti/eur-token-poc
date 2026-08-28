@@ -62,6 +62,8 @@ class Deal {
     this.awaitingFundingSignatures = false,
     this.borrowerFundingSigned = false,
     this.investorFundingSigned = false,
+    this.saverPayoutMode,
+    this.investorPayoutMode,
   });
 
   final String id;
@@ -82,6 +84,8 @@ class Deal {
   final bool awaitingFundingSignatures;
   final bool borrowerFundingSigned;
   final bool investorFundingSigned;
+  final String? saverPayoutMode;
+  final String? investorPayoutMode;
 
   double get amountEur => amountEurCents / 100.0;
 
@@ -116,6 +120,59 @@ class Deal {
       awaitingFundingSignatures: json['awaiting_funding_signatures'] as bool? ?? false,
       borrowerFundingSigned: json['borrower_funding_signed'] as bool? ?? false,
       investorFundingSigned: json['investor_funding_signed'] as bool? ?? false,
+      saverPayoutMode: json['saver_payout_mode'] as String?,
+      investorPayoutMode: json['investor_payout_mode'] as String?,
+    );
+  }
+}
+
+class FundingRequest {
+  const FundingRequest({
+    required this.id,
+    required this.role,
+    required this.status,
+    required this.amountEurCents,
+    required this.payoutMode,
+    required this.receiveAddress,
+    required this.collectionIban,
+    this.payoutIban,
+    this.budgetId,
+    this.remainingEurCents,
+    this.requiredSats,
+  });
+
+  final String id;
+  final String role;
+  final String status;
+  final int amountEurCents;
+  final String payoutMode;
+  final String receiveAddress;
+  final String collectionIban;
+  final String? payoutIban;
+  final String? budgetId;
+  final int? remainingEurCents;
+  final int? requiredSats;
+
+  double get amountEur => amountEurCents / 100.0;
+  bool get isSaver => role == 'saver';
+  bool get isInvestor => role == 'investor';
+  bool get awaitingDeposit => status == 'awaiting_deposit';
+  bool get queued => status == 'queued';
+  bool get matched => status == 'matched';
+
+  factory FundingRequest.fromJson(Map<String, dynamic> json) {
+    return FundingRequest(
+      id: json['id'].toString(),
+      role: json['role'] as String,
+      status: json['status'] as String,
+      amountEurCents: json['amount_eur_cents'] as int,
+      payoutMode: json['payout_mode'] as String,
+      receiveAddress: json['receive_address'] as String,
+      collectionIban: json['collection_iban'] as String? ?? '',
+      payoutIban: json['payout_iban'] as String?,
+      budgetId: json['budget_id']?.toString(),
+      remainingEurCents: json['remaining_eur_cents'] as int?,
+      requiredSats: json['required_sats'] as int?,
     );
   }
 }
@@ -342,7 +399,9 @@ class DashboardData {
     required this.maxBorrowableEurCents,
     required this.borrowedDeals,
     required this.fundPositions,
-    required this.investableDeals,
+    this.investableDeals = const [],
+    this.fundingRequests = const [],
+    this.collectionIban,
   });
 
   final User user;
@@ -353,6 +412,8 @@ class DashboardData {
   final List<Deal> borrowedDeals;
   final List<FundPosition> fundPositions;
   final List<Deal> investableDeals;
+  final List<FundingRequest> fundingRequests;
+  final String? collectionIban;
 
   double get maxBorrowableEur => maxBorrowableEurCents / 100.0;
 
@@ -370,9 +431,13 @@ class DashboardData {
       fundPositions: (json['fund_positions'] as List<dynamic>? ?? const [])
           .map((e) => FundPosition.fromJson(e as Map<String, dynamic>))
           .toList(),
-      investableDeals: (json['investable_deals'] as List<dynamic>)
+      investableDeals: (json['investable_deals'] as List<dynamic>? ?? const [])
           .map((e) => Deal.fromJson(e as Map<String, dynamic>))
           .toList(),
+      fundingRequests: (json['funding_requests'] as List<dynamic>? ?? const [])
+          .map((e) => FundingRequest.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      collectionIban: json['collection_iban'] as String?,
     );
   }
 }

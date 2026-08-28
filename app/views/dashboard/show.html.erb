@@ -72,8 +72,63 @@
         <p class="text-muted mb-4"><%= t(".admin.active_budgets.empty") %></p>
       <% end %>
 
+      <% if @settled_eur_budgets.present? %>
+        <h2 class="h6"><%= t(".admin.bank.sepa_out_title") %></h2>
+        <ul class="list-group mb-4">
+          <% @settled_eur_budgets.each do |budget| %>
+            <li class="list-group-item d-flex justify-content-between align-items-center flex-wrap gap-2">
+              <span>
+                #<%= budget.id %>
+                <%= BtcConversion.format_eur(budget.amount_eur_cents) %>
+                <span class="text-muted small d-block font-monospace"><%= budget.saver_payout_iban %></span>
+              </span>
+              <%= button_to t(".admin.bank.simulate_sepa_out"),
+                simulate_sepa_out_admin_budget_path(budget),
+                method: :post,
+                class: "btn btn-sm btn-outline-success" %>
+            </li>
+          <% end %>
+        </ul>
+      <% end %>
+
       <% unless @market_rate.set? %>
         <p class="text-muted mb-4"><%= t(".admin.market_rate.required") %></p>
+      <% end %>
+
+      <hr>
+      <h2 class="h6"><%= t(".admin.bank.title") %></h2>
+      <p class="text-muted small mb-2">
+        <%= t(".admin.bank.iban_html", name: @bank_account.name, iban: @bank_account.iban, balance: number_to_currency(@bank_account.balance_eur_cents / 100.0, unit: "€")) %>
+      </p>
+
+      <% if @funding_requests.any? %>
+        <ul class="list-group mb-4">
+          <% @funding_requests.each do |request| %>
+            <li class="list-group-item d-flex justify-content-between align-items-center flex-wrap gap-2">
+              <span>
+                <strong><%= request.role %></strong>
+                #<%= request.id %>
+                <%= BtcConversion.format_eur(request.amount_eur_cents) %>
+                · <%= request.status %>
+                · <%= request.payout_mode %>
+                <span class="text-muted small d-block font-monospace"><%= request.receive_address %></span>
+              </span>
+              <% if request.saver? && request.awaiting_deposit? %>
+                <%= button_to t(".admin.bank.simulate_sepa_in"),
+                  simulate_sepa_in_admin_funding_request_path(request),
+                  method: :post,
+                  class: "btn btn-sm btn-success" %>
+              <% elsif request.investor? && request.awaiting_deposit? %>
+                <%= button_to t(".admin.bank.simulate_investor_btc"),
+                  simulate_investor_deposit_admin_funding_request_path(request),
+                  method: :post,
+                  class: "btn btn-sm btn-success" %>
+              <% end %>
+            </li>
+          <% end %>
+        </ul>
+      <% else %>
+        <p class="text-muted mb-4"><%= t(".admin.bank.empty_requests") %></p>
       <% end %>
 
       <hr>
@@ -183,49 +238,12 @@
     </div>
   </div>
 </div>
-<% if @rgb_node_error %>
-  <div class="card mb-4 border-danger">
-    <div class="card-header bg-danger-subtle"><%= t(".user.rgb.title") %></div>
-    <div class="card-body">
-      <p class="mb-0 text-danger"><%= t(".user.rgb.unavailable_html") %></p>
-    </div>
-  </div>
-<% else %>
-  <div class="card mb-4 border-primary">
-    <div class="card-header bg-primary-subtle"><%= t(".user.rgb.title") %></div>
-    <div class="card-body">
-      <p class="text-muted small mb-3"><%= t(".user.rgb.description") %></p>
-      <% if @rgb_assets.present? %>
-        <ul class="list-group">
-          <% @rgb_assets.each do |asset| %>
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-              <span>
-                <strong><%= asset["ticker"] %></strong> - <%= asset["name"] %>
-                <span class="text-muted small d-block"><code><%= asset["asset_id"] %></code></span>
-              </span>
-              <span class="badge text-bg-primary">
-                <%= number_with_delimiter(asset.dig("balance", "settled") || asset.dig("balance", "future") || 0) %>
-              </span>
-            </li>
-          <% end %>
-        </ul>
-      <% else %>
-        <p class="mb-0 text-muted"><%= t(".user.rgb.empty") %></p>
-      <% end %>
-    </div>
-  </div>
-<% end %>
 <% end %>
 
 <div class="d-flex gap-2 mb-4 flex-wrap">
   <% unless admin? %>
     <%= link_to t(".user.actions.deposit"), new_reserve_deposit_path, class: "btn btn-success" %>
     <%= link_to t(".user.actions.new_budget"), new_budget_path, class: "btn btn-primary" %>
-    <% if @spendable_token_cents.positive? %>
-      <%= link_to t(".user.actions.send_money"), new_token_transfer_path, class: "btn btn-outline-primary" %>
-    <% else %>
-      <span class="btn btn-outline-secondary disabled" aria-disabled="true"><%= t(".user.actions.send_money") %></span>
-    <% end %>
   <% end %>
   <% if admin? %>
     <%= link_to t(".admin.actions.all_budgets"), budgets_path, class: "btn btn-outline-secondary" %>

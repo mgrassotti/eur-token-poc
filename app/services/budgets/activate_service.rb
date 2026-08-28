@@ -12,11 +12,6 @@ module Budgets
     PROVISION_ERRORS = [
       L1::ProvisionEscrowService::Error,
       Dlc::ContractSetupService::Error,
-      Rgb::LightningClient::Error,
-      Rgb::Nodes::Error,
-      Rgb::WalletSetupService::Error,
-      Rgb::LibIssueService::Error,
-      Rgb::IssueService::Error,
       FundingParams::Error,
       L1::UtxoSetValidator::Error
     ].freeze

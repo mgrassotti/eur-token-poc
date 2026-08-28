@@ -71,7 +71,7 @@ module Dlc
       shares.each_with_index.map do |s, i|
         Payout.new(user: s[:user], sats: actual[i], address: outputs[i][:address], txid: result.txid)
       end
-    rescue NodeClient::Error, Rgb::Nodes::Error, Rgb::LightningClient::Error => e
+    rescue NodeClient::Error => e
       raise Error, I18n.t("services.dlc.distribution.failed", message: e.message)
     end
 

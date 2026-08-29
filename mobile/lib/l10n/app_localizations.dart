@@ -790,6 +790,8 @@ abstract class AppLocalizations {
   String get yourIban;
   String get matIban;
   String get onePercentMonth;
+  String currentBtcRate(String rate);
+  String investorPnlAt(String date);
   String get noPendingRequests;
   String get signFundingAutomatically;
 }

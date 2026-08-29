@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../l10n/app_localizations.dart';
@@ -28,10 +29,30 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
   bool get _isSaver => widget.role == 'saver';
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_isSaver && mounted) {
+        context.read<DashboardState>().refreshMarketRate();
+      }
+    });
+  }
+
+  @override
   void dispose() {
     _amount.dispose();
     _iban.dispose();
     super.dispose();
+  }
+
+  /// Last day of next calendar month — the 1-month term's month-end.
+  DateTime _termMonthEnd() {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month + 2, 0);
+  }
+
+  String _formatRate(double rate, Locale locale) {
+    return NumberFormat('#,##0', locale.toString()).format(rate.round());
   }
 
   Future<void> _submit() async {
@@ -81,6 +102,30 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
     }
   }
 
+  List<Widget> _headline(AppLocalizations l10n) {
+    if (_isSaver) {
+      return [
+        Text(l10n.onePercentMonth, style: Theme.of(context).textTheme.titleMedium),
+      ];
+    }
+
+    final locale = Localizations.localeOf(context);
+    final rate = context.watch<DashboardState>().marketRateEur;
+    final rateText = rate != null && rate > 0 ? _formatRate(rate, locale) : '—';
+    final dateText = DateFormat.yMMMMd(locale.toString()).format(_termMonthEnd());
+
+    return [
+      Text(l10n.currentBtcRate(rateText), style: Theme.of(context).textTheme.titleMedium),
+      const SizedBox(height: 8),
+      Text(
+        l10n.investorPnlAt(dateText),
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+      ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -90,7 +135,7 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Text(l10n.onePercentMonth, style: Theme.of(context).textTheme.titleMedium),
+          ..._headline(l10n),
           const SizedBox(height: 16),
           if (created != null) ...[
             if (_isSaver) ...[
@@ -121,7 +166,7 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
               decoration: const InputDecoration(labelText: 'EUR', prefixText: '€ '),
             ),
             const SizedBox(height: 16),
-            Text(l10n.onePercentMonth),
+            if (_isSaver) Text(l10n.onePercentMonth),
             RadioListTile<String>(
               title: Text(l10n.payoutKeepBtc),
               value: 'keep_btc',

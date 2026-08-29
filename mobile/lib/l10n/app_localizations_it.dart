@@ -439,6 +439,16 @@ class AppLocalizationsIt extends AppLocalizations {
   String get onePercentMonth => '1% per 1 mese';
 
   @override
+  String currentBtcRate(String rate) {
+    return 'Cambio BTC corrente: $rate€/BTC';
+  }
+
+  @override
+  String investorPnlAt(String date) {
+    return 'Guadagno/perdita in base al prezzo al $date';
+  }
+
+  @override
   String get noPendingRequests => 'Nessuna richiesta in attesa.';
 
   @override

@@ -132,6 +132,18 @@
   "yourIban": "Il tuo IBAN",
   "matIban": "Bonifico a questo IBAN",
   "onePercentMonth": "1% per 1 mese",
+  "currentBtcRate": "Cambio BTC corrente: {rate}€/BTC",
+  "@currentBtcRate": {
+    "placeholders": {
+      "rate": { "type": "String" }
+    }
+  },
+  "investorPnlAt": "Guadagno/perdita in base al prezzo al {date}",
+  "@investorPnlAt": {
+    "placeholders": {
+      "date": { "type": "String" }
+    }
+  },
   "noPendingRequests": "Nessuna richiesta in attesa.",
   "signFundingAutomatically": "Firma del contratto in corso…"
 }

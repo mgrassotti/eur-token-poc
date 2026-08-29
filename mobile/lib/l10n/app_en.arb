@@ -219,6 +219,18 @@
   "yourIban": "Your IBAN",
   "matIban": "Pay to this IBAN",
   "onePercentMonth": "1% for 1 month",
+  "currentBtcRate": "Current BTC rate: {rate}€/BTC",
+  "@currentBtcRate": {
+    "placeholders": {
+      "rate": { "type": "String" }
+    }
+  },
+  "investorPnlAt": "Gain/loss depends on the price on {date}",
+  "@investorPnlAt": {
+    "placeholders": {
+      "date": { "type": "String" }
+    }
+  },
   "noPendingRequests": "No pending requests.",
   "signFundingAutomatically": "Signing the contract…"
 }

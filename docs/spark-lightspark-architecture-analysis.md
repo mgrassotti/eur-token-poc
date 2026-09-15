@@ -245,12 +245,21 @@ Claude's balances:
 ✅ Clean accounting per deal  
 ✅ Natural scoping for settlement (each token type settles independently)  
 ✅ Prevents cross-deal token pollution  
+✅ Clear maturity tracking (each token has its own maturity date)
+✅ Simpler to reason about holder rights per deal
 
 **Cons:**
-❌ Claude cannot pool funds across deals for a large purchase  
-❌ More token types to manage on mobile wallet  
-❌ Liquidity fragmentation  
-❌ Each token needs separate BTKN deployment  
+❌ More token types to manage in wallet implementation
+❌ Multi-token transfers (send 350 EUR = 300 DEAL001_EUR + 50 DEAL002_EUR)
+❌ Each token needs separate BTKN/RGB deployment
+❌ Recipient must understand they're receiving multiple token types
+
+**UX Note:** Similar to Bitcoin UTXOs - can be aggregated in wallet display:
+```
+Total Balance: 400 EUR
+  ├─ Deal #1 (matures 2026-12-01): 300 EUR
+  └─ Deal #2 (matures 2027-01-15): 100 EUR
+```  
 
 **Option 2: Token per Pair**
 
@@ -274,19 +283,144 @@ At settlement:
 
 **This is simpler and matches your current RGB design.**
 
-### Recommendation: Single Shared Token
+### Recommendation: Reconsider Token-Per-Deal 🤔
 
-**Reasons:**
+**You're right:** Token-per-deal is like Bitcoin UTXOs - wallet can aggregate and show total.
 
-1. **Fungibility** - Users want pooled EUR balance, not per-deal silos
-2. **UX** - "You have 400 EUR" is simpler than "300 from Deal A + 100 from Deal B"
-3. **Liquidity** - Shared token = better network effect
-4. **Simpler settlement** - One token balance, multiple deal payouts (current design)
+#### Arguments FOR Token-Per-Deal
 
-**If you go with Spark:**
-- Issue **one MAT_EUR BTKN token** (or MAT_EURT)
-- All deals mint from same token
-- At settlement, snapshot balances per deal (like today)
+**1. Natural Settlement Scoping**
+
+Each deal has its own maturity date and settlement:
+```
+Deal #1 (matures Dec 2026): 300 DEAL001_EUR outstanding
+Deal #2 (matures Jan 2027): 100 DEAL002_EUR outstanding
+
+On Deal #1 maturity:
+  - Only DEAL001_EUR holders get paid
+  - DEAL002_EUR unaffected
+  - No cross-deal accounting needed
+```
+
+**2. Clearer Holder Rights**
+
+"I hold 300 DEAL001_EUR" = precise claim on Deal #1's `peg_pot`
+- No ambiguity about which deal you're entitled to
+- Simpler legal/accounting (each token = specific contract)
+
+**3. UTXO Pattern Works**
+
+Bitcoin wallets already solve this:
+- Aggregate UTXO balance: "You have 1.5 BTC"
+- Coin control: Spend from specific UTXOs when needed
+- Same for tokens: "You have 400 EUR" (aggregated from multiple deals)
+
+**4. Better for Failures**
+
+If Deal #1 fails (oracle failure, refund needed):
+- Only DEAL001_EUR affected
+- DEAL002_EUR holders protected
+- No cross-contamination
+
+**5. Simpler Settlement Logic**
+
+Current (shared token) approach:
+```ruby
+# At Deal #1 maturity
+holders = TokenAccount.where(asset_id: 'MAT_EUR').where.not(balance: 0)
+# Problem: How do you know which holders are entitled to THIS deal?
+# Need: deal_participation tracking table
+```
+
+Token-per-deal approach:
+```ruby
+# At Deal #1 maturity
+holders = TokenAccount.where(asset_id: 'DEAL001_EUR').where.not(balance: 0)
+# All DEAL001_EUR holders are entitled. Done.
+```
+
+#### Arguments AGAINST Token-Per-Deal
+
+**1. Implementation Complexity**
+
+Each transfer now potentially involves multiple tokens:
+```
+Alice wants to send 350 EUR to Bob
+Alice has: 300 DEAL001_EUR + 100 DEAL002_EUR
+
+Wallet must:
+  - Send 300 DEAL001_EUR
+  - Send 50 DEAL002_EUR  
+  - Keep 50 DEAL002_EUR as change
+
+Bob receives 2 token types in one "payment"
+```
+
+**2. Recipient Acceptance**
+
+Bob's wallet must be prepared to receive arbitrary token types:
+- First time: Receives DEAL001_EUR (unknown token)
+- Auto-register? Manual accept?
+- Trust model: Does Bob trust each deal's issuer?
+
+**3. More Issuance Overhead**
+
+Each deal activation:
+- Deploy new RGB asset (or BTKN token)
+- Register in wallet address books
+- More on-chain footprint (if RGB genesis)
+
+**4. Not Directly Interchangeable**
+
+300 DEAL001_EUR ≠ 300 DEAL002_EUR (even though both are "EUR")
+- Can't directly swap without conversion logic
+- If you add DEX later, need separate liquidity pools per token
+
+#### Hybrid Approach: Single Token + Deal Tracking
+
+**Alternative:** Keep single MAT_EUR token, track entitlements in metadata:
+
+```ruby
+# TokenAccount model
+user_id: 123  (Claude)
+asset_id: 'MAT_EUR'
+balance: 400
+
+# TokenEntitlement model (new)
+user_id: 123
+budget_id: 1
+entitled_amount: 300
+
+user_id: 123  
+budget_id: 2
+entitled_amount: 100
+```
+
+**Pros:**
+- Fungible EUR token (simpler transfers)
+- Still track per-deal entitlements for settlement
+- Wallet shows: "400 EUR from 2 deals"
+
+**Cons:**
+- Need separate entitlement tracking
+- Settlement must query entitlements (not just token balances)
+- Token transfers don't automatically update entitlements (need transfer hooks)
+
+### Updated Recommendation: It Depends 🎯
+
+| Use Case | Recommendation |
+|----------|----------------|
+| **Few deals per user** | ✅ Token-per-deal (cleaner) |
+| **Many deals per user** | ✅ Single token + entitlement tracking |
+| **Priority: Trustless settlement** | ✅ Token-per-deal (direct claim) |
+| **Priority: Transfer UX** | ✅ Single token (simpler sends) |
+| **Using Spark BTKN** | 🟡 Either works (BTKN supports multiple token types) |
+| **Using RGB** | 🟡 Either works (RGB supports multiple assets) |
+
+**For MAT v1:** I'd now lean toward **token-per-deal** if:
+1. You expect users to participate in 1-5 deals typically (not 100s)
+2. Wallet can aggregate like Bitcoin (show "Total: 400 EUR")
+3. Settlement simplicity > transfer UX
 
 ---
 
@@ -568,13 +702,281 @@ Spark Bridge (optional):
 
 ### Q3: "Emitting a new token per each couple of investor and saver?"
 
-**A:** Not recommended.
+**A:** Token-per-deal is actually viable (like Bitcoin UTXOs).
 
-**Token per deal:** Creates fragmentation, poor UX  
-**Token per pair:** Even worse  
-**Shared token (current):** Best for fungibility and UX
+**Token per deal:** ✅ Clean settlement scoping; wallet can aggregate balance  
+**Token per pair:** ❌ Too much fragmentation  
+**Shared token:** ✅ Simpler transfers, but need entitlement tracking  
 
-**If using Spark:** Issue one `MAT_EUR` BTKN token, same as current RGB design.
+**Key insight:** You can aggregate tokens in wallet display (like BTC UTXOs):
+```
+Total: 400 EUR
+├─ Deal #1 (300 EUR)
+└─ Deal #2 (100 EUR)
+```
+
+**Recommendation:** Token-per-deal if users typically have 1-5 deals; single token if expecting 100s of deals per user.
+
+**If using Spark:** Either works - BTKN supports multiple token types natively.
+
+---
+
+## Technical Deep Dive: Token-Per-Deal Implementation
+
+### How It Would Work (RGB Example)
+
+**Deal Activation:**
+
+```ruby
+class Budgets::ActivateService
+  def call
+    # 1. DLC funding (as today)
+    fund_dlc_contract
+    
+    # 2. Issue deal-specific RGB asset
+    asset_id = Rgb::IssueService.call(
+      ticker: "D#{budget.id}EUR",  # e.g., "D42EUR"
+      name: "MAT Deal ##{budget.id} EUR",
+      precision: 2,
+      amount: budget.borrower_amount_cents
+    )
+    
+    budget.update!(rgb_asset_id: asset_id)
+    
+    # 3. Assign to borrower
+    Rgb::TransferService.call(
+      asset_id: asset_id,
+      recipient: budget.borrower,
+      amount: budget.borrower_amount_cents
+    )
+  end
+end
+```
+
+**User Balance Query:**
+
+```ruby
+class User < ApplicationRecord
+  def eur_tokens
+    # Returns array of {asset_id, amount, deal} hashes
+    TokenAccount.where(user: self)
+      .joins(:rgb_assignment)
+      .joins(rgb_assignment: :budget)
+      .map do |account|
+        {
+          asset_id: account.asset_id,
+          amount: account.balance,
+          deal_id: account.rgb_assignment.budget.id,
+          maturity: account.rgb_assignment.budget.maturity_at,
+          ticker: "D#{account.rgb_assignment.budget.id}EUR"
+        }
+      end
+  end
+  
+  def total_eur_balance
+    # Aggregate for display
+    eur_tokens.sum { |t| t[:amount] }
+  end
+end
+```
+
+**Transfer (Multi-Token):**
+
+```ruby
+class Tokens::WalletTransferService
+  def call(sender:, recipient:, amount_cents:)
+    # Find sender's token holdings
+    holdings = sender.eur_tokens.sort_by { |t| t[:maturity] }
+    
+    remaining = amount_cents
+    transfers = []
+    
+    holdings.each do |holding|
+      break if remaining.zero?
+      
+      transfer_amount = [holding[:amount], remaining].min
+      
+      transfers << {
+        asset_id: holding[:asset_id],
+        amount: transfer_amount
+      }
+      
+      remaining -= transfer_amount
+    end
+    
+    raise InsufficientBalance if remaining > 0
+    
+    # Execute multiple RGB transfers
+    transfers.each do |transfer|
+      Rgb::LibTransferService.call(
+        asset_id: transfer[:asset_id],
+        sender: sender,
+        recipient: recipient,
+        amount: transfer[:amount]
+      )
+    end
+    
+    transfers
+  end
+end
+```
+
+**Settlement (Simplified):**
+
+```ruby
+class Settlements::ExecuteService
+  def call(budget)
+    # 1. Get all holders of THIS deal's token
+    asset_id = budget.rgb_asset_id
+    holders = TokenAccount.where(asset_id: asset_id)
+                          .where("balance > 0")
+    
+    # 2. Execute DLC CET
+    cet_result = Dlc::SettlementService.call(budget)
+    
+    # 3. Distribute peg_pot to holders
+    Dlc::Distribution.call(
+      holders: holders,
+      peg_pot_sats: cet_result.peg_sats
+    )
+    
+    # 4. Burn this deal's tokens (redeemed)
+    holders.each do |holder|
+      Rgb::BurnService.call(
+        asset_id: asset_id,
+        holder: holder.user,
+        amount: holder.balance
+      )
+    end
+  end
+end
+```
+
+### Wallet Display (Mobile)
+
+**Aggregated View:**
+
+```dart
+// Flutter example
+class WalletBalanceWidget extends StatelessWidget {
+  final List<TokenHolding> holdings;
+  
+  @override
+  Widget build(BuildContext context) {
+    final totalEur = holdings.fold<int>(
+      0, 
+      (sum, h) => sum + h.amount
+    );
+    
+    return Column(
+      children: [
+        // Primary balance (aggregated)
+        Text(
+          '€${(totalEur / 100).toStringAsFixed(2)}',
+          style: Theme.of(context).textTheme.headline2,
+        ),
+        
+        // Expandable detail
+        ExpansionTile(
+          title: Text('${holdings.length} active deals'),
+          children: holdings.map((h) => 
+            ListTile(
+              title: Text('Deal #${h.dealId}'),
+              subtitle: Text('Matures ${h.maturityDate}'),
+              trailing: Text('€${(h.amount / 100).toStringAsFixed(2)}'),
+            )
+          ).toList(),
+        ),
+      ],
+    );
+  }
+}
+```
+
+**Send Flow:**
+
+```dart
+// User enters: "Send 350 EUR to Bob"
+// Wallet automatically selects tokens (like coin selection)
+
+class SendMoneyScreen extends StatefulWidget {
+  void _send(String recipient, int amountCents) async {
+    // Backend selects which tokens to send
+    final result = await api.sendEur(
+      recipient: recipient,
+      amount: amountCents,
+    );
+    
+    // Show success with breakdown
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text('Sent €${(amountCents / 100).toStringAsFixed(2)}'),
+        content: Column(
+          children: [
+            Text('Tokens sent:'),
+            ...result.transfers.map((t) => 
+              Text('${t.ticker}: €${(t.amount / 100).toStringAsFixed(2)}')
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+```
+
+### Comparison: Settlement Logic Complexity
+
+**Single Token (Current):**
+
+```ruby
+# More complex: need to track which balances belong to which deal
+class Settlements::ExecuteService
+  def call(budget)
+    # Get all holders of MAT_EUR
+    all_holders = TokenAccount.where(asset_id: 'MAT_EUR')
+    
+    # Filter to holders who participated in THIS budget
+    # Option A: participation tracking table
+    eligible_holders = all_holders.joins(:budget_participations)
+                                   .where(budget_participations: { budget: budget })
+    
+    # Option B: scan transfer history (expensive)
+    eligible_holders = all_holders.select do |holder|
+      has_received_from_this_budget?(holder, budget)
+    end
+    
+    # Distribute...
+  end
+end
+```
+
+**Token-Per-Deal:**
+
+```ruby
+# Simpler: all holders of this asset are entitled
+class Settlements::ExecuteService
+  def call(budget)
+    holders = TokenAccount.where(asset_id: budget.rgb_asset_id)
+                          .where("balance > 0")
+    
+    # All holders are entitled. Done.
+    Dlc::Distribution.call(holders: holders, peg_pot_sats: ...)
+  end
+end
+```
+
+### Migration Path
+
+**Start with single token (v1):**
+- Simpler to launch
+- Learn user patterns
+
+**Evaluate token-per-deal (v2) if:**
+- Users report confusion about mixed deal entitlements
+- Settlement accounting becomes complex
+- Want clearer legal separation per deal
 
 ---
 

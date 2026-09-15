@@ -1276,6 +1276,558 @@ end
 
 ---
 
+## Technical Deep Dive: DLC + Token Distribution Integration
+
+### The Core Challenge
+
+**Timeline Problem:**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ T0: Deal Activation                                         │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  1. DLC Setup                                               │
+│     • Borrower + Hodler create funding tx                   │
+│     • Sign CET templates for all oracle outcomes            │
+│     • ⚠️ Holder outputs NOT KNOWN at this point            │
+│                                                             │
+│  2. Token Issuance                                          │
+│     • Issue 1000 DEAL001_EUR to borrower                    │
+│     • Borrower is initial holder                            │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│ T1-T90: Deal Lifetime (Weeks)                               │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Token Transfers:                                           │
+│     Alice → Claude: 300 EUR                                 │
+│     Alice → David:  200 EUR                                 │
+│     Alice keeps:    500 EUR                                 │
+│                                                             │
+│  ⚠️ DLC is already signed (immutable)                      │
+│  ⚠️ Cannot update CET outputs retroactively                │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│ T91: Maturity                                               │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  1. Oracle attests: BTC/EUR = 65,000                        │
+│                                                             │
+│  2. CET broadcasts with outputs:                            │
+│     • investor_pot: 50,000 sats → Hodler L1 address ✓     │
+│     • peg_pot: 100,000 sats → ❓❓❓                       │
+│                                                             │
+│  3. Must distribute peg_pot to:                             │
+│     • Alice: 50,000 sats (500 EUR = 50%)                   │
+│     • Claude: 30,000 sats (300 EUR = 30%)                  │
+│     • David: 20,000 sats (200 EUR = 20%)                   │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Key Constraint:** CET outputs are fixed at T0, but holders are only known at T91.
+
+### Solution Architectures
+
+#### Architecture 1: Peg Output → Distributor Address (Current PoC)
+
+**How it works:**
+
+```
+CET peg output:
+  value: 100,000 sats
+  scriptPubKey: <distributor_pubkey>
+```
+
+**At activation (T0):**
+```ruby
+# DLC signing
+cet_outputs = [
+  {
+    # Hodler return (known at T0)
+    value: investor_pot_sats,
+    address: hodler.reserve_address
+  },
+  {
+    # Peg pot (goes to distributor)
+    value: peg_pot_sats,
+    address: distributor_peg_address  # Controlled by Rails/sidecar
+  }
+]
+```
+
+**At maturity (T91):**
+```ruby
+# 1. CET broadcasts
+cet_txid = Dlc::SettlementService.broadcast_cet(
+  oracle_attestation: attestation,
+  outcome: btc_eur_rate
+)
+
+# 2. Wait for confirmation
+wait_for_confirmation(cet_txid)
+
+# 3. Distributor spends peg_pot
+class Dlc::Distribution
+  def execute(budget)
+    # Get all DEAL001_EUR holders
+    holders = TokenAccount.where(asset_id: budget.rgb_asset_id)
+                          .where("balance > 0")
+    
+    # Build fan-out transaction
+    outputs = holders.map do |holder|
+      {
+        address: holder.user.reserve_address,
+        value: calculate_pro_rata_share(holder, budget)
+      }
+    end
+    
+    # Spend peg_pot UTXO → fan-out to holders
+    distribution_tx = build_transaction(
+      inputs: [{ txid: cet_txid, vout: 0 }],  # peg_pot output
+      outputs: outputs
+    )
+    
+    # Sign with distributor key
+    signed_tx = sign_transaction(distribution_tx, distributor_key)
+    
+    # Broadcast
+    broadcast(signed_tx)
+  end
+end
+```
+
+**Pros:**
+✅ Works today (PoC implements this)  
+✅ Simple to implement  
+✅ CET outputs known at signing time  
+
+**Cons:**
+❌ Distributor is trusted (can steal peg_pot)  
+❌ Single point of failure  
+❌ Requires hot wallet for distributor key  
+
+**Trustlessness:** 🔴 Low (distributor has custody)
+
+---
+
+#### Architecture 2: Peg Output → 2-of-2 (Borrower + Escrow) with Timelock
+
+**How it works:**
+
+```
+CET peg output:
+  value: 100,000 sats
+  scriptPubKey: 2-of-2 <borrower_pubkey> <escrow_pubkey> OR
+                <borrower_pubkey> after 2016 blocks
+```
+
+**At activation (T0):**
+```ruby
+# Pre-sign distribution transactions (templates)
+holders_placeholder = [borrower.address]  # Initially just borrower
+
+distribution_tx = create_transaction(
+  inputs: [peg_pot_output],
+  outputs: holders_placeholder.map { |addr| {address: addr, value: ...} }
+)
+
+# Borrower signs
+borrower_sig = borrower.sign(distribution_tx)
+
+# Store template (to be updated if holders change)
+# ⚠️ Problem: If Alice transfers tokens, this template is invalid
+```
+
+**Pros:**
+✅ Escrow can verify correct distribution  
+✅ Timelock gives borrower fallback  
+
+**Cons:**
+❌ Pre-signed templates don't account for token transfers  
+❌ Requires cooperation to update distribution  
+❌ Escrow still needs trust for verification  
+
+**Trustlessness:** 🟡 Medium (escrow + timelock)
+
+---
+
+#### Architecture 3: Verifiable Distributor + Fraud Proofs
+
+**How it works:**
+
+```
+CET peg output → Distributor (bonded)
+
+Distributor must:
+1. Publish holder snapshot (merkle root) on-chain
+2. Publish distribution commitment (amounts per holder)
+3. Execute distribution within timeout
+
+Anyone can challenge with fraud proof:
+  "Amount for holder X is wrong"
+  Proof includes:
+    - Token balance (RGB state)
+    - FloorEUR calculation
+    - Merkle proof
+
+If fraud proven → bond slashed
+```
+
+**At activation (T0):**
+```ruby
+# Distributor posts bond
+distributor_bond = 0.1 BTC
+
+# CET as normal
+cet_outputs = [
+  { value: investor_pot, address: hodler.address },
+  { value: peg_pot, address: bonded_distributor.address }
+]
+```
+
+**At maturity (T91):**
+```ruby
+# 1. CET broadcasts
+cet_confirmed
+
+# 2. Distributor publishes snapshot
+snapshot = {
+  asset_id: 'DEAL001_EUR',
+  block_height: maturity_block,
+  holders: [
+    { address: alice_pubkey, balance: 500, merkle_proof: ... },
+    { address: claude_pubkey, balance: 300, merkle_proof: ... },
+    { address: david_pubkey, balance: 200, merkle_proof: ... }
+  ],
+  merkle_root: "0xabc123..."
+}
+
+# Commit merkle root on-chain (OP_RETURN or taproot)
+publish_commitment_tx(snapshot.merkle_root)
+
+# 3. Distributor has 144 blocks to execute
+distribution_tx = build_fan_out(snapshot.holders)
+broadcast(distribution_tx)
+
+# 4. Challenge period
+# Anyone can verify and challenge:
+def verify_distribution(snapshot, distribution_tx)
+  snapshot.holders.each do |holder|
+    expected = calculate_floor_eur(holder.balance, oracle_price)
+    actual = distribution_tx.outputs.find { |o| o.address == holder.address }.value
+    
+    raise FraudProof.new(holder, expected, actual) if expected != actual
+  end
+end
+```
+
+**Challenge mechanism:**
+```ruby
+class FraudProof < ApplicationRecord
+  def publish(holder, expected_sats, actual_sats)
+    # On-chain fraud proof transaction
+    fraud_tx = {
+      inputs: [distributor_bond_utxo],
+      outputs: [
+        { address: challenger.address, value: 0.05 BTC },  # Reward
+        { address: holder.address, expected_sats },  # Correct amount
+        # ... rest of corrected distribution
+      ],
+      witness: {
+        rgb_balance_proof: holder.rgb_state,
+        merkle_proof: holder.merkle_proof,
+        floor_eur_calc: deterministic_calculation
+      }
+    }
+    
+    broadcast(fraud_tx)
+  end
+end
+```
+
+**Pros:**
+✅ Cryptoeconomic security (bond at risk)  
+✅ Anyone can verify  
+✅ Permissionless challenging  
+✅ Token-per-deal makes proofs simpler  
+
+**Cons:**
+🟡 Requires on-chain bond commitment  
+🟡 Challenge period adds latency  
+🟡 Needs watchers to catch fraud  
+
+**Trustlessness:** 🟢 High (fraud-provable)
+
+---
+
+#### Architecture 4: RGB Commitment in CET Output (Most Trustless)
+
+**How it works:**
+
+```
+CET peg output includes RGB commitment:
+  scriptPubKey: taproot with RGB metadata
+  
+RGB validators ensure:
+  - Spending requires valid token burns
+  - Output amounts match token balances
+```
+
+**At activation (T0):**
+```ruby
+# DLC + RGB coordinated setup
+rgb_contract_id = Rgb::IssueService.call(
+  ticker: 'DEAL001_EUR',
+  initial_supply: 1000_00,
+  settlement_utxo: :to_be_determined  # Will be CET peg output
+)
+
+# Create DLC with RGB commitment
+cet_peg_output = {
+  value: :calculated_at_settlement,
+  script: rgb_aware_script(
+    contract_id: rgb_contract_id,
+    redemption_rules: :pro_rata_burn
+  )
+}
+
+# Store RGB state linking:
+# "DEAL001_EUR tokens → CET peg output UTXO"
+```
+
+**At maturity (T91):**
+```ruby
+# 1. CET broadcasts
+# Output 0: investor_pot → hodler
+# Output 1: peg_pot → RGB-committed script
+
+# 2. Holders redeem individually
+class Rgb::RedemptionService
+  def redeem(holder, amount)
+    # Holder burns tokens
+    burn_proof = Rgb::BurnService.call(
+      asset_id: 'DEAL001_EUR',
+      holder: holder,
+      amount: amount
+    )
+    
+    # Construct redemption tx
+    redemption_tx = {
+      inputs: [{ 
+        txid: cet_txid, 
+        vout: 1,  # peg_pot output
+        witness: {
+          rgb_burn_proof: burn_proof,
+          amount_calculation: floor_eur_calculation
+        }
+      }],
+      outputs: [{
+        address: holder.btc_address,
+        value: calculate_pro_rata(amount, peg_pot_total)
+      }]
+    }
+    
+    # RGB validators verify:
+    # - Burn proof valid
+    # - Amount matches token balance
+    # - Pro-rata calculation correct
+    
+    broadcast(redemption_tx)
+  end
+end
+```
+
+**Challenge: Parallel Redemptions**
+
+```
+Problem: Multiple holders spending same peg_pot UTXO
+
+Solution 1: Batch redemption tree
+  Peg_pot → Intermediate outputs (tree structure)
+  Each holder gets leaf UTXO to redeem
+
+Solution 2: Covenant-enforced sequencing
+  First redemption creates change output
+  Next holder spends that change, etc.
+```
+
+**Pros:**
+✅ Most trustless (client-side validation)  
+✅ No distributor needed  
+✅ Holders redeem permissionlessly  
+✅ Token burn = atomic redemption  
+
+**Cons:**
+❌ Requires advanced RGB features (not standard yet)  
+❌ Complex UTXO tree structure  
+❌ Coordination needed for parallel redemptions  
+
+**Trustlessness:** 🟢🟢 Highest (covenant-like)
+
+---
+
+#### Architecture 5: Lightning HODL Invoices (Phase 5 Plan)
+
+**How it works:**
+
+```
+CET peg output → Lightning-capable address
+
+Holders present HODL invoices:
+  - Invoice amount = FloorEUR calculation
+  - Payment held pending token burn
+  - Token burn releases payment
+```
+
+**At activation (T0):**
+```ruby
+# CET pays to Lightning Service Provider
+cet_peg_output = {
+  value: peg_pot_sats,
+  address: lightning_service.funding_address
+}
+
+# Lightning service bonds to honest distribution
+```
+
+**At maturity (T91):**
+```ruby
+class Lightning::HodlRedemptionService
+  def redeem(holder)
+    # 1. Holder creates HODL invoice
+    invoice = holder.create_hodl_invoice(
+      amount: calculate_floor_eur(holder.balance),
+      hodl_key: holder.secret_key
+    )
+    
+    # 2. Submit redemption request
+    redemption = {
+      holder_pubkey: holder.identity_key,
+      token_balance: holder.balance,
+      invoice: invoice,
+      rgb_state_proof: holder.rgb_state
+    }
+    
+    # 3. Lightning service prepares payment (not settled)
+    lightning_service.prepare_payment(redemption.invoice)
+    # Payment is HELD (not finalized)
+    
+    # 4. Holder burns tokens
+    burn_proof = Rgb::BurnService.call(
+      asset_id: 'DEAL001_EUR',
+      holder: holder,
+      amount: holder.balance
+    )
+    
+    # 5. Reveal preimage (finalizes payment)
+    holder.reveal_preimage(
+      burn_proof: burn_proof,
+      hodl_key: holder.secret_key
+    )
+    
+    # 6. Payment releases atomically
+    lightning_service.finalize_payment(redemption.invoice)
+  end
+end
+```
+
+**Atomic sequence:**
+```
+1. Invoice created (HODL)
+2. Payment prepared (held)
+3. Token burn submitted
+4. Preimage revealed (conditional on burn)
+5. Payment finalizes
+```
+
+**Pros:**
+✅ Atomic: token burn ↔ BTC receipt  
+✅ Instant settlement (Lightning)  
+✅ No on-chain fan-out (cheaper)  
+✅ Works with token-per-deal  
+
+**Cons:**
+🟡 Requires HODL invoice support  
+🟡 Lightning liquidity needed  
+🟡 Service provider must be online  
+
+**Trustlessness:** 🟢 High (atomic swap)
+
+---
+
+### Token-Per-Deal: Why It Helps All Architectures
+
+**Direct Entitlement:**
+```ruby
+# Single token (complex)
+eligible_holders = TokenAccount.where(asset_id: 'MAT_EUR')
+                               .select { |h| participated_in_deal?(h, budget) }
+                               # ⚠️ Need to prove participation
+
+# Token-per-deal (simple)
+eligible_holders = TokenAccount.where(asset_id: budget.rgb_asset_id)
+                               # ✓ Token ownership = participation proof
+```
+
+**Fraud Proofs Simpler:**
+```ruby
+# Challenge: "Holder X was underpaid"
+proof = {
+  token_balance: rgb_state_proof('DEAL001_EUR', holder),  # Direct
+  expected_payout: floor_eur(token_balance, oracle_price),
+  actual_payout: distribution_tx.output(holder.address)
+}
+
+# With single token, need additional proof:
+# "Holder participated in THIS deal" (history scan)
+```
+
+**RGB Commitment Cleaner:**
+```
+Single token:
+  RGB contract → Multiple deals → Complex state
+
+Token-per-deal:
+  RGB contract → One deal → Simple 1:1 mapping
+  DEAL001_EUR burn → Deal #1 peg_pot redemption (unambiguous)
+```
+
+---
+
+### Recommended Implementation Path
+
+**Phase 1 (v1): Architecture 1 + Verifiable**
+```ruby
+# Distributor with published commitments
+# - Works today
+# - Add merkle root publication
+# - Open-source distribution logic
+# Token-per-deal simplifies verification
+```
+
+**Phase 2 (v2): Architecture 3 or 5**
+```ruby
+# Option A: Bonded distributor + fraud proofs
+# Option B: Lightning HODL invoices
+# Both benefit from token-per-deal's direct entitlement
+```
+
+**Phase 3 (Future): Architecture 4**
+```ruby
+# RGB covenant-style redemption
+# Fully trustless
+# Token burn = permissionless redemption
+# Requires RGB protocol maturity
+```
+
+---
+
 ## Technical Deep Dive: Spark Settlement Bridge
 
 ### The Critical Unsolved Problem

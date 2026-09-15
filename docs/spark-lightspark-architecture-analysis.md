@@ -926,6 +926,302 @@ class SendMoneyScreen extends StatefulWidget {
 }
 ```
 
+### Decentralized Interest Distribution
+
+**Question:** Does token-per-deal support trustless/decentralized distribution of interests?
+
+**Answer:** Yes - and it's actually **MORE decentralized** than single token approach.
+
+#### Current Challenge (Both Approaches)
+
+The DLC itself only knows about **two parties**:
+```
+DLC 2-of-2:
+  └─→ Borrower input (peg side)
+  └─→ Hodler input (investor side)
+
+CET outputs:
+  └─→ investor_pot → Hodler L1 address (trustless ✓)
+  └─→ peg_pot → ??? (multiple holders, needs distribution)
+```
+
+**The peg_pot must be distributed to N holders** (not just borrower), which requires additional logic beyond the DLC itself.
+
+#### Single Token: Centralized Tracking Required
+
+```ruby
+# At settlement
+holders = TokenAccount.where(asset_id: 'MAT_EUR')
+
+# Problem: How to TRUSTLESSLY prove which holders
+# are entitled to THIS deal's peg_pot?
+
+# Option 1: Centralized database (not trustless)
+entitled = holders.joins(:budget_participations)
+                  .where(budget: this_deal)
+# ❌ Requires trusting Rails DB
+
+# Option 2: Scan RGB transfer history (complex)
+entitled = holders.select do |h|
+  rgb_history_shows_participation?(h, this_deal)
+end
+# 🟡 Trustless but expensive to verify
+```
+
+**Issue:** With single token, you need **off-chain tracking** or **expensive on-chain scanning** to prove entitlement.
+
+#### Token-Per-Deal: On-Chain Proof of Entitlement
+
+```ruby
+# At settlement
+holders = TokenAccount.where(asset_id: 'DEAL001_EUR')
+
+# ✓ All holders are entitled (by definition)
+# ✓ Provable on-chain: RGB state or Spark TTXO ownership
+# ✓ No centralized participation database needed
+```
+
+**Advantage:** Token ownership **IS** the entitlement proof.
+
+#### RGB Client-Side Validation (Most Trustless)
+
+With token-per-deal + RGB:
+
+```
+1. Holder verifies RGB state locally (client-side validation)
+2. Holder proves: "I own X DEAL001_EUR tokens"
+3. Holder submits proof to distribution service
+4. Distribution service verifies proof (deterministic)
+5. Payment sent
+
+Alternative: Holder can broadcast exit tx themselves
+  └─→ Pre-signed transaction from DLC setup
+  └─→ Includes RGB commitment in outputs
+```
+
+**This is more trustless because:**
+- RGB state is client-validated (not operator-validated)
+- Each holder can independently verify their claim
+- No need to trust centralized registry of "who participated"
+
+#### Distribution Mechanisms: Centralization Spectrum
+
+```
+Most Centralized ←→ Most Decentralized
+
+█ Trusted distributor
+  └─→ Rails service pays holders
+  └─→ Must trust server to calculate + send correctly
+  
+  █ Verifiable distributor
+    └─→ Holders submit proofs
+    └─→ Anyone can verify calculation
+    └─→ But still one party holds peg_pot keys
+    
+    █ HODL invoices (Phase 5 plan)
+      └─→ Holder presents Lightning invoice
+      └─→ Payment conditional on token burn
+      └─→ More atomic, but needs honest invoice payer
+      
+      █ DLC fan-out in CET
+        └─→ CET includes output for each holder
+        └─→ Fully trustless, but...
+        └─→ ❌ Can't work: holders unknown at DLC signing
+```
+
+**Current limitation:** Holders can transfer tokens AFTER DLC is signed, so you cannot include all holder outputs in the CET itself.
+
+#### Token-Per-Deal + Verifiable Distribution
+
+**Better approach with token-per-deal:**
+
+```ruby
+class Dlc::VerifiableDistribution
+  # 1. Snapshot holder state at maturity block
+  def snapshot_holders(budget)
+    holders = snapshot_rgb_state(
+      asset_id: budget.rgb_asset_id,
+      block_height: budget.maturity_block
+    )
+    
+    # Publish snapshot + merkle root
+    publish_snapshot(holders, merkle_root)
+  end
+  
+  # 2. Each holder can verify their inclusion
+  def holder_can_verify(holder, budget)
+    proof = merkle_proof(holder, budget.snapshot_merkle_root)
+    
+    # Holder independently verifies:
+    # - They hold X tokens at maturity block ✓
+    # - Merkle proof includes them ✓  
+    # - FloorEUR calculation correct ✓
+    
+    proof.valid? && floor_eur_correct?
+  end
+  
+  # 3. Holder claims payment
+  def claim_payout(holder, proof)
+    verify(proof)
+    pay_lightning_invoice(holder.invoice, amount)
+  end
+end
+```
+
+**Why token-per-deal helps:**
+- Snapshot is just: "all DEAL001_EUR holders at block N"
+- No need to filter: "which MAT_EUR holders participated in Deal #1"
+- Simpler proof: token ownership is the only requirement
+
+#### Phase 5: Atomic Interest Distribution
+
+**With Lightning HODL invoices + token-per-deal:**
+
+```
+1. Holder presents Lightning invoice for calculated amount
+2. Holder proves RGB token ownership (DEAL001_EUR)
+3. Distributor prepares payment (held, not settled)
+4. Holder submits token burn proof
+5. Payment released atomically
+```
+
+**Token-per-deal advantage here:**
+- Clearer burn semantics: burning DEAL001_EUR = claiming from Deal #1
+- No ambiguity about which deal the claim is for
+- Simpler to verify burn corresponds to correct payout
+
+#### Comparison Table
+
+| Aspect | Single Token | Token-Per-Deal |
+|--------|-------------|----------------|
+| **Entitlement proof** | ❌ Need off-chain tracking or history scan | ✅ Token ownership IS proof |
+| **Trustless verification** | 🟡 Complex (full history replay) | ✅ Simple (current state snapshot) |
+| **Distribution target** | ❌ Must filter participants | ✅ All token holders are participants |
+| **Interest calculation** | Same (FloorEUR) | Same (FloorEUR) |
+| **RGB client validation** | ✅ Works | ✅ Works (simpler) |
+| **Lightning atomicity** | ✅ Possible | ✅ Possible (clearer) |
+| **Decentralization** | 🟡 Medium | ✅ Higher |
+
+### Summary: Token-Per-Deal → More Decentralized
+
+**Token-per-deal improves decentralization because:**
+
+1. ✅ **On-chain entitlement**: Token ownership = verifiable claim (no off-chain registry)
+2. ✅ **Simpler proofs**: "I hold X DEAL001_EUR" vs "I hold X MAT_EUR from Deal #1"
+3. ✅ **Client-side verification**: Holders can independently verify their share
+4. ✅ **Clear burn semantics**: DEAL001_EUR burn → Deal #1 claim only
+5. ✅ **No participation filtering**: All token holders are entitled (by definition)
+
+**The distribution mechanism itself** (Lightning, L1 fan-out, etc.) is independent of token-per-deal vs single token, but token-per-deal makes the **entitlement layer more trustless**.
+
+### Fully Decentralized Interest Distribution (Future)
+
+**Can we make distribution trustless end-to-end?**
+
+#### Option 1: Pre-Committed CET Fan-Out (Not Viable)
+
+```
+Problem: Holders unknown at DLC signing time
+  - Alice gets 500 DEAL001_EUR
+  - Alice sends 300 → Claude, 200 → David
+  - At maturity: Claude + David are holders (not Alice)
+  - CET was signed weeks ago (can't include Claude/David outputs)
+
+❌ Cannot enumerate holders in CET
+```
+
+#### Option 2: Recursive Covenants (Bitcoin Limitation)
+
+```
+Ideal: CET output with covenant
+  "Can only be spent to pay DEAL001_EUR holders
+   in proportion to their token balances"
+
+❌ Bitcoin doesn't support general covenants
+🟡 Possible with OP_CTV or future opcodes
+```
+
+#### Option 3: RGB Commitments in CET (Promising)
+
+```
+CET output includes RGB commitment:
+  └─→ "This output represents DEAL001_EUR redemption pool"
+  
+RGB validators ensure:
+  └─→ Spending this output requires valid token burns
+  └─→ Output amounts match token balances (pro-rata)
+
+✅ Trustless token → BTC redemption
+🟡 Requires RGB validator infrastructure
+```
+
+**How it works:**
+
+1. DLC CET pays `peg_pot` to **RGB-aware address**
+2. RGB state links: `DEAL001_EUR tokens → peg_pot UTXO`
+3. Holders burn tokens → receive pro-rata share of UTXO
+4. RGB validators enforce: total burns = total supply before payouts
+
+**Token-per-deal advantage:**
+- Clean 1-to-1 mapping: DEAL001_EUR ↔ Deal #1 peg_pot
+- No cross-deal state needed in RGB commitments
+
+#### Option 4: Federated Distribution with Fraud Proofs
+
+```
+Distributor publishes:
+  - Holder snapshot (merkle root)
+  - Payout amounts (signed commitments)
+  
+Anyone can challenge with fraud proof:
+  "Distributor calculated wrong amount for holder X"
+  
+Challenge includes:
+  - Token balance proof (RGB state)
+  - FloorEUR calculation
+  - Merkle proof of inclusion
+  
+If fraud proven:
+  - Distributor's bond slashed
+  - Correct distribution enforced
+```
+
+**Token-per-deal advantage:**
+- Fraud proofs simpler: just prove DEAL001_EUR balance
+- No need to prove "participated in Deal #1" separately
+
+#### Option 5: Lightning Native Tokens (Long-term)
+
+```
+Future: RGB-Lightning native integration
+  - Tokens move on Lightning channels
+  - At settlement, Lightning HTLC enforces atomicity
+  - Token burn reveals preimage → payment released
+  
+✅ Fully decentralized
+🟡 Requires mature RGB-LN + HTLC extensions
+```
+
+#### Recommended Path
+
+**Phase 1 (Now):** Verifiable distribution
+- Publish holder snapshot (merkle tree)
+- Open-source distribution logic
+- Anyone can verify calculations
+- Token-per-deal makes verification simpler
+
+**Phase 2 (v2):** Lightning HODL invoices
+- Holder submits invoice + token burn proof
+- Atomic: payment ↔ burn
+- Reduces trust in distributor timing
+
+**Phase 3 (Future):** RGB covenant-style redemption
+- CET output includes RGB commitment
+- Token burn directly spends from peg_pot
+- Fully trustless (no distributor needed)
+
+**Token-per-deal helps all phases** by providing clear entitlement proofs.
+
 ### Comparison: Settlement Logic Complexity
 
 **Single Token (Current):**

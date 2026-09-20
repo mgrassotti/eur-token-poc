@@ -12,8 +12,9 @@ module DemoFlowHelpers
   # Alice deposits slightly more than the 0.02 BTC collateral so the DLC funding
   # tx (funded from her reserve in Fase 1) has headroom for her share of the
   # on-chain funding fee; the remainder returns to her reserve as change.
-  ALICE_DEPOSIT_SATS = 2_100_000   # 0.021 BTC (0.02 collateral + fee headroom)
-  BOB_DEPOSIT_SATS = 10_000_000    # 0.1 BTC
+  # Add 10,000 sats funding fee buffer required by Budgets::CreateService
+  ALICE_DEPOSIT_SATS = 2_110_000   # 0.0211 BTC (0.02 collateral + fee headroom + buffer)
+  BOB_DEPOSIT_SATS = 10_010_000    # 0.10010 BTC (includes 10k buffer)
   BUDGET_EUR_CENTS = 100_000       # 1_000 €
   PEG_EUR_PER_BTC = 50_000
   SETTLEMENT_EUR_PER_BTC = 55_000

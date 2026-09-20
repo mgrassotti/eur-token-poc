@@ -68,7 +68,32 @@ RSpec.describe Dlc::SettlementService do
 
     expect(oracle).to have_received(:attest_numeric)
       .with(event_id: "deal-#{budget.id}", outcome: 60_000, maturity_epoch: dlc_contract.maturity_epoch)
-    expect(node).to have_received(:execute_contract).with(contract_id: "c-1", attestation: "atthex")
+    expect(node).to have_received(:execute_contract).with(
+      contract_id: "c-1",
+      attestation: "atthex",
+      close_package: nil
+    )
+  end
+
+  it "forwards the stored close package so the sidecar needs no party keys" do
+    dlc_contract.update!(
+      sign_package: { "cets" => ["00"] },
+      offerer_adaptor_sigs: %w[aa],
+      acceptor_adaptor_sigs: %w[bb],
+      offerer_refund_sig: "r1",
+      acceptor_refund_sig: "r2"
+    )
+
+    described_class.call(budget: budget.reload, end_btc_eur_rate: 60_000, oracle: oracle, node: node)
+
+    expect(node).to have_received(:execute_contract).with(
+      contract_id: "c-1",
+      attestation: "atthex",
+      close_package: hash_including(
+        "offerer_adaptor_sigs" => %w[aa],
+        "acceptor_adaptor_sigs" => %w[bb]
+      )
+    )
   end
 
   it "is idempotent on an already-executed settlement" do

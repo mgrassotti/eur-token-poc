@@ -15,8 +15,8 @@ RSpec.describe "PAYOFF-SPEC §11 integration" do
 
   def activate_deal!(amount_cents: 500_000, rate_bps: 100)
     period_start, period_end = six_month_period
-    alice.btc_account.update!(balance_sats: BtcConversion.eur_cents_to_sats(amount_cents, strike))
-    bob.btc_account.update!(balance_sats: BtcConversion.eur_cents_to_sats(amount_cents * 2, strike))
+    alice.btc_account.update!(balance_sats: BtcConversion.eur_cents_to_sats(amount_cents, strike) + 10_000)
+    bob.btc_account.update!(balance_sats: BtcConversion.eur_cents_to_sats(amount_cents * 2, strike) + 10_000)
     MarketRate.current.update!(btc_eur_per_btc: strike)
 
     budget = Budgets::CreateService.call(
@@ -26,7 +26,7 @@ RSpec.describe "PAYOFF-SPEC §11 integration" do
       period_end: period_end
     )
     budget.update!(rate_bps_monthly: rate_bps)
-    Budgets::ActivateService.call(budget: budget, investor: bob)
+    unit_activate_budget!(budget, investor: bob)
     budget.reload
     advance_to_maturity!(budget)
     budget

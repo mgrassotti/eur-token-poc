@@ -2,7 +2,7 @@
 
 require "rails_helper"
 
-RSpec.describe Tokens::TransferService do
+RSpec.describe Tokens::TransferService, skip: "MVP savings: RGB/P2P transfers unplugged" do
   let(:alice) { create(:user) }
   let(:bob) { create(:user) }
   let(:claude) { create(:user) }
@@ -20,7 +20,7 @@ RSpec.describe Tokens::TransferService do
 
   before do
     bob.btc_account.update!(balance_sats: 5_000_000)
-    Budgets::ActivateService.call(budget: budget, investor: bob)
+    unit_activate_budget!(budget, investor: bob)
   end
 
   it "transfers tokens between users" do

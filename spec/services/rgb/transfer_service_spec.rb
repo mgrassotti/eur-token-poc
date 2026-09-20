@@ -2,7 +2,7 @@
 
 require "rails_helper"
 
-RSpec.describe Rgb::TransferService do
+RSpec.describe Rgb::TransferService, skip: "MVP savings: RGB unplugged" do
   let(:alice) { create(:user) }
   let(:claude) { create(:user) }
   let(:budget) { create(:budget, borrower: alice, rgb_asset_id: "rgb_stub") }

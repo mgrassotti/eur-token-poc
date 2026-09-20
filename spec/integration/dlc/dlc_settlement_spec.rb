@@ -30,8 +30,21 @@ RSpec.describe "DLC settlement (regtest)", :regtest, :dlc_integration do
     admin = demo_user(:admin)
 
     MarketRate.current.update!(btc_eur_per_btc: DemoFlowHelpers::PEG_EUR_PER_BTC, set_by: admin)
-    L1::DepositReserveService.call(user: alice, amount_sats: DemoFlowHelpers::ALICE_DEPOSIT_SATS)
-    L1::DepositReserveService.call(user: bob, amount_sats: DemoFlowHelpers::BOB_DEPOSIT_SATS)
+
+    # Phase 2: Set up reserve addresses and fund them
+    alice_wallet = L1::UserWallet.for(alice)
+    bob_wallet = L1::UserWallet.for(bob)
+    alice.btc_account.update!(reserve_receive_address: alice_wallet.receive_address)
+    bob.btc_account.update!(reserve_receive_address: bob_wallet.receive_address)
+
+    L1::FundReceiveAddressService.call(
+      address: alice.btc_account.reserve_receive_address,
+      amount_sats: DemoFlowHelpers::ALICE_DEPOSIT_SATS
+    )
+    L1::FundReceiveAddressService.call(
+      address: bob.btc_account.reserve_receive_address,
+      amount_sats: DemoFlowHelpers::BOB_DEPOSIT_SATS
+    )
 
     budget = Budgets::CreateService.call(
       borrower: alice,
@@ -41,7 +54,7 @@ RSpec.describe "DLC settlement (regtest)", :regtest, :dlc_integration do
     )
 
     # Activation funds the DLC on the node (oracle announcement + 2-of-2 funding tx).
-    Budgets::ActivateService.call(budget: budget, investor: bob)
+    activate_budget_with_wallets!(budget, investor: bob)
     budget.reload
 
     expect(budget.dlc_contract).to be_present

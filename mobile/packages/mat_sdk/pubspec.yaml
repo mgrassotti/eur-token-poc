@@ -1,0 +1,10 @@
+name: mat_sdk
+description: On-device MAT deal economics (FloorEUR) — Dart mirror of mat-core for Phase 0/1 independence. Native mat-ffi will replace this path later.
+publish_to: "none"
+version: 0.1.0
+
+environment:
+  sdk: ">=3.5.0 <4.0.0"
+
+dev_dependencies:
+  test: ^1.25.0

@@ -8,23 +8,29 @@ Rails.application.routes.draw do
       resource :dashboard, only: :show, controller: "dashboard"
       resource :market_rate, only: :show, controller: "market_rates"
       resource :reserve, only: :show, controller: "reserve" do
+        put :update_address, on: :member
         post :sync, on: :member
       end
-      resources :users, only: :index
-      resources :transfers, only: :create
-      resources :receive_requests, only: %i[create show], param: :id
-      resources :deals, only: %i[index show create] do
+      resource :bank, only: :show, controller: "bank"
+      resources :funding_requests, only: %i[index show create] do
         member do
-          post :accept
+          post :submit_utxos
         end
-        resource :settlement, only: %i[show create], controller: "deals/settlements"
-        resources :transfers, only: %i[index create], controller: "deals/transfers"
+      end
+      resources :users, only: :index
+      resources :deals, only: %i[index show] do
+        member do
+          post :funding_signature
+          post :dlc_signature
+        end
+        resource :settlement, only: %i[show], controller: "deals/settlements"
       end
 
       if Rails.env.development? || Rails.env.test?
         namespace :integration do
           post "demo_reset", to: "demo_resets#create"
           post "admin_fund_reserve", to: "admin_fund_reserves#create"
+          post "fund_regtest_address", to: "fund_regtest_addresses#create"
         end
       end
     end
@@ -55,6 +61,17 @@ Rails.application.routes.draw do
     resource :market_rate, only: :update
     resource :chain_state, only: :update
     resource :reserve_deposit, only: :create, controller: "reserve_deposits"
+    resources :funding_requests, only: [] do
+      member do
+        post :simulate_sepa_in
+        post :simulate_investor_deposit
+      end
+    end
+    resources :budgets, only: [] do
+      member do
+        post :simulate_sepa_out
+      end
+    end
   end
 
   if Rails.env.development? || Rails.env.test?

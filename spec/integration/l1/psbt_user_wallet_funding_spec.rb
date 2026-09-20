@@ -20,8 +20,20 @@ RSpec.describe "L1 reserve-funded DLC collateral", :regtest, :dlc_integration do
     alice = create(:user, name: "Alice", email: "alice-reserve-#{SecureRandom.hex(4)}@example.com")
     bob = create(:user, name: "Bob", email: "bob-reserve-#{SecureRandom.hex(4)}@example.com")
 
-    L1::DepositReserveService.call(user: alice, amount_sats: 10_000_000)
-    L1::DepositReserveService.call(user: bob, amount_sats: 10_000_000)
+    # Phase 2: Set up reserve addresses and fund them
+    alice_wallet = L1::UserWallet.for(alice)
+    bob_wallet = L1::UserWallet.for(bob)
+    alice.btc_account.update!(reserve_receive_address: alice_wallet.receive_address)
+    bob.btc_account.update!(reserve_receive_address: bob_wallet.receive_address)
+
+    L1::FundReceiveAddressService.call(
+      address: alice.btc_account.reserve_receive_address,
+      amount_sats: 10_000_000
+    )
+    L1::FundReceiveAddressService.call(
+      address: bob.btc_account.reserve_receive_address,
+      amount_sats: 10_000_000
+    )
 
     budget = setup_active_budget!(
       borrower: alice,

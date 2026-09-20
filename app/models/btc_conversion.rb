@@ -37,6 +37,10 @@ module BtcConversion
     sats_to_btc(sats) * eur_per_btc.to_d
   end
 
+  def sats_to_eur_cents(sats, eur_per_btc)
+    max_eur_cents_for_sats(sats, eur_per_btc)
+  end
+
   # Importo € massimo bloc cabile senza superare i sats disponibili (arrotondamento per difetto).
   def max_eur_cents_for_sats(sats, eur_per_btc)
     return 0 unless sats.positive? && eur_per_btc.to_d.positive?

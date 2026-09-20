@@ -7,16 +7,13 @@ import 'config/api_config.dart';
 import 'l10n/app_localizations.dart';
 import 'providers/app_state.dart';
 import 'screens/add_funds_screen.dart';
-import 'screens/create_deal_screen.dart';
+import 'screens/create_request_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/deal_detail_screen.dart';
-import 'screens/login_screen.dart';
-import 'screens/receive_money_screen.dart';
-import 'screens/scan_pay_screen.dart';
-import 'screens/send_money_screen.dart';
+import 'screens/local_wallet_debug_screen.dart';
+import 'screens/name_form_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/settlement_summary_screen.dart';
-import 'screens/transfer_list_screen.dart';
 import 'services/relay_api_client.dart';
 
 void bootstrap({RelayApiClient? api, String? apiBaseUrl}) {
@@ -36,9 +33,21 @@ class MatApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         Provider<RelayApiClient>.value(value: api),
+        ChangeNotifierProvider(create: (_) => SettingsState()),
+        ChangeNotifierProvider(create: (_) => NameState()),
         ChangeNotifierProvider(create: (_) => AuthState(api)),
         ChangeNotifierProvider(create: (_) => DashboardState(api)),
-        ChangeNotifierProvider(create: (_) => SettingsState()),
+        ChangeNotifierProxyProvider2<SettingsState, AuthState, WalletState>(
+          create: (context) {
+            final settings = context.read<SettingsState>();
+            final api = context.read<RelayApiClient>();
+            return WalletState(electrumUrl: settings.electrumUrl, api: api);
+          },
+          update: (context, settings, auth, previous) {
+            final api = context.read<RelayApiClient>();
+            return previous ?? WalletState(electrumUrl: settings.electrumUrl, api: api);
+          },
+        ),
       ],
       child: const MatAppRouter(),
     );
@@ -50,35 +59,34 @@ class MatAppRouter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final auth = context.watch<AuthState>();
+    final nameState = context.watch<NameState>();
     final settings = context.watch<SettingsState>();
 
     final router = GoRouter(
-      initialLocation: auth.isLoggedIn ? '/' : '/login',
-      refreshListenable: auth,
+      initialLocation: nameState.hasName ? '/' : '/name',
+      refreshListenable: nameState,
       redirect: (context, state) {
-        final loggedIn = auth.isLoggedIn;
-        final loggingIn = state.matchedLocation == '/login';
-        if (!loggedIn && !loggingIn) return '/login';
-        if (loggedIn && loggingIn) return '/';
+        final hasName = nameState.hasName;
+        final onNameForm = state.matchedLocation == '/name';
+        if (!hasName && !onNameForm) return '/name';
+        if (hasName && onNameForm) return '/';
         return null;
       },
       routes: [
-        GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
+        // GoRoute(path: '/login', builder: (_, __) => const LoginScreen()), // Saved for future: bank transfer deposits
+        GoRoute(path: '/name', builder: (_, __) => const NameFormScreen()),
         GoRoute(path: '/', builder: (_, __) => const DashboardScreen()),
         GoRoute(path: '/reserve/add-funds', builder: (_, __) => const AddFundsScreen()),
-        GoRoute(path: '/send-money', builder: (_, __) => const SendMoneyScreen()),
-        GoRoute(path: '/receive-money', builder: (_, __) => const ReceiveMoneyScreen()),
-        GoRoute(path: '/scan-pay', builder: (_, __) => const ScanPayScreen()),
+        GoRoute(path: '/requests/new/:role', builder: (_, state) => CreateRequestScreen(role: state.pathParameters['role']!)),
+        GoRoute(path: '/deals/new', builder: (_, __) => const CreateRequestScreen(role: 'saver')),
         GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
-        GoRoute(path: '/deals/new', builder: (_, __) => const CreateDealScreen()),
+        GoRoute(
+          path: '/settings/local-wallet',
+          builder: (_, __) => const LocalWalletDebugScreen(),
+        ),
         GoRoute(
           path: '/deals/:id',
           builder: (_, state) => DealDetailScreen(dealId: state.pathParameters['id']!),
-        ),
-        GoRoute(
-          path: '/deals/:id/transfers',
-          builder: (_, state) => TransferListScreen(dealId: state.pathParameters['id']!),
         ),
         GoRoute(
           path: '/deals/:id/settlement',

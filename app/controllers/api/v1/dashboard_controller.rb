@@ -23,7 +23,10 @@ module Api
             DealSerializer.render(deal, market_rate: market_rate)
           end,
           investable_deals: investable_deals(market_rate),
-          fund_positions: fund_positions,
+          funding_requests: FundingRequest.where(user: current_user).order(created_at: :desc).map do |request|
+            FundingRequestSerializer.render(request)
+          end,
+          collection_iban: BankAccount.default.iban,
           margin_call_deals: margin_call_deals(market_rate)
         }
       end
@@ -39,9 +42,9 @@ module Api
       end
 
       def savings_payload(market_rate)
-        sats = L1::ReserveBalance.sats_for(current_user)
-        eur = market_rate.set? ? BtcConversion.sats_to_eur(sats, market_rate.btc_eur_per_btc) : nil
-        { sats: sats, eur: eur }
+        # Phase 2: Mobile clients show their BDK wallet balance directly
+        # Server no longer tracks reserve balance
+        { sats: 0, eur: 0 }
       end
 
       def investable_deals(market_rate)

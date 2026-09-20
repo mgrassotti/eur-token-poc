@@ -32,6 +32,9 @@ class AppLocalizationsIt extends AppLocalizations {
   String get settings => 'Impostazioni';
 
   @override
+  String get refresh => 'Aggiorna';
+
+  @override
   String get language => 'Lingua';
 
   @override
@@ -358,9 +361,96 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get settlementPreviewNote =>
-      'Solo anteprima — la Fase 1 usa la matematica FloorEUR del relay. In produzione il settlement avviene on-device via mat-core.';
+      'Anteprima — gli importi sono ricalcolati sul dispositivo via mat_sdk; le cifre del relay sono confrontate per incongruenze.';
 
   @override
   String get settlementExecutedNote =>
-      'Settlement eseguito sul relay (percorso admin PoC).';
+      'Settlement eseguito sul relay (percorso admin PoC). Input inclusi per audit FloorEUR offline.';
+
+  @override
+  String get onDeviceFloorEur => 'Ricalcolato sul dispositivo (mat_sdk)';
+
+  @override
+  String get settlementMismatchWarning =>
+      'Il FloorEUR sul dispositivo non coincide con l\'anteprima del relay. Non fidarti delle cifre del server.';
+
+  @override
+  String get localWalletDebug => 'Wallet locale (spike BDK)';
+
+  @override
+  String get localWalletDebugSubtitle =>
+      'Fase 2: crea/carica mnemonic e mostra un indirizzo di ricezione';
+
+  @override
+  String get localWalletCreate => 'Crea wallet';
+
+  @override
+  String get localWalletReceiveAddress => 'Indirizzo di ricezione';
+
+  @override
+  String get localWalletMnemonicSaved =>
+      'Mnemonic salvato sul dispositivo (solo debug — non sicuro in produzione)';
+
+  @override
+  String localWalletError(String detail) {
+    return 'Errore wallet: $detail';
+  }
+
+  @override
+  String get saveMoney => 'Risparmia';
+
+  @override
+  String get invest => 'Investi';
+
+  @override
+  String get savingsRequests => 'Richieste di risparmio';
+
+  @override
+  String get investmentRequests => 'Richieste di investimento';
+
+  @override
+  String get awaitingBankTransfer => 'In attesa del bonifico';
+
+  @override
+  String get awaitingBtcDeposit => 'In attesa del deposito BTC';
+
+  @override
+  String get awaitingMatch => 'In attesa di matching';
+
+  @override
+  String get contractActive => 'Contratto attivo';
+
+  @override
+  String get payoutKeepBtc => 'Tieni i BTC in app';
+
+  @override
+  String get payoutReinvest => 'Reinvesti il mese successivo';
+
+  @override
+  String get payoutEur => 'Ricevi EUR sul mio IBAN';
+
+  @override
+  String get yourIban => 'Il tuo IBAN';
+
+  @override
+  String get matIban => 'Bonifico a questo IBAN';
+
+  @override
+  String get onePercentMonth => '1% per 1 mese';
+
+  @override
+  String currentBtcRate(String rate) {
+    return 'Cambio BTC corrente: $rate€/BTC';
+  }
+
+  @override
+  String investorPnlAt(String date) {
+    return 'Guadagno/perdita in base al prezzo al $date';
+  }
+
+  @override
+  String get noPendingRequests => 'Nessuna richiesta in attesa.';
+
+  @override
+  String get signFundingAutomatically => 'Firma del contratto in corso…';
 }

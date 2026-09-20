@@ -47,12 +47,17 @@ en:
         updated: "BTC/EUR rate updated to %{rate} EUR/BTC."
         margin_calls: "LTV warning (>=%{threshold}%): deal #%{ids} entered the risk zone."
       reserve_deposits:
-        created: "Sent %{amount} from %{wallet_name} to %{name} (%{address}). Reserve balance: %{balance}."
-        user_not_found: "User not found."
-        address_mismatch: "Receive address does not match the selected user's reserve wallet."
+        created: "Sent %{amount} from %{wallet_name} to %{address} (txid %{txid}). Sync the mobile wallet to see the balance."
+        address_required: "Receive address is required."
       demo_reset:
         done: "Demo reset."
         unavailable_in_production: "Demo reset is not available in production."
+      sepa_in:
+        created: "Simulated SEPA inbound %{amount}. Equivalent BTC sent to the saver wallet."
+      sepa_out:
+        created: "Simulated SEPA outbound to the saver IBAN."
+      investor_deposit:
+        created: "Simulated external BTC deposit to the investor wallet."
     recovery_packages:
       unauthorized: "Unauthorized."
       missing: "Recovery package not available for this deal."
@@ -77,6 +82,8 @@ en:
     l1:
       deposit_reserve:
         invalid_amount: "Invalid amount."
+      fund_receive_address:
+        address_required: "Receive address is required."
       provision_escrow:
         not_provisioned: "L1 escrow not provisioned: %{message}"
     settlements:
@@ -163,6 +170,14 @@ en:
           maturity_html: "Maturity block <strong>%{height}</strong> (%{remaining} remaining)"
           action: "Settlement"
           empty: "No active budgets waiting for settlement."
+        bank:
+          title: "MAT bank (simulated SEPA)"
+          iban_html: "%{name} IBAN <code>%{iban}</code> — ledger balance %{balance}"
+          simulate_sepa_in: "Simulate SEPA in"
+          simulate_sepa_out: "Simulate SEPA out"
+          simulate_investor_btc: "Simulate BTC deposit"
+          empty_requests: "No pending savings or investment requests."
+          sepa_out_title: "Settled deals awaiting EUR payout"
         wallets:
           title: "L1 multisig (regtest)"
           description_html: "Per-user regtest wallets; deposits come from <strong>%{wallet_name}</strong> (<code>%{wallet_code}</code>). Each deposit advances the simulated chain by %{blocks} blocks."
@@ -176,13 +191,12 @@ en:
             eur: "EUR equivalent"
             total: "Total"
         reserve_funding:
-          title: "Fund user reserve (regtest)"
-          description_html: "Send BTC from <strong>%{wallet_name}</strong> to the user's stable receive address (same QR shown in the mobile app)."
-          user: "User"
+          title: "Fund on-device wallet (regtest)"
+          description_html: "Send BTC from <strong>%{wallet_name}</strong> to any BDK receive address from the mobile app. No user lookup — sync the device wallet via Electrum to see the balance."
           amount: "Amount (BTC)"
           receive_address: "Receive address"
           receive_address_placeholder: "bcrt1q…"
-          receive_address_help: "Auto-filled when you pick a user. Paste from the mobile app to verify, or edit before sending."
+          receive_address_help: "Paste the receive address from the mobile app Add funds screen."
           submit: "Send to receive address"
         reset:
           button: "Reset demo DB"

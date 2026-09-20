@@ -1,6 +1,6 @@
 # Bitcoin Core regtest for M1 multisig integration tests.
-# Usage: docker compose -f docker-compose.regtest.yml up -d
-# RGB stack (electrs + proxy): always started by ./bin/regtest up
+# Usage: ./bin/regtest up  → profiles dlc (bitcoind + electrs + Pythia + dlc-rs)
+# Optional RGB/LN: ./bin/regtest --rgb up
 # RGB Lightning Nodes (one per demo user + issuer): profile rgb, ports 3001-3005
 
 # Shared config for every RGB Lightning Node container. Each node uses the same
@@ -51,7 +51,7 @@ services:
       retries: 30
 
   electrs:
-    profiles: [rgb]
+    profiles: [dlc, rgb]
     image: registry.gitlab.com/hashbeam/docker/electrs:0.10.10
     depends_on:
       bitcoind:

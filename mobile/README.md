@@ -29,6 +29,10 @@ The suite includes:
 
 - **Alice add-funds E2E**: copy address → admin funds **0.01 BTC** on regtest → sync balance
 - **Deal + transfer E2E**: Alice creates €1000 deal → Bob accepts (DLC/RGB on regtest) → Alice sends **€500 EURT** to Claude
+- **Settlement FloorEUR E2E**: after Bob accepts, settlement screen shows on-device `mat_sdk` recompute (via API `calculation_inputs`)
+- **Local wallet debug smoke**: Settings → Advanced → Local wallet (BDK spike) screen loads; does **not** create a wallet (native BDK)
+
+Widget / unit coverage (no Rails): `flutter test` — settlement on-device recompute + mismatch, local wallet UI with a fake `LocalWalletApi` (BDK cannot run under plain `flutter test`).
 
 Regtest starts automatically; deal tests reset demo data and fund Alice/Bob reserves via the integration bridge.
 
@@ -57,6 +61,51 @@ flutter test integration_test/mobile_flow_test.dart -d emulator-5554 \
 Tests live in `integration_test/mobile_flow_test.dart`. Add new flows there as mobile features grow.
 
 After admin sends funds: pull to refresh or tap **Sync balance** on Add funds.
+
+### Wallet Lifecycle Integration Tests
+
+Two test suites for wallet functionality:
+
+#### 1. Fast Test (FakeWalletService) - ✅ Recommended for CI
+
+```bash
+cd mobile
+flutter test integration_test/wallet_manager_test.dart -d macos
+```
+
+Tests wallet lifecycle logic **without** actual BDK blockchain operations:
+- Generate 12-word mnemonic (real BDK)
+- Create wallet with mnemonic 
+- Verify mnemonic persistence (SharedPreferences)
+- Verify wallet address generation (fake)
+- Delete wallet
+- Verify deletion
+
+**Time:** ~18s | **Dependencies:** None
+
+#### 2. Real BDK Test - ⚠️ Requires Infrastructure
+
+```bash
+cd mobile
+flutter test integration_test/bdk_wallet_lifecycle_test.dart -d macos
+```
+
+Tests with **real BDK library** and blockchain operations:
+- Real Bitcoin wallet creation
+- Real descriptor generation
+- Real address derivation (bcrt1...)
+- Electrum sync (requires running server)
+
+**Time:** ~50s+ | **Dependencies:** 
+- Electrum server running on 127.0.0.1:50001 (regtest)
+- Or test will timeout after 30s at wallet creation
+
+**Known Issues:**
+- Timeouts if Electrum unavailable
+- `ChecksumMismatchException` on multiple creations (DB not cleaned)
+- Needs proper tearDown with DB file deletion
+
+**Use when:** Testing actual BDK integration before releases.
 
 ## Run
 

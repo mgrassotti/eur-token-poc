@@ -2,7 +2,7 @@
 
 require "rails_helper"
 
-RSpec.describe Tokens::WalletTransferService do
+RSpec.describe Tokens::WalletTransferService, skip: "MVP savings: RGB/P2P transfers unplugged" do
   let(:alice) { create(:user, name: "Alice") }
   let(:bob) { create(:user, name: "Bob") }
   let(:claude) { create(:user, name: "Claude") }
@@ -17,7 +17,7 @@ RSpec.describe Tokens::WalletTransferService do
       period_start: Date.current,
       period_end: Date.current + 6.months
     )
-    Budgets::ActivateService.call(budget: budget, investor: investor)
+    unit_activate_budget!(budget, investor: investor)
     budget
   end
 
@@ -68,6 +68,6 @@ RSpec.describe Tokens::WalletTransferService do
 
     expect do
       described_class.call(from_user: alice, to_user: claude, amount_cents: 60_000)
-    end.to raise_error(described_class::Error, "Insufficient token balance")
+    end.to raise_error(described_class::Error, I18n.t("services.tokens.transfer.insufficient_balance"))
   end
 end

@@ -49,6 +49,15 @@ it:
       demo_reset:
         done: "Demo resettata."
         unavailable_in_production: "Reset demo non disponibile in produzione."
+      sepa_in:
+        created: "SEPA in simulato %{amount}. BTC equivalente inviato al wallet del risparmiatore."
+      sepa_out:
+        created: "SEPA out simulato verso l'IBAN del risparmiatore."
+      investor_deposit:
+        created: "Deposito BTC esterno simulato sul wallet dell'investitore."
+      reserve_deposits:
+        created: "Inviati %{amount} da %{wallet_name} a %{address} (txid %{txid}). Sincronizza il wallet mobile per vedere il saldo."
+        address_required: "L'indirizzo di ricezione e' obbligatorio."
     recovery_packages:
       unauthorized: "Non autorizzato."
       missing: "Recovery package non disponibile per questo deal."
@@ -73,6 +82,8 @@ it:
     l1:
       deposit_reserve:
         invalid_amount: "Importo non valido."
+      fund_receive_address:
+        address_required: "L'indirizzo di ricezione e' obbligatorio."
       provision_escrow:
         not_provisioned: "Escrow L1 non provisionato: %{message}"
     settlements:
@@ -159,6 +170,14 @@ it:
           maturity_html: "Maturity blocco <strong>%{height}</strong> (%{remaining} rimanenti)"
           action: "Settlement"
           empty: "Nessun budget attivo in attesa di settlement."
+        bank:
+          title: "Banca MAT (SEPA simulata)"
+          iban_html: "%{name} IBAN <code>%{iban}</code> — saldo ledger %{balance}"
+          simulate_sepa_in: "Simula SEPA in"
+          simulate_sepa_out: "Simula SEPA out"
+          simulate_investor_btc: "Simula deposito BTC"
+          empty_requests: "Nessuna richiesta di risparmio o investimento in attesa."
+          sepa_out_title: "Contratti chiusi in attesa di bonifico EUR"
         wallets:
           title: "Multisig L1 (regtest)"
           description_html: "Wallet regtest per utente; depositi dal <strong>%{wallet_name}</strong> (<code>%{wallet_code}</code>). Ogni deposito avanza la catena simulata di %{blocks} blocchi."

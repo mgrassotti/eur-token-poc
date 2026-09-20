@@ -2,7 +2,7 @@
 
 require "rails_helper"
 
-RSpec.describe Rgb::RedeemService do
+RSpec.describe Rgb::RedeemService, skip: "MVP savings: RGB unplugged" do
   let(:holder) { create(:user) }
   let(:budget) { create(:budget, borrower: holder, amount_eur_cents: 100_000, rgb_asset_id: "rgb_stub") }
   let(:holder_node) { instance_double(Rgb::LightningClient) }

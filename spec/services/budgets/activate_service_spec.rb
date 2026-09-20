@@ -21,13 +21,22 @@ RSpec.describe Budgets::ActivateService do
     bob.btc_account.update!(balance_sats: 5_000_000)
   end
 
+  def funding_for(budget, peg: 60_000, peg_extra: 0, investor_extra: 0)
+    collateral = budget.collateral_sats_at_peg(peg)
+    buffer = Dlc::ContractSetupService::FUNDING_FEE_BUFFER_SATS
+    Budgets::FundingParams.synthetic(
+      peg_sats: budget.borrower_locked_sats + buffer + peg_extra,
+      investor_sats: collateral + buffer + investor_extra
+    )
+  end
+
   it "locks collateral, mints tokens and activates budget at current rate" do
     peg = 60_000
     bob_collateral_sats = budget.collateral_sats_at_peg(peg)
     starting_bob_sats = bob.balance_sats
     alice_sats_after_create = alice.btc_account.balance_sats
 
-    described_class.call(budget: budget, investor: bob)
+    described_class.call(budget: budget, investor: bob, funding: funding_for(budget), verify_utxos: false)
 
     expect(budget.reload).to be_active
     expect(budget.peg_eur_per_btc).to eq(peg)
@@ -43,7 +52,12 @@ RSpec.describe Budgets::ActivateService do
   it "fixes peg and investor collateral at the current rate on activation" do
     MarketRate.current.update!(btc_eur_per_btc: 70_000)
 
-    described_class.call(budget: budget, investor: bob)
+    described_class.call(
+      budget: budget,
+      investor: bob,
+      funding: funding_for(budget, peg: 70_000),
+      verify_utxos: false
+    )
 
     expect(budget.reload.peg_eur_per_btc).to eq(70_000)
     expect(budget.investor_locked_sats).to eq(budget.collateral_sats_at_peg(70_000))
@@ -53,38 +67,30 @@ RSpec.describe Budgets::ActivateService do
     MarketRate.current.update!(btc_eur_per_btc: nil)
 
     expect do
-      described_class.call(budget: budget, investor: bob)
+      described_class.call(budget: budget, investor: bob, funding: funding_for(budget), verify_utxos: false)
     end.to raise_error(Budgets::ActivateService::Error, /cambio BTC/)
   end
 
-  it "rejects insufficient collateral" do
-    bob.btc_account.update!(balance_sats: 1000)
+  it "rejects insufficient investor funding inputs" do
+    funding = Budgets::FundingParams.synthetic(
+      peg_sats: budget.borrower_locked_sats + Dlc::ContractSetupService::FUNDING_FEE_BUFFER_SATS,
+      investor_sats: 1000
+    )
 
     expect do
-      described_class.call(budget: budget, investor: bob)
-    end.to raise_error(Budgets::ActivateService::Error, /Saldo insufficiente sul conto di riserva/)
+      described_class.call(budget: budget, investor: bob, funding: funding, verify_utxos: false)
+    end.to raise_error(Budgets::ActivateService::Error, /on-chain/)
   end
 
-  it "rejects activation when on-chain balance lacks the funding fee buffer" do
-    peg = 60_000
-    bob_collateral = budget.collateral_sats_at_peg(peg)
-    allow(L1::UserWallet).to receive(:for).with(alice).and_return(
-      instance_double(
-        L1::UserWallet,
-        wallet_name: "user_#{alice.id}",
-        spendable_sats: budget.borrower_locked_sats
-      )
-    )
-    allow(L1::UserWallet).to receive(:for).with(bob).and_return(
-      instance_double(
-        L1::UserWallet,
-        wallet_name: "user_#{bob.id}",
-        spendable_sats: bob_collateral + Dlc::ContractSetupService::FUNDING_FEE_BUFFER_SATS
-      )
+  it "rejects activation when borrower inputs lack the funding fee buffer" do
+    collateral = budget.collateral_sats_at_peg(60_000)
+    funding = Budgets::FundingParams.synthetic(
+      peg_sats: budget.borrower_locked_sats,
+      investor_sats: collateral + Dlc::ContractSetupService::FUNDING_FEE_BUFFER_SATS
     )
 
     expect do
-      described_class.call(budget: budget, investor: bob)
+      described_class.call(budget: budget, investor: bob, funding: funding, verify_utxos: false)
     end.to raise_error(Budgets::ActivateService::Error, /on-chain/)
   end
 
@@ -93,7 +99,7 @@ RSpec.describe Budgets::ActivateService do
       .and_raise(Dlc::ContractSetupService::Error, "Insufficient on-chain balance for user_2 (1 < 2 sats). Deposit into the reserve account.")
 
     expect do
-      described_class.call(budget: budget, investor: bob)
+      described_class.call(budget: budget, investor: bob, funding: funding_for(budget), verify_utxos: false)
     end.to raise_error(Dlc::ContractSetupService::Error, /Insufficient on-chain balance/)
 
     budget.reload
@@ -109,7 +115,7 @@ RSpec.describe Budgets::ActivateService do
     allow(L1::Bitcoind::Client).to receive(:new).and_return(unavailable)
 
     expect do
-      described_class.call(budget: budget, investor: bob)
+      described_class.call(budget: budget, investor: bob, funding: funding_for(budget), verify_utxos: false)
     end.to raise_error(Budgets::ActivateService::Error, /bitcoind regtest/)
   end
 end

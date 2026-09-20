@@ -8,8 +8,9 @@ RSpec.describe Settlements::ExecuteService, "DLC settlement path" do
   let(:bob) { create(:user, name: "Bob") }
 
   let(:budget) do
-    alice.btc_account.update!(balance_sats: BtcConversion.eur_cents_to_sats(500_000, peg))
-    bob.btc_account.update!(balance_sats: BtcConversion.eur_cents_to_sats(1_000_000, peg))
+    # Add 10,000 sats funding fee buffer required by Budgets::CreateService
+    alice.btc_account.update!(balance_sats: BtcConversion.eur_cents_to_sats(500_000, peg) + 10_000)
+    bob.btc_account.update!(balance_sats: BtcConversion.eur_cents_to_sats(1_000_000, peg) + 10_000)
     MarketRate.current.update!(btc_eur_per_btc: peg)
     created = Budgets::CreateService.call(
       borrower: alice,
@@ -17,7 +18,7 @@ RSpec.describe Settlements::ExecuteService, "DLC settlement path" do
       period_start: Date.new(2026, 1, 1),
       period_end: Date.new(2026, 7, 1)
     )
-    Budgets::ActivateService.call(budget: created, investor: bob)
+    unit_activate_budget!(created, investor: bob)
     created
   end
 
@@ -49,7 +50,8 @@ RSpec.describe Settlements::ExecuteService, "DLC settlement path" do
       budget: budget,
       peg_pot_sats: 10_600_000,
       shares: kind_of(Array),
-      holder_targets: kind_of(Array)
+      holder_targets: kind_of(Array),
+      address_resolver: kind_of(Proc)
     )
     expect(budget.reload).to be_settled
     expect(budget.recovery_package["settlement_txid"]).to eq(cet_txid)

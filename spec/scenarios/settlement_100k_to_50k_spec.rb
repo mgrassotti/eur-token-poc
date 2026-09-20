@@ -17,8 +17,8 @@ RSpec.describe "Settlement scenario 100k → 50k (FloorEUR)" do
 
   before do
     period_start, period_end = six_month_period
-    alice.btc_account.update!(balance_sats: BtcConversion.eur_cents_to_sats(500_000, peg))
-    bob.btc_account.update!(balance_sats: BtcConversion.eur_cents_to_sats(1_000_000, peg))
+    alice.btc_account.update!(balance_sats: BtcConversion.eur_cents_to_sats(500_000, peg) + 10_000)
+    bob.btc_account.update!(balance_sats: BtcConversion.eur_cents_to_sats(1_000_000, peg) + 10_000)
     claude.btc_account.update!(balance_sats: 0)
     david.btc_account.update!(balance_sats: 0)
     MarketRate.current.update!(btc_eur_per_btc: peg)
@@ -29,7 +29,7 @@ RSpec.describe "Settlement scenario 100k → 50k (FloorEUR)" do
       period_start: period_start,
       period_end: period_end
     )
-    Budgets::ActivateService.call(budget: @budget, investor: bob)
+    unit_activate_budget!(@budget, investor: bob)
     advance_to_maturity!(@budget)
     Tokens::TransferService.call(budget: @budget, from_user: alice, to_user: claude, amount_cents: 50_000)
     Tokens::TransferService.call(budget: @budget, from_user: claude, to_user: david, amount_cents: 25_000)

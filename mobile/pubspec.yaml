@@ -18,6 +18,14 @@ dependencies:
   qr_flutter: ^4.1.0
   shared_preferences: ^2.3.3
   share_plus: ^13.2.1
+  path_provider: ^2.1.5
+  mat_sdk:
+    path: packages/mat_sdk
+  mat_dlc:
+    path: packages/mat_dlc
+  # Phase 2 — L1 wallet on device (BDK integration).
+  bdk_flutter: ^0.31.3
+  ffi: ^2.1.3
 
 dev_dependencies:
   flutter_test:

@@ -42,35 +42,145 @@ class RelayApiClient {
     return DashboardData.fromJson(body);
   }
 
-  Future<List<Deal>> fetchDeals() async {
-    final body = await _get('/deals');
+  /// Public BTC/EUR rate from Rails (no auth). Used for on-device reserve EUR display.
+  Future<double?> fetchMarketRate() async {
+    final body = await _get('/market_rate', auth: false);
+    return (body['btc_eur_per_btc'] as num?)?.toDouble();
+  }
+
+  Future<List<Deal>> fetchDeals({List<String>? addresses}) async {
+    final query = (addresses == null || addresses.isEmpty)
+        ? ''
+        : '?${addresses.map((a) => 'addresses[]=${Uri.encodeQueryComponent(a)}').join('&')}';
+    final body = await _get('/deals$query', auth: false);
     return (body['deals'] as List<dynamic>)
         .map((e) => Deal.fromJson(e as Map<String, dynamic>))
         .toList();
   }
 
   Future<Deal> fetchDeal(String id) async {
-    final body = await _get('/deals/$id');
+    final body = await _get('/deals/$id', auth: false);
     return Deal.fromJson(body);
   }
 
-  Future<Deal> createDeal({
+  Future<List<FundingRequest>> fetchFundingRequests({List<String>? addresses}) async {
+    final query = (addresses == null || addresses.isEmpty)
+        ? ''
+        : '?${addresses.map((a) => 'addresses[]=${Uri.encodeQueryComponent(a)}').join('&')}';
+    final body = await _get('/funding_requests$query', auth: false);
+    return (body['requests'] as List<dynamic>)
+        .map((e) => FundingRequest.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<FundingRequest> createFundingRequest({
+    required String role,
     required int amountEurCents,
-    required String periodStart,
-    required String periodEnd,
+    required String receiveAddress,
+    required String payoutMode,
+    String? payoutIban,
+    String? displayName,
   }) async {
-    final body = await _post('/deals', {
-      'deal': {
-        'amount_eur_cents': amountEurCents,
-        'period_start': periodStart,
-        'period_end': periodEnd,
+    final body = await _post(
+      '/funding_requests',
+      {
+        'funding_request': {
+          'role': role,
+          'amount_eur_cents': amountEurCents,
+          'receive_address': receiveAddress,
+          'payout_mode': payoutMode,
+          if (payoutIban != null) 'payout_iban': payoutIban,
+          if (displayName != null) 'display_name': displayName,
+        },
       },
-    });
+      auth: false,
+    );
+    return FundingRequest.fromJson(body);
+  }
+
+  Future<FundingRequest> submitFundingUtxos({
+    required String requestId,
+    required List<Map<String, dynamic>> inputs,
+    required String changeAddress,
+    String? identityPubkey,
+  }) async {
+    final body = await _post(
+      '/funding_requests/$requestId/submit_utxos',
+      {
+        'inputs': inputs,
+        'change_address': changeAddress,
+        if (identityPubkey != null) 'identity_pubkey': identityPubkey,
+      },
+      auth: false,
+    );
+    return FundingRequest.fromJson(body);
+  }
+
+  Future<Map<String, dynamic>> fetchBank() async {
+    return _get('/bank', auth: false);
+  }
+
+  Future<Deal> acceptDeal(
+    String id, {
+    required String fundingAddress,
+    required List<Map<String, dynamic>> investorInputs,
+    required String investorChangeAddress,
+    required String investorPayoutAddress,
+    required String investorIdentityPubkey,
+    String? investorName,
+    List<Map<String, dynamic>>? pegInputs,
+    String? pegChangeAddress,
+    String? pegIdentityPubkey,
+  }) async {
+    final body = await _post(
+      '/deals/$id/accept',
+      {
+        'funding_address': fundingAddress,
+        if (investorName != null) 'investor_name': investorName,
+        'investor_inputs': investorInputs,
+        'investor_change_address': investorChangeAddress,
+        'investor_payout_address': investorPayoutAddress,
+        'investor_identity_pubkey': investorIdentityPubkey,
+        if (pegInputs != null) 'peg_inputs': pegInputs,
+        if (pegChangeAddress != null) 'peg_change_address': pegChangeAddress,
+        if (pegIdentityPubkey != null) 'peg_identity_pubkey': pegIdentityPubkey,
+      },
+      auth: false,
+    );
     return Deal.fromJson(body);
   }
 
-  Future<Deal> acceptDeal(String id) async {
-    final body = await _post('/deals/$id/accept', {});
+  Future<Deal> submitFundingSignature({
+    required String dealId,
+    required String fundingAddress,
+    required String signedPsbt,
+  }) async {
+    final body = await _post(
+      '/deals/$dealId/funding_signature',
+      {
+        'funding_address': fundingAddress,
+        'signed_psbt': signedPsbt,
+      },
+      auth: false,
+    );
+    return Deal.fromJson(body);
+  }
+
+  Future<Deal> submitDlcSignature({
+    required String dealId,
+    required String fundingAddress,
+    required List<String> adaptorSigs,
+    required String refundSig,
+  }) async {
+    final body = await _post(
+      '/deals/$dealId/dlc_signature',
+      {
+        'funding_address': fundingAddress,
+        'adaptor_sigs': adaptorSigs,
+        'refund_sig': refundSig,
+      },
+      auth: false,
+    );
     return Deal.fromJson(body);
   }
 
@@ -141,15 +251,20 @@ class RelayApiClient {
     return ReserveInfo.fromJson(body);
   }
 
+  /// Phase 2: Register BDK-generated receive address with server.
+  Future<void> updateReserveAddress(String address) async {
+    await _put('/reserve/update_address', {'receive_address': address});
+  }
+
   Future<int> syncReserve() async {
     final body = await _post('/reserve/sync', {});
     return body['balance_sats'] as int? ?? 0;
   }
 
-  Future<Map<String, dynamic>> _get(String path) async {
+  Future<Map<String, dynamic>> _get(String path, {bool auth = true}) async {
     final response = await _client.get(
       Uri.parse('$_baseUrl$path'),
-      headers: _headers(),
+      headers: _headers(includeAuth: auth),
     );
     return _decode(response);
   }
@@ -160,6 +275,19 @@ class RelayApiClient {
     bool auth = true,
   }) async {
     final response = await _client.post(
+      Uri.parse('$_baseUrl$path'),
+      headers: _headers(includeAuth: auth),
+      body: jsonEncode(payload),
+    );
+    return _decode(response);
+  }
+
+  Future<Map<String, dynamic>> _put(
+    String path,
+    Map<String, dynamic> payload, {
+    bool auth = true,
+  }) async {
+    final response = await _client.put(
       Uri.parse('$_baseUrl$path'),
       headers: _headers(includeAuth: auth),
       body: jsonEncode(payload),

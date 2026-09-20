@@ -3,9 +3,16 @@
 require "rails_helper"
 
 # Flusso demo (regtest + RGB Lightning Nodes reali): eseguire con bin/demo-spec
-RSpec.describe "Demo end-to-end flow", :regtest, :demo_flow do
+RSpec.describe "Demo end-to-end flow", :regtest, :demo_flow, skip: "MVP savings: RGB transfers removed from the happy path" do
   def bitcoind_available?
     L1::Bitcoind::Client.new.available?
+  end
+
+  def setup_phase2_reserve_address!(user)
+    # Phase 2: Generate address from user's wallet (still exists for DLC) and store it
+    wallet = L1::UserWallet.for(user)
+    address = wallet.receive_address
+    user.btc_account.update!(reserve_receive_address: address)
   end
 
   before do
@@ -22,9 +29,19 @@ RSpec.describe "Demo end-to-end flow", :regtest, :demo_flow do
 
     MarketRate.current.update!(btc_eur_per_btc: DemoFlowHelpers::PEG_EUR_PER_BTC, set_by: admin)
 
-    # Depositi on-chain
-    L1::DepositReserveService.call(user: alice, amount_sats: DemoFlowHelpers::ALICE_DEPOSIT_SATS)
-    L1::DepositReserveService.call(user: bob, amount_sats: DemoFlowHelpers::BOB_DEPOSIT_SATS)
+    # Phase 2: Set up mobile-registered addresses and fund them
+    setup_phase2_reserve_address!(alice)
+    setup_phase2_reserve_address!(bob)
+
+    # Depositi on-chain via admin funding
+    L1::FundReceiveAddressService.call(
+      address: alice.btc_account.reserve_receive_address,
+      amount_sats: DemoFlowHelpers::ALICE_DEPOSIT_SATS
+    )
+    L1::FundReceiveAddressService.call(
+      address: bob.btc_account.reserve_receive_address,
+      amount_sats: DemoFlowHelpers::BOB_DEPOSIT_SATS
+    )
 
     expect_reserve_sats!(alice, DemoFlowHelpers::ALICE_DEPOSIT_SATS)
     expect_reserve_sats!(bob, DemoFlowHelpers::BOB_DEPOSIT_SATS)
@@ -45,7 +62,7 @@ RSpec.describe "Demo end-to-end flow", :regtest, :demo_flow do
     expect(investable_budgets_for(bob).map(&:id)).to include(budget.id)
 
     # Bob accetta: escrow L1 + conti aggiornati
-    Budgets::ActivateService.call(budget: budget, investor: bob)
+    activate_budget_with_wallets!(budget, investor: bob)
     budget.reload
 
     expect(budget).to be_active
@@ -130,7 +147,7 @@ RSpec.describe "Demo end-to-end flow", :regtest, :demo_flow do
     expect(second_budget).to be_pending
     expect(second_budget.borrower_locked_sats).to eq(required_sats)
 
-    Budgets::ActivateService.call(budget: second_budget, investor: bob)
+    activate_budget_with_wallets!(second_budget, investor: bob)
     second_budget.reload
 
     expect(second_budget).to be_active

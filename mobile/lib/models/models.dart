@@ -56,6 +56,18 @@ class Deal {
     this.readyForSettlement = false,
     this.tokenHolders = const [],
     this.liabilityEurCents,
+    this.fundingAddress,
+    this.investorFundingAddress,
+    this.fundingPsbt,
+    this.awaitingFundingSignatures = false,
+    this.borrowerFundingSigned = false,
+    this.investorFundingSigned = false,
+    this.awaitingDlcSignatures = false,
+    this.borrowerDlcSigned = false,
+    this.investorDlcSigned = false,
+    this.signPackage,
+    this.saverPayoutMode,
+    this.investorPayoutMode,
   });
 
   final String id;
@@ -70,12 +82,25 @@ class Deal {
   final bool readyForSettlement;
   final List<TokenHolder> tokenHolders;
   final int? liabilityEurCents;
+  final String? fundingAddress;
+  final String? investorFundingAddress;
+  final String? fundingPsbt;
+  final bool awaitingFundingSignatures;
+  final bool borrowerFundingSigned;
+  final bool investorFundingSigned;
+  final bool awaitingDlcSignatures;
+  final bool borrowerDlcSigned;
+  final bool investorDlcSigned;
+  final Map<String, dynamic>? signPackage;
+  final String? saverPayoutMode;
+  final String? investorPayoutMode;
 
   double get amountEur => amountEurCents / 100.0;
 
   bool get isPending => status == 'pending';
   bool get isActive => status == 'active';
   bool get isSettled => status == 'settled';
+  bool get awaitingSignatures => awaitingFundingSignatures || awaitingDlcSignatures;
 
   factory Deal.fromJson(Map<String, dynamic> json) {
     return Deal(
@@ -98,6 +123,69 @@ class Deal {
               .toList() ??
           const [],
       liabilityEurCents: json['liability_eur_cents'] as int?,
+      fundingAddress: json['funding_address'] as String?,
+      investorFundingAddress: json['investor_funding_address'] as String?,
+      fundingPsbt: json['funding_psbt'] as String?,
+      awaitingFundingSignatures: json['awaiting_funding_signatures'] as bool? ?? false,
+      borrowerFundingSigned: json['borrower_funding_signed'] as bool? ?? false,
+      investorFundingSigned: json['investor_funding_signed'] as bool? ?? false,
+      awaitingDlcSignatures: json['awaiting_dlc_signatures'] as bool? ?? false,
+      borrowerDlcSigned: json['borrower_dlc_signed'] as bool? ?? false,
+      investorDlcSigned: json['investor_dlc_signed'] as bool? ?? false,
+      signPackage: json['sign_package'] as Map<String, dynamic>?,
+      saverPayoutMode: json['saver_payout_mode'] as String?,
+      investorPayoutMode: json['investor_payout_mode'] as String?,
+    );
+  }
+}
+
+class FundingRequest {
+  const FundingRequest({
+    required this.id,
+    required this.role,
+    required this.status,
+    required this.amountEurCents,
+    required this.payoutMode,
+    required this.receiveAddress,
+    required this.collectionIban,
+    this.payoutIban,
+    this.budgetId,
+    this.remainingEurCents,
+    this.requiredSats,
+  });
+
+  final String id;
+  final String role;
+  final String status;
+  final int amountEurCents;
+  final String payoutMode;
+  final String receiveAddress;
+  final String collectionIban;
+  final String? payoutIban;
+  final String? budgetId;
+  final int? remainingEurCents;
+  final int? requiredSats;
+
+  double get amountEur => amountEurCents / 100.0;
+  bool get isSaver => role == 'saver';
+  bool get isInvestor => role == 'investor';
+  bool get awaitingDeposit => status == 'awaiting_deposit';
+  bool get queued => status == 'queued';
+  bool get matched => status == 'matched';
+
+  factory FundingRequest.fromJson(Map<String, dynamic> json) {
+    return FundingRequest(
+      id: json['id'].toString(),
+      role: json['role'] as String,
+      status: json['status'] as String,
+      amountEurCents: json['amount_eur_cents'] as int,
+      payoutMode: json['payout_mode'] as String,
+      receiveAddress: json['receive_address'] as String,
+      collectionIban: json['collection_iban'] as String? ?? '',
+      payoutIban: json['payout_iban'] as String?,
+      budgetId: json['budget_id']?.toString(),
+      remainingEurCents: json['remaining_eur_cents'] as int?,
+      requiredSats: json['required_sats'] as int?,
     );
   }
 }
@@ -155,6 +243,7 @@ class SettlementPreview {
     required this.readyForSettlement,
     this.payoff,
     this.holderAllocations = const [],
+    this.calculationInputs,
   });
 
   final String status;
@@ -162,6 +251,7 @@ class SettlementPreview {
   final bool readyForSettlement;
   final PayoffSummary? payoff;
   final List<HolderAllocation> holderAllocations;
+  final SettlementCalculationInputs? calculationInputs;
 
   factory SettlementPreview.fromJson(Map<String, dynamic> json) {
     return SettlementPreview(
@@ -175,6 +265,49 @@ class SettlementPreview {
               ?.map((e) => HolderAllocation.fromJson(e as Map<String, dynamic>))
               .toList() ??
           const [],
+      calculationInputs: json['calculation_inputs'] != null
+          ? SettlementCalculationInputs.fromJson(
+              json['calculation_inputs'] as Map<String, dynamic>,
+            )
+          : null,
+    );
+  }
+}
+
+/// Inputs for on-device FloorEUR recompute (mirrors relay `calculation_inputs`).
+class SettlementCalculationInputs {
+  const SettlementCalculationInputs({
+    required this.notionalEurCents,
+    required this.notionalTotalCents,
+    required this.holderSharesCents,
+    required this.spotEurPerBtc,
+    required this.rateBpsMonthly,
+    required this.monthsElapsed,
+    required this.escrowTotalSats,
+    required this.miningFeeSats,
+  });
+
+  final int notionalEurCents;
+  final int notionalTotalCents;
+  final List<int> holderSharesCents;
+  final int spotEurPerBtc;
+  final int rateBpsMonthly;
+  final int monthsElapsed;
+  final int escrowTotalSats;
+  final int miningFeeSats;
+
+  factory SettlementCalculationInputs.fromJson(Map<String, dynamic> json) {
+    return SettlementCalculationInputs(
+      notionalEurCents: json['notional_eur_cents'] as int? ?? 0,
+      notionalTotalCents: json['notional_total_cents'] as int? ?? 0,
+      holderSharesCents: (json['holder_shares_cents'] as List<dynamic>? ?? const [])
+          .map((e) => e as int)
+          .toList(),
+      spotEurPerBtc: json['spot_eur_per_btc'] as int? ?? 0,
+      rateBpsMonthly: json['rate_bps_monthly'] as int? ?? 0,
+      monthsElapsed: json['months_elapsed'] as int? ?? 0,
+      escrowTotalSats: json['escrow_total_sats'] as int? ?? 0,
+      miningFeeSats: json['mining_fee_sats'] as int? ?? 5000,
     );
   }
 }
@@ -279,7 +412,9 @@ class DashboardData {
     required this.maxBorrowableEurCents,
     required this.borrowedDeals,
     required this.fundPositions,
-    required this.investableDeals,
+    this.investableDeals = const [],
+    this.fundingRequests = const [],
+    this.collectionIban,
   });
 
   final User user;
@@ -290,6 +425,8 @@ class DashboardData {
   final List<Deal> borrowedDeals;
   final List<FundPosition> fundPositions;
   final List<Deal> investableDeals;
+  final List<FundingRequest> fundingRequests;
+  final String? collectionIban;
 
   double get maxBorrowableEur => maxBorrowableEurCents / 100.0;
 
@@ -307,9 +444,13 @@ class DashboardData {
       fundPositions: (json['fund_positions'] as List<dynamic>? ?? const [])
           .map((e) => FundPosition.fromJson(e as Map<String, dynamic>))
           .toList(),
-      investableDeals: (json['investable_deals'] as List<dynamic>)
+      investableDeals: (json['investable_deals'] as List<dynamic>? ?? const [])
           .map((e) => Deal.fromJson(e as Map<String, dynamic>))
           .toList(),
+      fundingRequests: (json['funding_requests'] as List<dynamic>? ?? const [])
+          .map((e) => FundingRequest.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      collectionIban: json['collection_iban'] as String?,
     );
   }
 }

@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../l10n/app_localizations.dart';
 import '../providers/app_state.dart';
+import '../services/btc_math.dart';
 import '../services/relay_api_client.dart';
 
 class CreateDealScreen extends StatefulWidget {
@@ -34,7 +35,7 @@ class _CreateDealScreenState extends State<CreateDealScreen> {
     final now = DateTime.now();
     _start = DateTime(now.year, now.month, now.day);
     _expiration = now.add(CreateDealScreen.topUpDuration);
-    _loadLimits();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadLimits());
   }
 
   @override
@@ -45,20 +46,40 @@ class _CreateDealScreenState extends State<CreateDealScreen> {
 
   Future<void> _loadLimits() async {
     try {
-      final api = context.read<RelayApiClient>();
-      final dashboard = await api.fetchDashboard();
+      final wallet = context.read<WalletState>();
+      final dashboard = context.read<DashboardState>();
+      if (!wallet.isInitialized) {
+        setState(() {
+          _error = 'Wallet not ready';
+          _loading = false;
+        });
+        return;
+      }
+      await Future.wait([
+        wallet.sync(),
+        dashboard.refreshMarketRate(),
+      ]);
       if (!mounted) return;
 
-      final maxCents = dashboard.maxBorrowableEurCents;
+      final rate = dashboard.marketRateEur;
+      if (rate == null || rate <= 0) {
+        setState(() {
+          _error = 'Market rate unavailable';
+          _loading = false;
+        });
+        return;
+      }
+
+      final maxCents = BtcMath.maxBorrowableEurCents(wallet.balanceSats, rate);
       setState(() {
         _maxBorrowableEurCents = maxCents;
         _amount.text = maxCents > 0 ? (maxCents / 100).toStringAsFixed(2) : '';
         _loading = false;
       });
-    } on RelayApiException catch (e) {
+    } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.message;
+          _error = e.toString();
           _loading = false;
         });
       }
@@ -90,19 +111,35 @@ class _CreateDealScreenState extends State<CreateDealScreen> {
       return;
     }
 
+    final wallet = context.read<WalletState>();
+    final dashboard = context.read<DashboardState>();
+    final nameState = context.read<NameState>();
+    final rate = dashboard.marketRateEur;
+    final address = wallet.receiveAddress;
+    if (rate == null || address == null) {
+      setState(() => _error = 'Wallet or market rate not ready');
+      return;
+    }
+
     setState(() {
       _submitting = true;
       _error = null;
     });
 
     try {
+      final requiredSats = BtcMath.borrowerRequiredSats(cents, rate);
+      final commitmentPsbt = await wallet.buildCommitmentPsbt(requiredSats: requiredSats);
+
       await api.createDeal(
         amountEurCents: cents,
         periodStart: _isoDate(_start),
         periodEnd: _isoDate(_expiration),
+        fundingAddress: address,
+        commitmentPsbt: commitmentPsbt,
+        borrowerName: nameState.name,
       );
       if (mounted) {
-        await context.read<DashboardState>().refresh();
+        await context.read<DashboardState>().refreshOpenDeals();
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(l10n.topUpSubmitted)),
@@ -113,6 +150,13 @@ class _CreateDealScreenState extends State<CreateDealScreen> {
       if (mounted) {
         setState(() {
           _error = e.message;
+          _submitting = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
           _submitting = false;
         });
       }

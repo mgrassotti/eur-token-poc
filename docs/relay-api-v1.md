@@ -147,6 +147,8 @@ Token transfer history for a deal.
 - **`preview`** — FloorEUR payoff projection via `Payoffs::FloorEurCalculator` (Phase 1 mock path).
 - **`executed`** — after admin settlement.
 
+Both statuses include **`calculation_inputs`** so clients can recompute FloorEUR on-device (`mat_sdk` / mat-core) and audit after execution.
+
 Preview example:
 
 ```json
@@ -156,6 +158,16 @@ Preview example:
   "status": "preview",
   "end_btc_eur_rate": 50000.0,
   "ready_for_settlement": false,
+  "calculation_inputs": {
+    "notional_eur_cents": 100000,
+    "notional_total_cents": 100000,
+    "holder_shares_cents": [100000],
+    "spot_eur_per_btc": 50000,
+    "rate_bps_monthly": 100,
+    "months_elapsed": 1,
+    "escrow_total_sats": 3975000,
+    "mining_fee_sats": 5000
+  },
   "payoff": {
     "liability_eur_cents": 101000,
     "total_holder_sats": 2020000,
@@ -190,7 +202,9 @@ Non-admin users except self — for transfer recipient picker.
 
 ### `GET /reserve`
 
-Stable regtest receive address for the logged-in user's reserve wallet (QR in mobile app).
+Returns the user's stored receive address (set by mobile client via `PUT /reserve/update_address`).
+
+**Phase 2 change:** No longer generates addresses server-side. Mobile clients create wallets using BDK and register their address.
 
 ```json
 {
@@ -198,16 +212,59 @@ Stable regtest receive address for the logged-in user's reserve wallet (QR in mo
   "network": "regtest",
   "receive_address": "bcrt1q...",
   "balance_sats": 0,
-  "wallet_name": "user_2",
-  "instructions": "..."
+  "instructions": "Send BTC on regtest to this address. An admin funds via Exchange wallet."
 }
 ```
 
-Requires `./bin/regtest up` (bitcoind).
+If the user hasn't registered an address yet:
+
+```json
+{
+  "schema_version": 1,
+  "network": "regtest",
+  "receive_address": null,
+  "balance_sats": 0,
+  "instructions": "Create an on-device wallet first (Phase 2 BDK)."
+}
+```
+
+### `PUT /reserve/update_address`
+
+**Phase 2:** Mobile clients register their BDK-generated receive address.
+
+```json
+{
+  "receive_address": "bcrt1q..."
+}
+```
+
+**Response 200:**
+
+```json
+{
+  "schema_version": 1,
+  "receive_address": "bcrt1q...",
+  "registered_at": "2026-07-31T10:00:00Z"
+}
+```
+
+**Errors:**
+- `400` `address_required` - Address is blank
+- `422` `invalid_address` - Address format is invalid
+- `409` `address_in_use` - Address already registered by another user
 
 ### `POST /reserve/sync`
 
-Refresh `balance_sats` from the user's bitcoind wallet after an on-chain deposit.
+**Phase 2 change:** Sync is now a no-op. Mobile clients use BDK sync directly. Balance updates happen when admin funds via the server.
+
+```json
+{
+  "schema_version": 1,
+  "balance_sats": 0,
+  "synced_at": "2026-07-31T10:00:00Z",
+  "note": "Phase 2: Balance synced by admin funding service. Use BDK sync on mobile for L1 state."
+}
+```
 
 ---
 

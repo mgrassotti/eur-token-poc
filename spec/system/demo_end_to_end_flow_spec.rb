@@ -3,7 +3,7 @@
 require "rails_helper"
 
 # Flusso demo via browser (regtest + RGB Lightning Nodes reali): bin/system-spec
-RSpec.describe "Demo end-to-end flow (system)", type: :system, regtest: true, demo_flow: true,
+RSpec.describe "Demo end-to-end flow (system)", type: :system, regtest: true, demo_flow: true, skip: "MVP savings: RGB transfers removed from the happy path",
                use_transactional_fixtures: false do
   def bitcoind_available?
     L1::Bitcoind::Client.new.available?

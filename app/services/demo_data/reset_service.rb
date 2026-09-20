@@ -42,6 +42,8 @@ module DemoData
     private
 
     def clear_ledger!
+      BankTransfer.delete_all
+      FundingRequest.delete_all
       InvestorYieldPayout.delete_all
       Settlement.delete_all
       DlcSettlement.delete_all
@@ -51,6 +53,7 @@ module DemoData
       TokenAccount.delete_all
       CollateralLock.delete_all
       Budget.delete_all
+      BankAccount.update_all(balance_eur_cents: 0)
     end
 
     def remove_non_demo_users!

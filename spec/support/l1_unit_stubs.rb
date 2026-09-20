@@ -4,8 +4,7 @@ module L1UnitStubs
   L1_INTEGRATION_PATH = %r{
     spec/integration/l1/|
     spec/integration/rgb_lib_transfer_spec\.rb|
-    spec/integration/demo_end_to_end_flow_spec\.rb|
-    spec/services/l1/deposit_reserve_service_spec\.rb
+    spec/integration/demo_end_to_end_flow_spec\.rb
   }x
 
   def l1_integration_spec?(example)
@@ -35,11 +34,11 @@ module L1UnitStubs
 
   def stub_l1_provisioned!(budget)
     budget.update!(
-      peg_party_pubkey: "02#{"a" * 64}",
-      investor_pubkey: "02#{"b" * 64}",
-      escrow_txid: "deadbeef" * 8,
-      escrow_vout: 0,
-      recovery_package: { "version" => 1, "escrow" => { "address" => "bcrt1stub" } }
+      peg_party_pubkey: budget.peg_party_pubkey.presence || "02#{"a" * 64}",
+      investor_pubkey: budget.investor_pubkey.presence || "02#{"b" * 64}",
+      escrow_txid: budget.escrow_txid.presence || "deadbeef" * 8,
+      escrow_vout: budget.escrow_vout || 0,
+      recovery_package: budget.recovery_package.presence || { "version" => 1, "escrow" => { "address" => "bcrt1stub" } }
     )
     seed_rgb_genesis!(budget)
     seed_dlc_contract!(budget)
@@ -111,7 +110,9 @@ module L1UnitStubs
   end
 
   def stub_l1_unit_operations!
-    allow(L1::ProvisionEscrowService).to receive(:call) do |budget:|
+    allow_any_instance_of(L1::Bitcoind::Client).to receive(:available?).and_return(true)
+
+    allow(L1::ProvisionEscrowService).to receive(:call) do |budget:, auto_sign_wallets: nil|
       budget.tap { |b| stub_l1_provisioned!(b) if b.persisted? && !b.l1_multisig_provisioned? }
     end
 
@@ -124,8 +125,6 @@ module L1UnitStubs
       allow(wallet).to receive(:identity_pubkey) { account.escrow_identity_pubkey }
       wallet
     end
-
-    allow(L1::SyncReserveBalanceService).to receive(:call) { |user:| user.btc_account.reload }
   end
 
   # Specs that exercise the real DLC services (oracle/node clients + Ruby

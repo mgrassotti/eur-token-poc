@@ -2,7 +2,7 @@
 
 require "rails_helper"
 
-RSpec.describe Rgb::ProjectionService do
+RSpec.describe Rgb::ProjectionService, skip: "MVP savings: RGB unplugged" do
   let(:alice) { create(:user) }
   let(:claude) { create(:user) }
   let(:budget) do

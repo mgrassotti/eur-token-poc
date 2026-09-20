@@ -14,6 +14,8 @@ class Budget < ApplicationRecord
 
   belongs_to :borrower, class_name: "User"
   belongs_to :investor, class_name: "User", optional: true
+  belongs_to :saver_funding_request, class_name: "FundingRequest", optional: true
+  belongs_to :investor_funding_request, class_name: "FundingRequest", optional: true
 
   has_one :collateral_lock, dependent: :destroy
   has_one :settlement, dependent: :destroy
@@ -25,6 +27,8 @@ class Budget < ApplicationRecord
   has_many :investor_yield_payouts, dependent: :destroy
 
   enum :status, { pending: 0, active: 1, settled: 2 }
+  enum :saver_payout_mode, { keep_btc: 0, reinvest: 1, eur: 2 }, prefix: :saver
+  enum :investor_payout_mode, { keep_btc: 0, reinvest: 1, eur: 2 }, prefix: :investor
 
   validates :amount_eur_cents, numericality: { only_integer: true, greater_than: 0 }
   validates :collateral_eur_cents, numericality: { only_integer: true, greater_than: 0 }
@@ -34,6 +38,10 @@ class Budget < ApplicationRecord
   before_validation :set_default_collateral, on: :create
 
   scope :awaiting_investor, -> { pending.where(investor_id: nil) }
+  # Open offers + deals waiting on-device funding signatures (escrow not yet broadcast).
+  scope :marketplace_visible, lambda {
+    awaiting_investor.or(active.where.not(funding_psbt: [nil, ""]).where(escrow_txid: nil))
+  }
 
   def peg_set?
     peg_eur_per_btc.present? && peg_eur_per_btc.positive?
@@ -78,7 +86,12 @@ class Budget < ApplicationRecord
   def symbolic_months_duration
     end_months = period_end.year * 12 + period_end.month
     start_months = period_start.year * 12 + period_start.month
-    end_months - start_months
+    delta = end_months - start_months
+    return delta if delta.positive?
+
+    # Same calendar month (e.g. Aug 1 → Aug 31 from mobile top-up duration) still
+    # counts as one symbolic month for maturity / refund locktime.
+    period_end > period_start ? 1 : 0
   end
 
   def blocks_remaining

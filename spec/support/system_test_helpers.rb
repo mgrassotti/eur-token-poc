@@ -40,16 +40,30 @@ module SystemTestHelpers
     expect(page).not_to have_css(".alert-danger", text: /Nodo RGB|Internal Server Error|Escrow L1 non provisionato/i)
   end
 
-  def deposit_reserve!(sats:)
+  def deposit_reserve!(sats:, user: nil)
+    # Phase 2: Set up receive address (mimics mobile app registration)
+    # Get user from session by finding who's currently showing in the greeting
+    current_user = user || begin
+      # Extract user from "Ciao, <name>" greeting in the page
+      page_text = page.text
+      name_match = page_text.match(/Ciao, (.+)/)
+      name_match ? User.find_by(name: name_match[1]) : User.first
+    end
+    
+    if current_user && current_user.btc_account.reserve_receive_address.blank?
+      wallet = L1::UserWallet.for(current_user)
+      current_user.btc_account.update!(reserve_receive_address: wallet.receive_address)
+    end
+    
     visit new_reserve_deposit_path
-    fill_in "Importo (BTC)", with: btc_amount_for(sats)
+    fill_in "amount_btc", with: btc_amount_for(sats)
     click_button "Conferma deposito"
     expect_no_error_flash!
     expect(page).to have_current_path(root_path, ignore_query: true)
   end
 
   def set_market_rate!(eur_per_btc)
-    fill_in "€/BTC", with: eur_per_btc.to_s
+    fill_in "btc_eur_per_btc", with: eur_per_btc.to_s
     click_button "Aggiorna cambio"
     expect_no_error_flash!
     expect(page).to have_current_path(root_path, ignore_query: true)
@@ -87,14 +101,14 @@ module SystemTestHelpers
   def send_tokens!(to_user:, amount_eur:)
     visit new_token_transfer_path
     select to_user.name, from: "Destinatario"
-    fill_in "Importo (€)", with: amount_eur.to_s
+    fill_in "amount_eur", with: amount_eur.to_s
     click_button "Invia Denaro"
     expect_no_error_flash!
     expect(page).to have_current_path(root_path, ignore_query: true)
   end
 
   def advance_chain_to_maturity!(budget)
-    fill_in "Altezza blocco", with: budget.maturity_block_height.to_s
+    fill_in "bitcoin_block_height", with: budget.maturity_block_height.to_s
     click_button "Aggiorna blocco"
     expect_no_error_flash!
     expect(page).to have_current_path(root_path, ignore_query: true)

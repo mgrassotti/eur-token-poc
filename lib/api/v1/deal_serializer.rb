@@ -35,6 +35,20 @@ module Api
           maturity_block_height: deal.maturity_block_height,
           blocks_remaining: deal.blocks_remaining,
           ready_for_settlement: deal.ready_for_settlement?,
+          funding_address: deal.funding_address,
+          investor_funding_address: deal.investor&.btc_account&.reserve_receive_address.presence ||
+                                    deal.investor_change_address,
+          awaiting_funding_signatures: deal.funding_psbt.present? && !deal.l1_multisig_provisioned?,
+          borrower_funding_signed: deal.borrower_funding_signed,
+          investor_funding_signed: deal.investor_funding_signed,
+          awaiting_dlc_signatures: awaiting_dlc_signatures?,
+          borrower_dlc_signed: deal.borrower_dlc_signed,
+          investor_dlc_signed: deal.investor_dlc_signed,
+          sign_package: deal.l1_multisig_provisioned? ? nil : deal.dlc_contract&.sign_package,
+          funding_psbt: deal.l1_multisig_provisioned? ? nil : deal.funding_psbt,
+          saver_payout_mode: deal.saver_payout_mode,
+          investor_payout_mode: deal.investor_payout_mode,
+          saver_payout_iban: deal.saver_payout_iban,
           created_at: deal.created_at.iso8601,
           updated_at: deal.updated_at.iso8601
         }
@@ -77,6 +91,13 @@ module Api
         return unless deal.active? || deal.settled?
 
         deal.liability_eur_cents(at_height: deal.maturity_block_height || ChainState.block_height)
+      end
+
+      def awaiting_dlc_signatures?
+        return false if deal.l1_multisig_provisioned?
+        return false if deal.dlc_contract&.sign_package.blank?
+
+        !(deal.borrower_dlc_signed? && deal.investor_dlc_signed?)
       end
     end
   end

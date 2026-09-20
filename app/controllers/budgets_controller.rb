@@ -57,9 +57,12 @@ class BudgetsController < ApplicationController
       return
     end
 
+    builder = Budgets::WalletFundingBuilder.new(budget: @budget, investor: current_user)
     budget = Budgets::ActivateService.call(
       budget: @budget,
-      investor: current_user
+      investor: current_user,
+      funding: builder.call,
+      auto_sign_wallets: builder.wallets
     )
     notice = t("flash.budgets.activated", amount: BtcConversion.format_btc(budget.investor_locked_sats))
     if budget.l1_multisig_provisioned?

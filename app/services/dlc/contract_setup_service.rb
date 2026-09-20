@@ -1,9 +1,9 @@
 # frozen_string_literal: true
 
 module Dlc
-  # Funds the 2-of-2 numeric DLC from client-supplied UTXOs (BDK / on-device).
-  # Fund keys stay at the dlc-rs sidecar; only P2WPKH funding inputs are signed
-  # by the parties (mobile BDK or auto_sign_wallets in regtest).
+  # Fund keys live on the phones; the sidecar only builds the unsigned CET set.
+  # auto_sign_wallets (regtest) still signs funding inputs AND asks the sidecar
+  # to adaptor-sign with its test keys (`auto_sign: true`).
   class ContractSetupService
     class Error < StandardError; end
 
@@ -40,6 +40,9 @@ module Dlc
       investor_sats = budget.investor_locked_sats
 
       points = PayoutCurve.for(budget: budget, num_digits: num_digits)
+      peg_payout_address = budget.saver_payout_address.presence ||
+                           budget.funding_address.presence ||
+                           budget.borrower_change_address
       contract = node.create_contract(
         oracle_announcement: announcement.hex,
         payouts: points.map { |p| { outcome: p.outcome, peg_sats: p.peg_sats, investor_sats: p.investor_sats } },
@@ -51,6 +54,10 @@ module Dlc
         peg_change_address: budget.borrower_change_address,
         investor_change_address: budget.investor_change_address,
         investor_payout_address: budget.investor_payout_address,
+        peg_payout_address: peg_payout_address,
+        peg_fund_pubkey: budget.peg_party_pubkey,
+        investor_fund_pubkey: budget.investor_pubkey,
+        auto_sign: @auto_sign_wallets.present?,
         contract_id: event_id
       )
 
@@ -141,7 +148,9 @@ module Dlc
       budget.update!(
         funding_tx_hex: hex,
         borrower_funding_signed: true,
-        investor_funding_signed: true
+        investor_funding_signed: true,
+        borrower_dlc_signed: true,
+        investor_dlc_signed: true
       )
       txid
     end
@@ -167,6 +176,7 @@ module Dlc
     end
 
     def create_dlc_record!(contract, announcement, num_digits, peg_sats, investor_sats, status:)
+      raw = contract.raw.is_a?(Hash) ? contract.raw.stringify_keys : {}
       DlcContract.create!(
         budget: budget,
         oracle_event_id: event_id,
@@ -179,7 +189,13 @@ module Dlc
         unit: announcement.unit || Config.price_unit,
         peg_collateral_sats: peg_sats,
         investor_collateral_sats: investor_sats,
-        status: status
+        status: status,
+        sign_package: contract.sign_package,
+        direct_payout: contract.direct_payout != false,
+        offerer_adaptor_sigs: raw["offerer_adaptor_sigs"],
+        acceptor_adaptor_sigs: raw["acceptor_adaptor_sigs"],
+        offerer_refund_sig: raw["offerer_refund_sig"],
+        acceptor_refund_sig: raw["acceptor_refund_sig"]
       )
     end
 

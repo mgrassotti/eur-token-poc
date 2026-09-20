@@ -54,6 +54,31 @@ RSpec.describe Funding::MatchingService do
     expect(described_class.call.budgets).to be_empty
   end
 
+  it "passes each request's fund pubkey into activation and does not auto-sign" do
+    saver = queued_request(alice, role: :saver, address: alice.btc_account.reserve_receive_address)
+    queued_request(bob, role: :investor, address: bob.btc_account.reserve_receive_address, amount: 200_000)
+    saver.update!(identity_pubkey: "02#{"1" * 64}")
+    FundingRequest.investor.matchable.first.update!(identity_pubkey: "03#{"2" * 64}")
+
+    described_class.call
+
+    budget = Budget.find_by!(borrower: alice, investor: bob)
+    expect(budget.peg_party_pubkey).to eq("02#{"1" * 64}")
+    expect(budget.investor_pubkey).to eq("03#{"2" * 64}")
+    expect(L1::ProvisionEscrowService).to have_received(:call).with(
+      budget: kind_of(Budget),
+      auto_sign_wallets: nil
+    )
+  end
+
+  it "does not match a queued request that is missing a fund pubkey" do
+    queued_request(alice, role: :saver, address: alice.btc_account.reserve_receive_address)
+    queued_request(bob, role: :investor, address: bob.btc_account.reserve_receive_address)
+    FundingRequest.saver.matchable.update_all(identity_pubkey: nil)
+
+    expect(described_class.call.budgets).to be_empty
+  end
+
   it "sizes leftover investor deposits against remaining capacity, not the original amount" do
     queued_request(alice, role: :saver, address: alice.btc_account.reserve_receive_address)
     investor = queued_request(bob, role: :investor, address: bob.btc_account.reserve_receive_address, amount: 200_000)

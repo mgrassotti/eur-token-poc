@@ -59,6 +59,10 @@ module Dlc
       shares = compute_shares
       return [] if shares.empty?
 
+      if contract.direct_payout?
+        return persist_direct_payout!(shares)
+      end
+
       outputs = shares.map { |s| { address: address_resolver.call(s[:user]), sats: s[:sats] } }
       result = node.distribute(contract_id: contract.ddk_contract_id, payouts: outputs)
       @last_result = result
@@ -146,6 +150,24 @@ module Dlc
         end
       }
       budget.update!(recovery_package: package)
+    end
+
+    def persist_direct_payout!(shares)
+      outputs = shares.map { |s| { address: address_resolver.call(s[:user]), sats: s[:sats] } }
+      txid = budget.dlc_settlement&.cet_txid.presence || budget.recovery_package&.dig("settlement_txid")
+      persist!(txid, shares, outputs, shares.map { |s| s[:sats] })
+      investor_sats = budget.dlc_settlement&.investor_sats.to_i
+      package = budget.recovery_package&.deep_dup || {}
+      package["dlc_distribution"] = (package["dlc_distribution"] || {}).merge(
+        "direct_payout" => true,
+        "investor_payout_sats" => investor_sats,
+        "investor_payout_address" => budget.investor_payout_address
+      )
+      budget.update!(recovery_package: package)
+
+      shares.each_with_index.map do |s, i|
+        Payout.new(user: s[:user], sats: s[:sats], address: outputs[i][:address], txid: txid)
+      end
     end
   end
 end

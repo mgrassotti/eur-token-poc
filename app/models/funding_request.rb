@@ -29,7 +29,8 @@ class FundingRequest < ApplicationRecord
   end
 
   def ready_to_match?
-    queued? && funding_inputs_list.any? && receive_address.present? && change_address.present?
+    queued? && funding_inputs_list.any? && receive_address.present? &&
+      change_address.present? && identity_pubkey.present?
   end
 
   private

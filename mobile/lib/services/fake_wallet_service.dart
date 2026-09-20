@@ -138,6 +138,22 @@ class FakeWalletService implements WalletApi {
   }
 
   @override
+  String? get dlcFundPubkey {
+    final seed = _mnemonicPhrase ?? _receiveAddress ?? 'fake';
+    return _fakeFundPubkey(seed);
+  }
+
+  @override
+  Future<DlcPartySignatures> signDlcAdaptor(Map<String, dynamic> signPackage) async {
+    if (!_initialized) throw WalletNotInitializedException();
+    final n = (signPackage['cets'] as List?)?.length ?? 1;
+    return DlcPartySignatures(
+      adaptorSigs: List.generate(n, (i) => 'fake-adaptor-$i'),
+      refundSig: 'fake-refund',
+    );
+  }
+
+  @override
   Future<String> broadcastTx(String txHex) async {
     if (!_initialized) throw WalletNotInitializedException();
     await Future.delayed(const Duration(milliseconds: 50)); // Simulate broadcast
@@ -188,5 +204,15 @@ class FakeWalletService implements WalletApi {
     final random = DateTime.now().microsecondsSinceEpoch;
     final hexStr = random.toRadixString(16).padRight(40, '0');
     return 'bcrt1qfake${hexStr.substring(0, 36)}';
+  }
+
+  String _fakeFundPubkey(String seed) {
+    final bytes = seed.codeUnits;
+    final buf = StringBuffer('02');
+    for (var i = 0; i < 32; i++) {
+      final raw = bytes.isEmpty ? i : bytes[i % bytes.length] ^ (i * 17);
+      buf.write((raw & 0xff).toRadixString(16).padLeft(2, '0'));
+    }
+    return buf.toString();
   }
 }

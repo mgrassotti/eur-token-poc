@@ -43,12 +43,18 @@ RSpec.describe Dlc::NodeClient do
       expect(payload["peg_change_address"]).to eq("bcrt1peg")
       expect(payload["investor_change_address"]).to eq("bcrt1invchg")
       expect(payload["investor_payout_address"]).to eq("bcrt1invpay")
+      expect(payload["peg_payout_address"]).to eq("bcrt1pegpay")
+      expect(payload["peg_fund_pubkey"]).to eq("02" + "a" * 64)
+      expect(payload["investor_fund_pubkey"]).to eq("02" + "b" * 64)
+      expect(payload["auto_sign"]).to be(false)
       ok(
         "contract_id" => "c-1",
         "funding_txid" => "ab" * 32,
         "funding_vout" => 0,
         "funding_tx_hex" => "0200000000",
-        "status" => "pending_funding"
+        "status" => "pending_funding",
+        "sign_package" => { "cets" => [] },
+        "direct_payout" => true
       )
     end
 
@@ -62,7 +68,10 @@ RSpec.describe Dlc::NodeClient do
       investor_inputs: [{ txid: "bb" * 32, vout: 1, amount_sats: 10_100_000 }],
       peg_change_address: "bcrt1peg",
       investor_change_address: "bcrt1invchg",
-      investor_payout_address: "bcrt1invpay"
+      investor_payout_address: "bcrt1invpay",
+      peg_payout_address: "bcrt1pegpay",
+      peg_fund_pubkey: "02" + "a" * 64,
+      investor_fund_pubkey: "02" + "b" * 64
     )
 
     expect(contract).to be_a(described_class::Contract)
@@ -70,6 +79,28 @@ RSpec.describe Dlc::NodeClient do
     expect(contract.funding_vout).to eq(0)
     expect(contract.funding_tx_hex).to eq("0200000000")
     expect(contract.status).to eq("pending_funding")
+    expect(contract.sign_package).to eq("cets" => [])
+    expect(contract.direct_payout).to be(true)
+  end
+
+  it "uploads one party's adaptor signatures" do
+    allow(http).to receive(:post) do |path, body, _headers|
+      expect(path).to eq("/contracts/c-1/adaptor_sigs")
+      expect(JSON.parse(body)).to eq(
+        "role" => "offer",
+        "adaptor_sigs" => %w[aa bb],
+        "refund_sig" => "cc"
+      )
+      ok("offerer_signed" => true, "acceptor_signed" => false)
+    end
+
+    raw = client.submit_adaptor_sigs(
+      contract_id: "c-1",
+      role: "offer",
+      adaptor_sigs: %w[aa bb],
+      refund_sig: "cc"
+    )
+    expect(raw["offerer_signed"]).to be(true)
   end
 
   it "executes the CET for a given attestation" do
@@ -120,12 +151,40 @@ RSpec.describe Dlc::NodeClient do
   end
 
   it "broadcasts the timelocked refund" do
-    allow(http).to receive(:post) do |path, _body, _headers|
+    allow(http).to receive(:post) do |path, body, _headers|
       expect(path).to eq("/contracts/c-1/refund")
+      expect(JSON.parse(body)).to eq("sign_package" => { "cets" => [] }, "offerer_refund_sig" => "r1")
       ok("refund_txid" => "ef" * 32)
     end
 
-    expect(client.refund_contract(contract_id: "c-1").refund_txid).to eq("ef" * 32)
+    expect(
+      client.refund_contract(
+        contract_id: "c-1",
+        close_package: { "sign_package" => { "cets" => [] }, "offerer_refund_sig" => "r1" }
+      ).refund_txid
+    ).to eq("ef" * 32)
+  end
+
+  it "executes a CET from a watchtower close package" do
+    allow(http).to receive(:post) do |path, body, _headers|
+      expect(path).to eq("/contracts/c-1/execute")
+      payload = JSON.parse(body)
+      expect(payload["attestation"]).to eq("atthex")
+      expect(payload["offerer_adaptor_sigs"]).to eq(["aa"])
+      ok(
+        "cet_txid" => "cd" * 32,
+        "outcome" => 60_000,
+        "peg_sats" => 8_000_000,
+        "investor_sats" => 12_000_000
+      )
+    end
+
+    execution = client.execute_contract(
+      contract_id: "c-1",
+      attestation: "atthex",
+      close_package: { "offerer_adaptor_sigs" => ["aa"] }
+    )
+    expect(execution.cet_txid).to eq("cd" * 32)
   end
 
   it "reports availability from /info" do

@@ -14,7 +14,8 @@ RSpec.describe Dlc::Distribution do
   let!(:dlc_contract) do
     DlcContract.create!(
       budget: budget, oracle_event_id: "deal-#{budget.id}", ddk_contract_id: "c-1",
-      funding_txid: "ab" * 32, funding_vout: 0, status: :executed, num_digits: 20
+      funding_txid: "ab" * 32, funding_vout: 0, status: :executed, num_digits: 20,
+      direct_payout: false
     )
   end
 
@@ -133,6 +134,31 @@ RSpec.describe Dlc::Distribution do
     expect do
       described_class.call(budget: budget, peg_pot_sats: 1_000_000, node: node, address_resolver: resolver)
     end.to raise_error(described_class::Error, /Distribuzione DLC fallita: broadcast failed/)
+  end
+
+  it "skips sidecar fan-out when the CET already pays user addresses" do
+    dlc_contract.update!(direct_payout: true)
+    DlcSettlement.create!(
+      budget: budget,
+      dlc_contract: dlc_contract,
+      cet_txid: "ce" * 32,
+      outcome: 50_000,
+      peg_pot_sats: 1_000_000,
+      investor_sats: 500_000,
+      status: :executed,
+      executed_at: Time.current
+    )
+
+    payouts = described_class.call(
+      budget: budget.reload,
+      peg_pot_sats: 1_000_000,
+      node: node,
+      address_resolver: resolver
+    )
+
+    expect(node).not_to have_received(:distribute)
+    expect(payouts.sum(&:sats)).to eq(1_000_000)
+    expect(budget.reload.recovery_package.dig("dlc_distribution", "direct_payout")).to be(true)
   end
 
   it "raises when the budget has no DLC contract" do

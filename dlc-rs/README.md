@@ -1,44 +1,46 @@
-# dlc-node — Rust DLC sidecar (rust-dlc)
+# dlc-node — Rust DLC sidecar (`mat_dlc` + HTTP)
 
 REST sidecar that drives the FloorEUR numeric DLC on **regtest** against a
 [Pythia](https://github.com/dlc-markets/pythia) oracle. It is the on-chain DLC
-engine for the PoC and a drop-in replacement for the legacy node-dlc/cfd-dlc-js
-shim (`../dlc-shim`).
+engine for the PoC.
+
+The crate also exports **`mat_dlc`** (`rlib` + `cdylib`): unsigned contract
+construction, on-device adaptor signing, and watchtower CET/refund completion
+**without party secret keys**. Flutter loads the cdylib via
+`mobile/packages/mat_dlc`.
 
 ## Why Rust / rust-dlc
 
-The previous engine (`cfd-dlc-js`, AtomicFinance) produced CETs that bitcoind
-rejected with `NULLFAIL` on EXECUTE: its ECDSA-adaptor signature-point math did
-not agree with the `rust-dlc` attestations emitted by Pythia.
-
-This sidecar is built on **`rust-dlc`** (`dlc` + `dlc-trie` + `dlc-messages`)
-pinned to the **same commit Pythia uses** (`p2pderivatives/rust-dlc` @
-`fe0e0764`) with `secp256k1-zkp 0.11`. Oracle and node therefore share the exact
-same crypto code: the adaptor point and the oracle s-value decomposition
-(`signatures_to_secret`) agree byte-for-byte, so EXECUTE is valid.
+Pinned to the **same commit Pythia uses** (`p2pderivatives/rust-dlc` @
+`fe0e0764`) with `secp256k1-zkp 0.11`. Oracle and node share the adaptor-point
+math, so EXECUTE verifies.
 
 ## HTTP contract (matches `Dlc::NodeClient`)
 
 | Method | Path | Returns |
 |---|---|---|
-| GET | `/info` | `{ pubkey, network }` |
-| POST | `/contracts` | `{ contract_id, funding_txid, funding_vout, funding_address, status }` |
-| GET | `/contracts/:id` | `{ contract_id, status, funding_txid, funding_vout }` |
-| POST | `/contracts/:id/execute` | `{ cet_txid, outcome, peg_sats, investor_sats }` |
-| POST | `/contracts/:id/refund` | `{ refund_txid }` |
-| POST | `/contracts/:id/distribute` | `{ txid, payouts }` |
+| GET | `/info` | `{ pubkey, network, watchtower }` |
+| POST | `/contracts` | unsigned funding + `sign_package` (+ adaptor sigs when `auto_sign`) |
+| GET | `/contracts/:id` | `{ contract_id, status, funding_txid, sign_package, … }` |
+| POST | `/contracts/:id/adaptor_sigs` | store one party's CET adaptor sigs + refund sig |
+| POST | `/contracts/:id/execute` | CET from oracle attestation + both adaptor sigs (close package) |
+| POST | `/contracts/:id/refund` | pre-signed refund |
+| POST | `/contracts/:id/distribute` | legacy fan-out (sidecar keys; unused for direct-payout CETs) |
 
-## Model (PoC)
+## Model
 
-- Holds **both** parties' keys (peg = offerer, investor = acceptor) and drives
-  the whole offer/accept/sign handshake in-process.
-- Funds the 2-of-2 from a bitcoind regtest wallet (one deterministic key per
-  party, used as funding-input + 2-of-2 fund key).
-- Numeric digit-decomposition via `MultiOracleTrie`; FloorEUR `peg = K/price`
-  curve sampled, rounded (`DLC_ROUNDING_BUCKETS`) and coalesced into one CET per
-  constant-payout interval.
-- At maturity, decrypts the accept-side adaptor signature with the oracle
-  attestation and co-signs with the peg fund key (`dlc::sign_cet`).
+- **Production / mobile:** the sidecar builds the 2-of-2 and CET set from
+  **client fund pubkeys** and **user payout addresses**. It does **not** hold
+  party seckeys. Each phone adaptor-signs the CET set; the close package
+  (both adaptor sigs + refund) is stored on the relay watchtower.
+- **Regtest `auto_sign: true`:** the sidecar adaptor-signs with
+  `PEG_SECKEY` / `INVESTOR_SECKEY` (test keys only) so integration specs can
+  activate without Flutter.
+- CET outputs pay saver/investor addresses directly (`direct_payout`).
+- At maturity the watchtower decrypts **both** adaptor signatures with the
+  oracle attestation (`complete_cet`) and broadcasts. No user key required.
+- If nobody publishes a CET before `refund_locktime`, the pre-signed refund
+  is broadcast.
 
 ## Config (env)
 
@@ -48,27 +50,18 @@ same crypto code: the adaptor point and the oracle s-value decomposition
 | `BITCOIND_RPC_URL` | `http://127.0.0.1:18443` |
 | `BITCOIND_RPC_USER` / `BITCOIND_RPC_PASSWORD` | `regtest` / `regtest` |
 | `MINER_WALLET` / `WATCH_WALLET` | `miner` / `dlcwatch` |
-| `PEG_SECKEY` / `INVESTOR_SECKEY` | deterministic regtest keys (NOT for real funds) |
+| `PEG_SECKEY` / `INVESTOR_SECKEY` | deterministic **regtest** keys (NOT for real funds; `auto_sign` only) |
 | `DLC_ROUNDING_BUCKETS` | `20` |
 
 ## Build / run
 
-Via compose (profile `dlc`):
-
 ```bash
 docker compose -f docker-compose.regtest.yml up -d --build dlc-node
+# native lib for Flutter:
+cargo build --release --manifest-path dlc-rs/Cargo.toml
 ```
 
-End-to-end smoke tests (need bitcoind + pythia + dlc-node up):
+## FFI (`mat_dlc_json`)
 
-```bash
-node ../dlc-shim/roundtrip_test.js   # CREATE / EXECUTE / DISTRIBUTE
-node ../dlc-shim/refund_test.js      # CREATE / REFUND
-```
-
-## Future alternative (Variant A)
-
-A full peer-to-peer DLC node — `ddk-node` (dlcdevkit, gRPC + Nostr transport +
-Kormir oracle + BDK wallet + esplora) remains a valid future direction. It is
-heavier (two nodes + relay + esplora) but also `rust-dlc`-based, so the concepts
-here carry over.
+Ops: `fund_keys`, `sign_adaptor`, `complete_cet`, `complete_refund`.
+Caller frees the result with `mat_dlc_string_free`.

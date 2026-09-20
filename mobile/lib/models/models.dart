@@ -62,6 +62,10 @@ class Deal {
     this.awaitingFundingSignatures = false,
     this.borrowerFundingSigned = false,
     this.investorFundingSigned = false,
+    this.awaitingDlcSignatures = false,
+    this.borrowerDlcSigned = false,
+    this.investorDlcSigned = false,
+    this.signPackage,
     this.saverPayoutMode,
     this.investorPayoutMode,
   });
@@ -84,6 +88,10 @@ class Deal {
   final bool awaitingFundingSignatures;
   final bool borrowerFundingSigned;
   final bool investorFundingSigned;
+  final bool awaitingDlcSignatures;
+  final bool borrowerDlcSigned;
+  final bool investorDlcSigned;
+  final Map<String, dynamic>? signPackage;
   final String? saverPayoutMode;
   final String? investorPayoutMode;
 
@@ -92,6 +100,7 @@ class Deal {
   bool get isPending => status == 'pending';
   bool get isActive => status == 'active';
   bool get isSettled => status == 'settled';
+  bool get awaitingSignatures => awaitingFundingSignatures || awaitingDlcSignatures;
 
   factory Deal.fromJson(Map<String, dynamic> json) {
     return Deal(
@@ -120,6 +129,10 @@ class Deal {
       awaitingFundingSignatures: json['awaiting_funding_signatures'] as bool? ?? false,
       borrowerFundingSigned: json['borrower_funding_signed'] as bool? ?? false,
       investorFundingSigned: json['investor_funding_signed'] as bool? ?? false,
+      awaitingDlcSignatures: json['awaiting_dlc_signatures'] as bool? ?? false,
+      borrowerDlcSigned: json['borrower_dlc_signed'] as bool? ?? false,
+      investorDlcSigned: json['investor_dlc_signed'] as bool? ?? false,
+      signPackage: json['sign_package'] as Map<String, dynamic>?,
       saverPayoutMode: json['saver_payout_mode'] as String?,
       investorPayoutMode: json['investor_payout_mode'] as String?,
     );

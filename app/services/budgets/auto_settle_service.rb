@@ -31,6 +31,8 @@ module Budgets
         raise Error, I18n.t("services.budgets.auto_settle.failed", budget_id: budget.id, detail: e.message)
       end
 
+      Dlc::Watchtower.call
+
       Result.new(
         settlements: settlements,
         blocked_budget_ids: blocked_past_maturity_budget_ids

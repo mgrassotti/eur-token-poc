@@ -66,7 +66,14 @@ RSpec.describe Dlc::ContractSetupService do
   let(:contract) do
     Dlc::NodeClient::Contract.new(
       contract_id: "c-1", funding_txid: "ab" * 32, funding_vout: 0,
-      funding_address: nil, funding_tx_hex: "0200000000", status: "pending_funding", raw: {}
+      funding_address: nil, funding_tx_hex: "0200000000", status: "pending_funding",
+      sign_package: { "cets" => [] }, direct_payout: true,
+      raw: {
+        "offerer_adaptor_sigs" => ["aa"],
+        "acceptor_adaptor_sigs" => ["bb"],
+        "offerer_refund_sig" => "r1",
+        "acceptor_refund_sig" => "r2"
+      }
     )
   end
 
@@ -116,6 +123,9 @@ RSpec.describe Dlc::ContractSetupService do
     expect(result.num_digits).to eq(20)
     expect(result.peg_collateral_sats).to eq(10_000_000)
     expect(result.investor_collateral_sats).to eq(10_000_000)
+    expect(result).to be_close_package_complete
+    expect(result.offerer_adaptor_sigs).to eq(["aa"])
+    expect(result.acceptor_refund_sig).to eq("r2")
   end
 
   it "records the DLC funding as the collateral lock on the budget" do
@@ -151,6 +161,10 @@ RSpec.describe Dlc::ContractSetupService do
       expect(args[:peg_change_address]).to eq("bcrt1peg")
       expect(args[:investor_change_address]).to eq("bcrt1invchg")
       expect(args[:investor_payout_address]).to eq("bcrt1invpay")
+      expect(args[:peg_payout_address]).to eq("bcrt1peg")
+      expect(args[:peg_fund_pubkey]).to eq("02peg")
+      expect(args[:investor_fund_pubkey]).to eq("02inv")
+      expect(args[:auto_sign]).to be(true)
       expect(args[:payouts].first).to include(:outcome, :peg_sats, :investor_sats)
     end
   end

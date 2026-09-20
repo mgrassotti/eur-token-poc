@@ -34,11 +34,11 @@ module L1UnitStubs
 
   def stub_l1_provisioned!(budget)
     budget.update!(
-      peg_party_pubkey: "02#{"a" * 64}",
-      investor_pubkey: "02#{"b" * 64}",
-      escrow_txid: "deadbeef" * 8,
-      escrow_vout: 0,
-      recovery_package: { "version" => 1, "escrow" => { "address" => "bcrt1stub" } }
+      peg_party_pubkey: budget.peg_party_pubkey.presence || "02#{"a" * 64}",
+      investor_pubkey: budget.investor_pubkey.presence || "02#{"b" * 64}",
+      escrow_txid: budget.escrow_txid.presence || "deadbeef" * 8,
+      escrow_vout: budget.escrow_vout || 0,
+      recovery_package: budget.recovery_package.presence || { "version" => 1, "escrow" => { "address" => "bcrt1stub" } }
     )
     seed_rgb_genesis!(budget)
     seed_dlc_contract!(budget)

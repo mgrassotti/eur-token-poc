@@ -75,7 +75,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               .map((u) => {'txid': u.txid, 'vout': u.vout, 'amount_sats': u.valueSats})
               .toList(),
           changeAddress: change,
-          identityPubkey: BtcMath.placeholderIdentityPubkey(wallet.receiveAddress!),
+          identityPubkey: wallet.dlcFundPubkey ??
+              BtcMath.placeholderIdentityPubkey(wallet.receiveAddress!),
         );
       } catch (_) {}
     }
@@ -97,6 +98,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
       } catch (_) {}
     }
 
+    for (final deal in dashboard.openDeals.where((d) => d.awaitingDlcSignatures && d.signPackage != null)) {
+      final isBorrower = wallet.ownsAddressSync(deal.fundingAddress, _knownAddresses);
+      final isInvestor = wallet.ownsAddressSync(deal.investorFundingAddress, _knownAddresses);
+      if (!isBorrower && !isInvestor) continue;
+      if (isBorrower && deal.borrowerDlcSigned) continue;
+      if (isInvestor && deal.investorDlcSigned) continue;
+      try {
+        final sigs = await wallet.signDlcAdaptor(deal.signPackage!);
+        final address = isBorrower ? deal.fundingAddress : deal.investorFundingAddress;
+        await api.submitDlcSignature(
+          dealId: deal.id,
+          fundingAddress: address ?? wallet.receiveAddress!,
+          adaptorSigs: sigs.adaptorSigs,
+          refundSig: sigs.refundSig,
+        );
+      } catch (_) {}
+    }
+
     await dashboard.refreshFundingRequests(addresses: _knownAddresses.toList());
     await dashboard.refreshOpenDeals(addresses: _knownAddresses.toList());
   }
@@ -112,14 +131,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
         .where(
           (d) =>
               wallet.ownsAddressSync(d.fundingAddress, _knownAddresses) &&
-              (d.isPending || d.awaitingFundingSignatures || d.isActive),
+              (d.isPending || d.awaitingSignatures || d.isActive),
         )
         .toList();
     final myInvestments = dashboard.openDeals
         .where(
           (d) =>
               wallet.ownsAddressSync(d.investorFundingAddress, _knownAddresses) &&
-              (d.awaitingFundingSignatures || d.isActive),
+              (d.awaitingSignatures || d.isActive),
         )
         .toList();
     final saverRequests = dashboard.fundingRequests.where((r) => r.isSaver && !r.matched).toList();
@@ -369,17 +388,21 @@ class _PendingTopUpSection extends StatelessWidget {
             color: Theme.of(context).colorScheme.secondaryContainer,
             child: ListTile(
               leading: Icon(
-                deal.awaitingFundingSignatures
+                deal.awaitingSignatures
                     ? Icons.draw_outlined
                     : Icons.hourglass_top_outlined,
               ),
               title: Text(l10n.pendingTopUpAmount(deal.amountEur.toStringAsFixed(2))),
               subtitle: Text(
-                deal.awaitingFundingSignatures
-                    ? (deal.borrowerFundingSigned
-                        ? 'Awaiting investor funding signature'
-                        : 'Sign funding to activate')
-                    : l10n.awaitingInvestor,
+                deal.awaitingDlcSignatures
+                    ? (deal.borrowerDlcSigned
+                        ? 'Awaiting investor DLC signature'
+                        : 'Sign DLC adaptor CETs to activate')
+                    : deal.awaitingFundingSignatures
+                        ? (deal.borrowerFundingSigned
+                            ? 'Awaiting investor funding signature'
+                            : 'Sign funding to activate')
+                        : l10n.awaitingInvestor,
               ),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => context.push('/deals/${deal.id}'),
@@ -419,14 +442,16 @@ class _DealSection extends StatelessWidget {
               child: ListTile(
                 title: Text('€${deal.amountEur.toStringAsFixed(0)} · ${deal.status}'),
                 subtitle: Text(
-                  deal.awaitingFundingSignatures
-                      ? 'Awaiting funding signatures'
-                      : '${deal.period.start} → ${deal.period.end}'
-                          '${deal.borrower != null ? ' · ${deal.borrower!.name}' : ''}',
+                  deal.awaitingDlcSignatures
+                      ? 'Awaiting DLC signatures'
+                      : deal.awaitingFundingSignatures
+                          ? 'Awaiting funding signatures'
+                          : '${deal.period.start} → ${deal.period.end}'
+                              '${deal.borrower != null ? ' · ${deal.borrower!.name}' : ''}',
                 ),
                 trailing: showAccept && deal.isPending
                     ? const Icon(Icons.handshake_outlined)
-                    : deal.awaitingFundingSignatures
+                    : deal.awaitingSignatures
                         ? const Icon(Icons.draw_outlined)
                         : const Icon(Icons.chevron_right),
                 onTap: () => context.push('/deals/${deal.id}'),

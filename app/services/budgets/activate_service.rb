@@ -67,7 +67,9 @@ module Budgets
           peg_party_pubkey: funding.peg_identity_pubkey,
           investor_pubkey: funding.investor_identity_pubkey,
           borrower_funding_signed: false,
-          investor_funding_signed: false
+          investor_funding_signed: false,
+          borrower_dlc_signed: false,
+          investor_dlc_signed: false
         )
 
         CollateralLock.create!(
@@ -163,6 +165,8 @@ module Budgets
           investor_payout_address: nil,
           borrower_funding_signed: false,
           investor_funding_signed: false,
+          borrower_dlc_signed: false,
+          investor_dlc_signed: false,
           status: :pending
         )
       end

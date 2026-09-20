@@ -4,25 +4,24 @@ require "net/http"
 require "json"
 
 module Dlc
-  # REST client for a DLC node (dlcdevkit / ddk) exposed through a thin shim.
+  # REST client for the dlc-rs sidecar.
   #
-  # The shim owns the on-chain DLC machinery: it builds the 2-of-2 funding
-  # transaction {peg, investor}, derives the CET set with adaptor signatures
-  # bound to the oracle announcement, broadcasts the funding tx, and — at
-  # maturity — executes the single CET unlocked by the oracle attestation (or
-  # the timelocked refund). Rails stays oblivious to the cryptographic detail
-  # and only forwards the oracle's hex blobs plus the FloorEUR payout schedule.
+  # The sidecar builds an unsigned 2-of-2 from client fund pubkeys and CET
+  # payout addresses. Adaptor signatures live on the phones (or, in regtest,
+  # on the sidecar when `auto_sign: true`). At maturity the watchtower
+  # decrypts both adaptor sigs with the oracle attestation — no party keys.
   #
-  # Endpoint contract (shim):
-  #   POST /contracts                      -> { contract_id, funding_txid, funding_vout, funding_address, status }
-  #   GET  /contracts/:id                  -> { contract_id, status, funding_txid, funding_vout }
-  #   POST /contracts/:id/execute          -> { cet_txid, outcome, peg_sats, investor_sats }
-  #   POST /contracts/:id/refund           -> { refund_txid }
-  #   GET  /info                           -> { pubkey, network }
+  # Endpoint contract:
+  #   POST /contracts                      -> unsigned funding + sign_package
+  #   GET  /contracts/:id                  -> status + sign_package
+  #   POST /contracts/:id/adaptor_sigs     -> store one party's CET/refund sigs
+  #   POST /contracts/:id/execute          -> CET from attestation + close package
+  #   POST /contracts/:id/refund           -> pre-signed refund
+  #   GET  /info                           -> { pubkey, network, watchtower }
   class NodeClient
     class Error < StandardError; end
 
-    Contract = Data.define(:contract_id, :funding_txid, :funding_vout, :funding_address, :funding_tx_hex, :status, :raw)
+    Contract = Data.define(:contract_id, :funding_txid, :funding_vout, :funding_address, :funding_tx_hex, :status, :sign_package, :direct_payout, :raw)
     Execution = Data.define(:cet_txid, :outcome, :peg_sats, :investor_sats, :raw)
     Refund = Data.define(:refund_txid, :raw)
     DistributionResult = Data.define(:txid, :payouts, :investor_payout_sats, :investor_payout_address, :raw)
@@ -64,6 +63,8 @@ module Dlc
                         investor_collateral_sats:, refund_locktime:,
                         peg_inputs:, investor_inputs:, peg_change_address:,
                         investor_change_address:, investor_payout_address:,
+                        peg_payout_address: nil, peg_fund_pubkey: nil,
+                        investor_fund_pubkey: nil, auto_sign: false,
                         fee_rate: 5, contract_id: nil)
       body = {
         oracle_announcement: oracle_announcement,
@@ -76,10 +77,22 @@ module Dlc
         investor_inputs: Array(investor_inputs).map { |i| normalize_input(i) },
         peg_change_address: peg_change_address,
         investor_change_address: investor_change_address,
-        investor_payout_address: investor_payout_address
+        investor_payout_address: investor_payout_address,
+        peg_payout_address: peg_payout_address.presence || investor_payout_address,
+        auto_sign: auto_sign
       }
+      body[:peg_fund_pubkey] = peg_fund_pubkey if peg_fund_pubkey.present?
+      body[:investor_fund_pubkey] = investor_fund_pubkey if investor_fund_pubkey.present?
       body[:contract_id] = contract_id if contract_id
       build_contract(post("/contracts", body))
+    end
+
+    def submit_adaptor_sigs(contract_id:, role:, adaptor_sigs:, refund_sig:)
+      post("/contracts/#{contract_id}/adaptor_sigs", {
+        role: role,
+        adaptor_sigs: Array(adaptor_sigs),
+        refund_sig: refund_sig
+      })
     end
 
     def contract(contract_id:)
@@ -87,8 +100,10 @@ module Dlc
     end
 
     # Maturity: broadcast the CET unlocked by the oracle attestation.
-    def execute_contract(contract_id:, attestation:)
-      raw = post("/contracts/#{contract_id}/execute", { attestation: attestation })
+    def execute_contract(contract_id:, attestation:, close_package: nil)
+      payload = { attestation: attestation }
+      payload.merge!(close_package) if close_package.present?
+      raw = post("/contracts/#{contract_id}/execute", payload)
       Execution.new(
         cet_txid: raw["cet_txid"] || raw["txid"],
         outcome: raw["outcome"].nil? ? nil : Integer(raw["outcome"]),
@@ -99,8 +114,8 @@ module Dlc
     end
 
     # Timelocked fallback: broadcast the refund once refund_locktime is reached.
-    def refund_contract(contract_id:)
-      raw = post("/contracts/#{contract_id}/refund", {})
+    def refund_contract(contract_id:, close_package: nil)
+      raw = post("/contracts/#{contract_id}/refund", close_package.presence || {})
       Refund.new(refund_txid: raw["refund_txid"] || raw["txid"], raw: raw)
     end
 
@@ -155,6 +170,8 @@ module Dlc
         funding_address: h["funding_address"],
         funding_tx_hex: h["funding_tx_hex"],
         status: h["status"],
+        sign_package: h["sign_package"],
+        direct_payout: h["direct_payout"] != false,
         raw: raw
       )
     end

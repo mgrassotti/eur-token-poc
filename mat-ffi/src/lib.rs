@@ -1,4 +1,7 @@
-//! Thin C ABI over `mat-core` for Flutter FFI.
+//! Thin C ABI over `mat-core` for Flutter FFI (FloorEUR).
+//!
+//! DLC adaptor signing / CET completion lives in `dlc-rs` (`libmat_dlc`,
+//! `mat_dlc_json`) — same C ABI style, loaded by `mobile/packages/mat_dlc`.
 //!
 //! Build: `cargo build -p mat-ffi --release`
 //! Dart loads the resulting `libmat_ffi` dylib when available; until then the

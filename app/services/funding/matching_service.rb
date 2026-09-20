@@ -82,8 +82,8 @@ module Funding
         peg_change_address: saver.change_address.presence || saver.receive_address,
         investor_change_address: investor.change_address.presence || investor.receive_address,
         investor_payout_address: investor.receive_address,
-        peg_identity_pubkey: saver.identity_pubkey.presence || "02#{"a" * 64}",
-        investor_identity_pubkey: investor.identity_pubkey.presence || "02#{"b" * 64}"
+        peg_identity_pubkey: saver.identity_pubkey,
+        investor_identity_pubkey: investor.identity_pubkey
       )
 
       verify = L1::Bitcoind::Client.new.available?

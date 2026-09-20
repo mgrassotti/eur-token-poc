@@ -12,14 +12,14 @@ RUN apt-get update \
 
 # 1) Dependency cache layer: build a stub against the real Cargo.toml so the git
 #    DLC crates + libsecp256k1 are fetched and compiled once and cached.
-COPY Cargo.toml ./
-RUN mkdir src && echo 'fn main() {}' > src/main.rs \
+COPY Cargo.toml Cargo.lock ./
+RUN mkdir src && echo 'fn main() {}' > src/main.rs && echo '// stub' > src/lib.rs \
   && cargo build --release \
   && rm -rf src
 
 # 2) Real sources.
 COPY src ./src
-RUN touch src/main.rs && cargo build --release
+RUN touch src/lib.rs src/main.rs && cargo build --release
 
 FROM debian:bookworm-slim
 RUN apt-get update \

@@ -176,5 +176,26 @@ void main() {
       expect(exception.cause, equals(cause));
       expect(exception.toString(), contains('Cannot connect'));
     });
+
+    test('dlcFundPubkey is a compressed hex pubkey', () async {
+      const mnemonic = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
+      await wallet.createWallet(mnemonic);
+
+      final pubkey = wallet.dlcFundPubkey;
+      expect(pubkey, isNotNull);
+      expect(pubkey!.length, equals(66));
+      expect(pubkey.startsWith('02') || pubkey.startsWith('03'), isTrue);
+    });
+
+    test('signDlcAdaptor returns one adaptor sig per CET', () async {
+      const mnemonic = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
+      await wallet.createWallet(mnemonic);
+
+      final signed = await wallet.signDlcAdaptor({
+        'cets': ['aa', 'bb'],
+      });
+      expect(signed.adaptorSigs, equals(['fake-adaptor-0', 'fake-adaptor-1']));
+      expect(signed.refundSig, equals('fake-refund'));
+    });
   });
 }

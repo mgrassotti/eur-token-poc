@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_28_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_20_120000) do
   create_table "bank_accounts", force: :cascade do |t|
     t.integer "balance_eur_cents", default: 0, null: false
     t.string "btc_receive_address"
@@ -60,6 +60,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_28_120000) do
   create_table "budgets", force: :cascade do |t|
     t.integer "amount_eur_cents", null: false
     t.string "borrower_change_address"
+    t.boolean "borrower_dlc_signed", default: false, null: false
     t.boolean "borrower_funding_signed", default: false, null: false
     t.integer "borrower_id", null: false
     t.bigint "borrower_locked_sats", default: 0, null: false
@@ -74,6 +75,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_28_120000) do
     t.text "funding_tx_hex"
     t.bigint "genesis_block_height"
     t.string "investor_change_address"
+    t.boolean "investor_dlc_signed", default: false, null: false
     t.json "investor_funding_inputs"
     t.integer "investor_funding_request_id"
     t.boolean "investor_funding_signed", default: false, null: false
@@ -112,17 +114,23 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_28_120000) do
   end
 
   create_table "dlc_contracts", force: :cascade do |t|
+    t.json "acceptor_adaptor_sigs"
+    t.text "acceptor_refund_sig"
     t.integer "budget_id", null: false
     t.datetime "created_at", null: false
     t.string "ddk_contract_id"
+    t.boolean "direct_payout", default: true, null: false
     t.string "funding_txid"
     t.integer "funding_vout"
     t.bigint "investor_collateral_sats"
     t.bigint "maturity_epoch"
     t.integer "num_digits"
+    t.json "offerer_adaptor_sigs"
+    t.text "offerer_refund_sig"
     t.text "oracle_announcement"
     t.string "oracle_event_id", null: false
     t.bigint "peg_collateral_sats"
+    t.json "sign_package"
     t.integer "status", default: 0, null: false
     t.string "unit"
     t.datetime "updated_at", null: false

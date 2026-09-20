@@ -325,6 +325,11 @@ class WalletState extends ChangeNotifier {
 
   Future<String> signPsbt(String psbtBase64) => _wallet.signPsbt(psbtBase64);
 
+  String? get dlcFundPubkey => _wallet.dlcFundPubkey;
+
+  Future<DlcPartySignatures> signDlcAdaptor(Map<String, dynamic> signPackage) =>
+      _wallet.signDlcAdaptor(signPackage);
+
   Future<List<Utxo>> listUnspent() => _wallet.listUnspent();
 
   Future<String> nextChangeAddress() => _wallet.getReceiveAddress();

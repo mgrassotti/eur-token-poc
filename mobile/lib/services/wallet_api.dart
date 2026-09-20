@@ -88,6 +88,13 @@ abstract class WalletApi {
   /// Throws [WalletException] if PSBT invalid or wallet not initialized.
   Future<String> signPsbt(String psbtBase64);
 
+  /// Compressed secp256k1 fund pubkey for the DLC 2-of-2 (hex). Independent
+  /// of the BIP84 spend path.
+  String? get dlcFundPubkey;
+
+  /// Adaptor-sign the CET set + refund using the on-device fund key.
+  Future<DlcPartySignatures> signDlcAdaptor(Map<String, dynamic> signPackage);
+
   /// Broadcasts a fully signed transaction to the Bitcoin network.
   ///
   /// Returns the transaction ID (txid).
@@ -163,4 +170,11 @@ class NetworkException extends WalletException {
 /// Invalid mnemonic phrase.
 class InvalidMnemonicException extends WalletException {
   InvalidMnemonicException([String message = 'Invalid mnemonic phrase']) : super(message);
+}
+
+class DlcPartySignatures {
+  const DlcPartySignatures({required this.adaptorSigs, required this.refundSig});
+
+  final List<String> adaptorSigs;
+  final String refundSig;
 }

@@ -5,6 +5,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../config/wallet_config.dart';
 import 'wallet_api.dart';
+import 'package:mat_dlc/mat_dlc.dart';
 
 /// BDK-based wallet service for on-device Bitcoin operations.
 ///
@@ -252,6 +253,33 @@ class BdkWalletService implements WalletApi {
       return psbt.toString();
     } catch (e) {
       throw WalletException('Failed to sign PSBT', e);
+    }
+  }
+
+  @override
+  String? get dlcFundPubkey {
+    final mnemonic = _mnemonicPhrase;
+    if (mnemonic == null) return null;
+    try {
+      return MatDlc.fundPubkey(mnemonic);
+    } catch (e) {
+      print('[BDK] DLC fund pubkey unavailable: $e');
+      return null;
+    }
+  }
+
+  @override
+  Future<DlcPartySignatures> signDlcAdaptor(Map<String, dynamic> signPackage) async {
+    final mnemonic = _mnemonicPhrase;
+    if (mnemonic == null) throw WalletNotInitializedException();
+    try {
+      final signed = MatDlc.signAdaptor(mnemonic: mnemonic, signPackage: signPackage);
+      return DlcPartySignatures(
+        adaptorSigs: signed.adaptorSigs,
+        refundSig: signed.refundSig,
+      );
+    } catch (e) {
+      throw WalletException('Failed to sign DLC adaptor CETs', e);
     }
   }
 

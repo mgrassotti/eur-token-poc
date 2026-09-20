@@ -36,8 +36,8 @@
 /dlc-shim/node_modules
 .DS_Store
 
-# Rust workspace (mat-core / mat-ffi)
-/target/
+# Ignore compiled Rust artifacts for the DLC sidecar / mat-dlc library.
+/dlc-rs/target/
 
 # Local bundler install (Ruby may differ from .ruby-version on this VM)
 /vendor/bundle/

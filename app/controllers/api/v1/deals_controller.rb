@@ -3,9 +3,9 @@
 module Api
   module V1
     class DealsController < BaseController
-      skip_before_action :authenticate_api_user!, only: %i[index show funding_signature]
-      before_action :optional_authenticate!, only: %i[index show funding_signature]
-      before_action :set_deal, only: %i[show funding_signature]
+      skip_before_action :authenticate_api_user!, only: %i[index show funding_signature dlc_signature]
+      before_action :optional_authenticate!, only: %i[index show funding_signature dlc_signature]
+      before_action :set_deal, only: %i[show funding_signature dlc_signature]
 
       def index
         market_rate = MarketRate.current
@@ -80,6 +80,19 @@ module Api
         render json: deal_payload(deal)
       rescue Budgets::SubmitFundingSignatureService::Error, Budgets::FinalizeFundingService::Error => e
         render json: { error: "funding_signature_failed", detail: e.message }, status: :unprocessable_entity
+      end
+
+      def dlc_signature
+        deal = Budgets::SubmitDlcSignatureService.call(
+          budget: @deal,
+          funding_address: params.require(:funding_address),
+          adaptor_sigs: params.require(:adaptor_sigs),
+          refund_sig: params.require(:refund_sig)
+        )
+
+        render json: deal_payload(deal)
+      rescue Budgets::SubmitDlcSignatureService::Error, Budgets::FinalizeFundingService::Error => e
+        render json: { error: "dlc_signature_failed", detail: e.message }, status: :unprocessable_entity
       end
 
       private

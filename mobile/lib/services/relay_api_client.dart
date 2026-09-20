@@ -166,6 +166,24 @@ class RelayApiClient {
     return Deal.fromJson(body);
   }
 
+  Future<Deal> submitDlcSignature({
+    required String dealId,
+    required String fundingAddress,
+    required List<String> adaptorSigs,
+    required String refundSig,
+  }) async {
+    final body = await _post(
+      '/deals/$dealId/dlc_signature',
+      {
+        'funding_address': fundingAddress,
+        'adaptor_sigs': adaptorSigs,
+        'refund_sig': refundSig,
+      },
+      auth: false,
+    );
+    return Deal.fromJson(body);
+  }
+
   Future<List<User>> fetchUsers() async {
     final body = await _get('/users');
     return (body['users'] as List<dynamic>)

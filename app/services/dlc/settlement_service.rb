@@ -37,7 +37,11 @@ module Dlc
         outcome: outcome,
         maturity_epoch: contract.maturity_epoch
       )
-      execution = node.execute_contract(contract_id: contract.ddk_contract_id, attestation: attestation.hex)
+      execution = node.execute_contract(
+        contract_id: contract.ddk_contract_id,
+        attestation: attestation.hex,
+        close_package: contract.close_package_payload
+      )
 
       settlement = DlcSettlement.create!(
         budget: budget,

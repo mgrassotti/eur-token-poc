@@ -17,7 +17,8 @@ module Budgets
     def call
       raise Error, "deal is not active" unless budget.active?
       raise Error, "funding PSBT missing" if budget.funding_psbt.blank?
-      raise Error, "both parties must sign" unless budget.borrower_funding_signed? && budget.investor_funding_signed?
+      raise Error, "both parties must sign the funding PSBT" unless budget.borrower_funding_signed? && budget.investor_funding_signed?
+      raise Error, "both parties must sign the DLC CET set" unless budget.borrower_dlc_signed? && budget.investor_dlc_signed?
       return budget if budget.l1_multisig_provisioned?
 
       dlc = budget.dlc_contract

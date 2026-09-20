@@ -30,7 +30,8 @@ module Budgets
       attrs[:investor_funding_signed] = true if role == :investor
       budget.update!(attrs)
 
-      if budget.borrower_funding_signed? && budget.investor_funding_signed?
+      if budget.borrower_funding_signed? && budget.investor_funding_signed? &&
+         budget.borrower_dlc_signed? && budget.investor_dlc_signed?
         FinalizeFundingService.call(budget: budget.reload)
       else
         budget.reload

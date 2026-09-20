@@ -1,0 +1,10 @@
+name: mat_dlc
+description: Dart FFI bindings to mat-dlc (adaptor CET signing and watchtower complete).
+publish_to: "none"
+version: 0.1.0
+
+environment:
+  sdk: ">=3.5.0 <4.0.0"
+
+dependencies:
+  ffi: ^2.1.3

@@ -1,0 +1,13 @@
+{
+  "name": "MAT PoC (Rails + DLC regtest)",
+  "user": "ubuntu",
+  "install": "bash .cursor/install.sh",
+  "start": "bash .cursor/start.sh",
+  "terminals": [
+    {
+      "name": "rails",
+      "command": "bash .cursor/run-rails.sh"
+    }
+  ],
+  "ports": [3000]
+}
